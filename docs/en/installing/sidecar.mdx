@@ -8,15 +8,14 @@ In order to take advantage of all of Istio’s features, pods in the service mes
 
 ## About sidecar injection
 
-Sidecar injection is enabled using labels at the namespace or pod level.
+Sidecar proxy injection is primarily controlled through labels applied at either the namespace or pod level.
 
 When enabled in namespace, automatic injection injects the proxy configuration at pod creation time using an admission controller,
 ensures any new pods in that namespace include a sidecar.
 
-The revision label is also used to determine which control plane to be used.
+The revision label is also used to dictates which Istio control plane instance the sidecar will associate with.
 
-Note that unlike manual injection, automatic injection occurs at the pod-level.
-You won’t see any change to the deployment itself.
+Note that unlike manual injection, automatic injection occurs at the pod-level. You won’t see any change to the deployment itself.
 Instead, you’ll want to check individual pods (via `kubectl describe`) to see the injected proxy.
 
 ## Identifying the revision name
@@ -24,13 +23,13 @@ Instead, you’ll want to check individual pods (via `kubectl describe`) to see 
 The label required to enable sidecar injection is determined by the specific control plane instance, known as a revision.
 Each revision is managed by corresponding `IstioRevision` resource, which is automatically managed by the `Istio` resource.
 
-The naming of an `IstioRevision` depends on the `spec.updateStrategy.type` setting in the `Istio` resource:
+The naming convention for an `IstioRevision` is based on the `spec.updateStrategy.type` setting in the `Istio` resource:
 
-- If set to `InPlace`, the revision shares the `Istio` resource name.
-- If set to `RevisionBased`, the revision name follows the format `<Istio resource name>-v<version>`.
+- `InPlace`: the revision shares the same name as the `Istio` resource name.
+- `RevisionBased`: the revision will follow the format `<Istio resource name>-v<version>`.
 
 Typically, each `Istio` resource corresponds to a single `IstioRevision`.
-However, during a revision-based upgrade, multiple `IstioRevision` resources may exist, each representing a distinct control plane instance.
+However, during a revision-based upgrade, multiple `IstioRevision` resources may exist, each representing a distinct control plane.
 
 To see available revision names, use the following command:
 
@@ -47,7 +46,7 @@ default-v1-24-5   istio-system             True    Healthy   False    v1.24.5   
 
 ### Enabling sidecar injection with default revision
 
-When the service mesh’s `IstioRevision` name is `default`, it’s possible to use the following labels on a namespace or a pod to enable sidecar injection:
+When the name of `IstioRevision` is `default`, you can use the following labels on a namespace or a pod to enable sidecar injection:
 
 | **Resource** | **Enabled label**              | **Disalbed label**              |
 | ------------ | ------------------------------ | ------------------------------- |
@@ -56,16 +55,16 @@ When the service mesh’s `IstioRevision` name is `default`, it’s possible to 
 
 :::note
 
-You can also enable injection by setting the `istio.io/rev: default` label in the namespace or pod.
+You can also enable injection by applying the `istio.io/rev: default` label to the namespace or pod.
 
 :::
 
 ### Enabling sidecar injection with other revisions
 
-When the `IstioRevision` name is not `default`, use the specific `IstioRevision` name with the `istio.io/rev` label to
-map the pod to the desired control plane and enable sidecar injection.
+When then name of `IstioRevision` is not `default`, you'll need to use the specific `IstioRevision` name with the `istio.io/rev` label.
+This links the pod to the desired control plane and enables sidecar injection.
 
-For example, with the revision shown above, the following labels would enable sidecar injection:
+For instance, using the example revision `default-v1-24-5` from above, the following labels would enable sidecar injection:
 
 | **Resource** | **Enabled label**              | **Disabled label**              |
 | ------------ | ------------------------------ | ------------------------------- |
@@ -78,4 +77,7 @@ When both `istio-injection` and `istio.io/rev` labels are applied, the `istio-in
 
 :::
 
-## Enabling sidecar injection
+The injector is configured with the following logic:
+
+1. If either label (`istio-injection` or `sidecar.istio.io/inject`) is disabled, the pod is not injected.
+2. If either label (`istio-injection` or `sidecar.istio.io/inject` or `istio.io/rev`) is enabled, the pod is injected.
