@@ -1,0 +1,168 @@
+---
+weight: 10
+---
+
+# Installing Alauda Service Mesh
+
+Installing Alauda Service Mesh consists four major parts:
+
+- Installing the Alauda Service Mesh v2 Operator
+- Deploying Istio CNI if required
+- Deploying Istio control plane
+- Customizing the Istio configuration
+
+:::warning
+
+Before installing Alauda Service Mesh v2, make sure you are not running Alauda Service Mesh and Alauda Service Mesh v2 in the same cluster,
+because it causes conflicts currently. Please be patient for migrating guide coming in the near future.
+
+:::
+
+## About deploying Istio using the Alauda Service Mesh v2 Operator
+
+To deploy Istio using Alauda Service Mesh v2 Operator, `Istio` resource is required to be created.
+Then the Operator creates an `IstioRevision` resources which represents one revision of the Istio control plane.
+Based on the `IstioRevision` resource, the Operator deploys the Istio control plane.
+
+The Operator may creates some additional instances of `IstioRevision` resources, when the update strategy is `RevisionBased` in the `Istio` resources.
+
+## Installing the Alauda Service Mesh v2 Operator
+
+**Prerequisites**
+
+- The Alauda Service Mesh v2 Operator must be uploaded.
+- You are logged in to the Alauda Container Platform web console as cluster-admin.
+
+**Procedure**
+
+1. In the Alauda Container Platform web console, navigate to **Administrator**.
+2. Select **Marketplace** > **OperatorHub**.
+3. Search for the Alauda Service Mesh v2.
+4. Locate the Alauda Service Mesh v2, and click to select it.
+5. Click **Install**.
+6. On the **Install Alauda Service Mesh v2** dialogue, perform the following steps:
+   i. Select an **Channel**
+     - Choose the **latest** channel to install the latest stable version of the Alauda Service Mesh v2 Operator. It is the default channel for installing the Operator.
+     - To install a specific version of the Alauda Service Mesh v2 Operator, choose the corresponding `servicemesh-<version>` channel. For example, to install the Alauda Service Mesh v2 Operator version 2.0.x, use the **servicemesh-2.0** channel.
+7. Click **Install** and **Confirm** to install the Operator.
+
+**Verification**
+
+Confirm that the **Installation Info** tile shows `Succeeded`.
+
+### About Service Mesh custom resource definitions
+
+Installing the Alauda Service Mesh v2 will also install two categories of custom resource definitions (CRD) that administrators can leverage to configure the Istio for Service Mesh:
+
+- Sail Operator CRDs
+- Istio CRDs
+
+Sail Operator CRDs define custom resources for installing and maintaining the Istio components required to operate a service mesh. These custom resources belong to the `sailoperator.io` API group and include the `Istio`, `IstioRevision`, `IstioCNI`, and `ZTunnel` resource kinds.
+For more information on how to configure these resources, see the `sailoperator.io` [API reference](https://github.com/alauda-mesh/sail-operator/blob/main/docs/api-reference/sailoperator.io.md) documentation.
+
+Istio CRDs are associated with mesh configuration, service and traffic management.
+Those CRDs define custom resources in several `istio.io` API groups, such as `networking.istio.io`, `security.istio.io`, and `telemetry.istio.io`, see the [Istio documentation](https://istio.io/latest/docs/) for more information.
+
+## About Istio deployment
+
+To deploy Istio, you must create `Istio` resource. For Huawei CCE or environments that prohibit the use of `NET_ADMIN` and `NET_RAW` permissions in business workloads, `IstioCNI` resource is also required.
+
+The `Istio` resource deploys and configures the Istio Control Plane.
+
+The `IstioCNI` resource deploys and configures the Istio Container Network Interface (CNI) plugin. You should create these resources in separate namespaces.
+
+### Creating the namespace for Istio
+
+```bash
+kubectl create namespace istio-system
+
+kubectl label namespace istio-system cpaas.io/project=cpaas-system
+```
+
+### Creating the Istio resource using web console
+
+Create the Istio resource that will contain the YAML configuration file for your Istio deployment. The Alauda Service Mesh v2 Operator uses the configuration specified by this resource to deploy the Istio Control Plane.
+
+**Prerequisites**
+
+- The Alauda Service Mesh v2 Operator must be installed.
+- You are logged in to the Alauda Container Platform web console as cluster-admin.
+
+**Procedure**
+
+1. In the Alauda Container Platform web console, navigate to **Administrator**.
+2. Select **Marketplace** > **OperatorHub**.
+3. Search for the Alauda Service Mesh v2.
+4. Locate the Alauda Service Mesh v2, and click to select it.
+5. Click **All Instances** tab.
+6. Click **Create**.
+7. Locate and Select **Istio** and then click **Create**.
+8. Select the `istio-system` from the **Namespace** drop down.
+9. Click **Create**.
+
+**Verification**
+
+Wait for `.status.state` field of the `Istio` resource to be `Ready`.
+
+### Creating the namespace for IstioCNI
+
+:::info
+
+You can skip this section if Istio CNI is not required in your environments.
+
+:::
+
+```bash
+kubectl create namespace istio-cni
+```
+
+### Creating the IstioCNI resource using web console
+
+:::info
+
+You can skip this section if Istio CNI is not required in your environments.
+
+:::
+
+Create an Istio Container Network Interface (CNI) resource, which contains the configuration file for the Istio CNI plugin.
+The Alauda Service Mesh v2 Operator uses the configuration specified by this resource to deploy the CNI pod.
+
+**Prerequisites**
+
+- The Alauda Service Mesh v2 Operator must be installed.
+- You are logged in to the Alauda Container Platform web console as cluster-admin.
+
+**Procedure**
+
+1. In the Alauda Container Platform web console, navigate to **Administrator**.
+2. Select **Marketplace** > **OperatorHub**.
+3. Search for the Alauda Service Mesh v2.
+4. Locate the Alauda Service Mesh v2, and click to select it.
+5. Click **All Instances** tab.
+6. Click **Create**.
+7. Locate and Select **IstioCNI** and then click **Create**.
+8. Select the `istio-cni` from the **Namespace** drop down.
+9. Click **Create**.
+
+**Verification**
+
+Wait for `.status.state` field of the `IstioCNI` resource to be `Ready`.
+
+## Customizing Istio configuration
+
+The `values` field of the Istio custom resource definition, which was created when the control plane was deployed,
+can be used to customize Istio configuration using Istio’s `Helm` configuration values.
+When you create this resource using the Alauda Container Platform web console, it is pre-populated with configuration settings to enable `Istio` to run on ACP.
+
+**Procedure**
+
+1. In the Alauda Container Platform web console, navigate to **Administrator**.
+2. Select **Marketplace** > **OperatorHub**.
+3. Search for the Alauda Service Mesh v2.
+4. Locate the Alauda Service Mesh v2, and click to select it.
+5. Click **All Instances** tab.
+6. Click the `Istio` instance, named `default`.
+7. Click **YAML** to view the `Istio` configuration.
+8. Click **Actions** > **Update** to make modifications to the `Istio` configuration.
+
+For a complete list of available configuration for the values field, refer to [sail-operator's documentation](https://github.com/alauda-mesh/sail-operator/blob/main/docs/api-reference/sailoperator.io.md).
