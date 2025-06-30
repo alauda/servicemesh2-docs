@@ -14,17 +14,19 @@ Installing Alauda Service Mesh consists four major parts:
 :::warning
 
 Before installing Alauda Service Mesh v2, make sure you are not running Alauda Service Mesh and Alauda Service Mesh v2 in the same cluster,
-because it causes conflicts currently. Please be patient for migrating guide coming in the near future.
+because it will lead to conflicts currently.
+
+Migration guide will be provided in an upcoming release.
 
 :::
 
 ## About deploying Istio using the Alauda Service Mesh v2 Operator
 
 To deploy Istio using Alauda Service Mesh v2 Operator, `Istio` resource is required to be created.
-Then the Operator creates an `IstioRevision` resources which represents one revision of the Istio control plane.
-Based on the `IstioRevision` resource, the Operator deploys the Istio control plane.
+The Operator then creates an `IstioRevision` resources, representing a distinct revision of the Istio control plane.
+The Istio control plane is subsequently deployed based on these `IstioRevision` resources.
 
-The Operator may creates some additional instances of `IstioRevision` resources, when the update strategy is `RevisionBased` in the `Istio` resources.
+The Operator might create additional `IstioRevision` instances, when the `Istio` resource's update strategy is set to `RevisionBased`.
 
 ## Installing the Alauda Service Mesh v2 Operator
 
@@ -52,36 +54,37 @@ Confirm that the **Installation Info** tile shows `Succeeded`.
 
 ### About Service Mesh custom resource definitions
 
-Installing the Alauda Service Mesh v2 will also install two categories of custom resource definitions (CRD) that administrators can leverage to configure the Istio for Service Mesh:
+Installing Alauda Service Mesh v2 also provisions two categories of custom resource definitions (CRDs) that administrators can use to configure Istio for the service mesh:
 
-- Sail Operator CRDs
-- Istio CRDs
+- **Sail Operator CRDs** defines custom resources for installing and maintaining the Istio components.
+  They belong to the `sailoperator.io` API group and include `Istio`, `IstioRevision`, `IstioCNI`, and `ZTunnel` resource kinds.
+  For configuration details, refer to the `sailoperator.io` [API reference](https://github.com/alauda-mesh/sail-operator/blob/main/docs/api-reference/sailoperator.io.md) documentation.
 
-Sail Operator CRDs define custom resources for installing and maintaining the Istio components required to operate a service mesh. These custom resources belong to the `sailoperator.io` API group and include the `Istio`, `IstioRevision`, `IstioCNI`, and `ZTunnel` resource kinds.
-For more information on how to configure these resources, see the `sailoperator.io` [API reference](https://github.com/alauda-mesh/sail-operator/blob/main/docs/api-reference/sailoperator.io.md) documentation.
-
-Istio CRDs are associated with mesh configuration, service and traffic management.
-Those CRDs define custom resources in several `istio.io` API groups, such as `networking.istio.io`, `security.istio.io`, and `telemetry.istio.io`, see the [Istio documentation](https://istio.io/latest/docs/) for more information.
+- **Istio CRDs** are associated with mesh configuration, service and traffic management.
+  Those CRDs define custom resources in several `istio.io` API groups, such as `networking.istio.io`, `security.istio.io`, and `telemetry.istio.io`, see the [Istio documentation](https://istio.io/latest/docs/) for more information.
 
 ## About Istio deployment
 
 To deploy Istio, you must create `Istio` resource. For Huawei CCE or environments that prohibit the use of `NET_ADMIN` and `NET_RAW` permissions in business workloads, `IstioCNI` resource is also required.
 
-The `Istio` resource deploys and configures the Istio Control Plane.
+The `Istio` resource is responsible for deploying and configuring the Istio Control Plane.
 
-The `IstioCNI` resource deploys and configures the Istio Container Network Interface (CNI) plugin. You should create these resources in separate namespaces.
+The `IstioCNI` resource handles the deployment and configuration of the Istio Container Network Interface (CNI) plugin.
+
+It's required to create these `Istio` and `IstioCNI` resources in separate namespaces.
 
 ### Creating the namespace for Istio
 
+
 ```bash
 kubectl create namespace istio-system
-
 kubectl label namespace istio-system cpaas.io/project=cpaas-system
 ```
 
 ### Creating the Istio resource using web console
 
-Create the Istio resource that will contain the YAML configuration file for your Istio deployment. The Alauda Service Mesh v2 Operator uses the configuration specified by this resource to deploy the Istio Control Plane.
+Create the `Istio` resource that will contain the YAML configuration for your Istio deployment.
+The Alauda Service Mesh v2 Operator leverages this resource's configuration to deploy the Istio Control Plane.
 
 **Prerequisites**
 
@@ -108,7 +111,7 @@ Wait for `.status.state` field of the `Istio` resource to be `Ready`.
 
 :::info
 
-You can skip this section if Istio CNI is not required in your environments.
+You can skip this section if Istio CNI is not required for your environments.
 
 :::
 
@@ -120,12 +123,12 @@ kubectl create namespace istio-cni
 
 :::info
 
-You can skip this section if Istio CNI is not required in your environments.
+You can skip this section if Istio CNI is not required for your environments.
 
 :::
 
 Create an Istio Container Network Interface (CNI) resource, which contains the configuration file for the Istio CNI plugin.
-The Alauda Service Mesh v2 Operator uses the configuration specified by this resource to deploy the CNI pod.
+The Alauda Service Mesh v2 Operator uses this resource's configuration to deploy the CNI pod.
 
 **Prerequisites**
 
@@ -150,9 +153,8 @@ Wait for `.status.state` field of the `IstioCNI` resource to be `Ready`.
 
 ## Customizing Istio configuration
 
-The `values` field of the Istio custom resource definition, which was created when the control plane was deployed,
+The `values` field of the `Istio` custom resource definition, which was created when the control plane was deployed,
 can be used to customize Istio configuration using Istio’s `Helm` configuration values.
-When you create this resource using the Alauda Container Platform web console, it is pre-populated with configuration settings to enable `Istio` to run on ACP.
 
 **Procedure**
 
