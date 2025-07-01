@@ -108,4 +108,4 @@ spec:
             value: product-docs-build
       params:
         - name: doc-base
-          value: devops
+          value: servicemeshv2
