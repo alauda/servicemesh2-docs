@@ -27,169 +27,169 @@ Create the root and intermediate certificate authority (CA) certificates for two
 
 1. Create a key for the root certificate by running the following command:
 
-```bash
-openssl genrsa -out root-key.pem 4096
-```
+    ```bash
+    openssl genrsa -out root-key.pem 4096
+    ```
 
 2. Create an OpenSSL configuration certificate file named `root-ca.conf` for the root CA certificates:
 
-  <details>
-  <summary>Example root certificate configuration file</summary>
+    <details>
+    <summary>Example root certificate configuration file</summary>
 
-  ```ini
-  encrypt_key = no
-  prompt = no
-  utf8 = yes
-  default_md = sha256
-  default_bits = 4096
-  req_extensions = req_ext
-  x509_extensions = req_ext
-  distinguished_name = req_dn
-  [ req_ext ]
-  subjectKeyIdentifier = hash
-  basicConstraints = critical, CA:true
-  keyUsage = critical, digitalSignature, nonRepudiation, keyEncipherment, keyCertSign
-  [ req_dn ]
-  O = Istio
-  CN = Root CA
-  ```
-  </details>
+    ```ini
+    encrypt_key = no
+    prompt = no
+    utf8 = yes
+    default_md = sha256
+    default_bits = 4096
+    req_extensions = req_ext
+    x509_extensions = req_ext
+    distinguished_name = req_dn
+    [ req_ext ]
+    subjectKeyIdentifier = hash
+    basicConstraints = critical, CA:true
+    keyUsage = critical, digitalSignature, nonRepudiation, keyEncipherment, keyCertSign
+    [ req_dn ]
+    O = Istio
+    CN = Root CA
+    ```
+    </details>
 
 3. Create the certificate signing request by running the following command:
-  ```bash
-  openssl req -sha256 -new -key root-key.pem \
-      -config root-ca.conf \
-      -out root-cert.csr
-  ```
+    ```bash
+    openssl req -sha256 -new -key root-key.pem \
+        -config root-ca.conf \
+        -out root-cert.csr
+    ```
 4. Create a shared root certificate by running the following command:
-  ```bash
-  openssl x509 -req -sha256 -days 3650 \
-      -signkey root-key.pem \
-      -extensions req_ext -extfile root-ca.conf \
-      -in root-cert.csr \
-      -out root-cert.pem
-  ```
+    ```bash
+    openssl x509 -req -sha256 -days 3650 \
+        -signkey root-key.pem \
+        -extensions req_ext -extfile root-ca.conf \
+        -in root-cert.csr \
+        -out root-cert.pem
+    ```
 
 ### Create the intermediate CA certificate for the **East** cluster
 
 1. Create a directory named `east` by running the following command:
-   ```bash
-   mkdir east
-   ```
+    ```bash
+    mkdir east
+    ```
 2. Create a key for the intermediate certificate for the **East** cluster by running the following command:
 
-```bash
-openssl genrsa -out east/ca-key.pem 4096
-```
+    ```bash
+    openssl genrsa -out east/ca-key.pem 4096
+    ```
 
 3. Create an OpenSSL configuration file named `intermediate.conf` in the `east/` directory for the intermediate certificate of the **East** cluster. Copy the following example file and save it locally:
-  <details>
-  <summary>Example configuration file</summary>
+    <details>
+    <summary>Example configuration file</summary>
 
-  ```ini
-  [ req ]
-  encrypt_key = no
-  prompt = no
-  utf8 = yes
-  default_md = sha256
-  default_bits = 4096
-  req_extensions = req_ext
-  x509_extensions = req_ext
-  distinguished_name = req_dn
-  [ req_ext ]
-  subjectKeyIdentifier = hash
-  basicConstraints = critical, CA:true, pathlen:0
-  keyUsage = critical, digitalSignature, nonRepudiation, keyEncipherment, keyCertSign
-  subjectAltName=@san
-  [ san ]
-  DNS.1 = istiod.istio-system.svc
-  [ req_dn ]
-  O = Istio
-  CN = Intermediate CA
-  L = east
-  ```
-  </details>
+    ```ini
+    [ req ]
+    encrypt_key = no
+    prompt = no
+    utf8 = yes
+    default_md = sha256
+    default_bits = 4096
+    req_extensions = req_ext
+    x509_extensions = req_ext
+    distinguished_name = req_dn
+    [ req_ext ]
+    subjectKeyIdentifier = hash
+    basicConstraints = critical, CA:true, pathlen:0
+    keyUsage = critical, digitalSignature, nonRepudiation, keyEncipherment, keyCertSign
+    subjectAltName=@san
+    [ san ]
+    DNS.1 = istiod.istio-system.svc
+    [ req_dn ]
+    O = Istio
+    CN = Intermediate CA
+    L = east
+    ```
+    </details>
 4. Create a certificate signing request by running the following command:
-  ```bash
-  openssl req -new -config east/intermediate.conf \
-    -key east/ca-key.pem \
-    -out east/cluster-ca.csr
-  ```
+    ```bash
+    openssl req -new -config east/intermediate.conf \
+      -key east/ca-key.pem \
+      -out east/cluster-ca.csr
+    ```
 5. Create the intermediate CA certificate for the **East** cluster by running the following command:
-  ```bash
-  openssl x509 -req -sha256 -days 3650 \
-    -CA root-cert.pem \
-    -CAkey root-key.pem -CAcreateserial \
-    -extensions req_ext -extfile east/intermediate.conf \
-    -in east/cluster-ca.csr \
-    -out east/ca-cert.pem
-  ```
+    ```bash
+    openssl x509 -req -sha256 -days 3650 \
+      -CA root-cert.pem \
+      -CAkey root-key.pem -CAcreateserial \
+      -extensions req_ext -extfile east/intermediate.conf \
+      -in east/cluster-ca.csr \
+      -out east/ca-cert.pem
+    ```
 6. Create a certificate chain from the intermediate and root CA certificate for the east cluster by running the following command:
-  ```bash
-  cat east/ca-cert.pem root-cert.pem > east/cert-chain.pem && cp root-cert.pem east
-  ```
+    ```bash
+    cat east/ca-cert.pem root-cert.pem > east/cert-chain.pem && cp root-cert.pem east
+    ```
 
 ### Create the intermediate CA certificate for the **West** cluster
 
 1. Create a directory named `west` by running the following command:
 
-```bash
-mkdir west
-```
+    ```bash
+    mkdir west
+    ```
 
 2. Create a key for the intermediate certificate for the **West** cluster by running the following command:
 
-```bash
-openssl genrsa -out west/ca-key.pem 4096
-```
+    ```bash
+    openssl genrsa -out west/ca-key.pem 4096
+    ```
 
 3. Create an OpenSSL configuration file named `intermediate.conf` in the `west/` directory for the intermediate certificate of the **West** cluster. Copy the following example file and save it locally:
-  <details>
-  <summary>Example configuration file</summary>
+    <details>
+    <summary>Example configuration file</summary>
 
-  ```ini
-  [ req ]
-  encrypt_key = no
-  prompt = no
-  utf8 = yes
-  default_md = sha256
-  default_bits = 4096
-  req_extensions = req_ext
-  x509_extensions = req_ext
-  distinguished_name = req_dn
-  [ req_ext ]
-  subjectKeyIdentifier = hash
-  basicConstraints = critical, CA:true, pathlen:0
-  keyUsage = critical, digitalSignature, nonRepudiation, keyEncipherment, keyCertSign
-  subjectAltName=@san
-  [ san ]
-  DNS.1 = istiod.istio-system.svc
-  [ req_dn ]
-  O = Istio
-  CN = Intermediate CA
-  L = west
-  ```
-  </details>
+    ```ini
+    [ req ]
+    encrypt_key = no
+    prompt = no
+    utf8 = yes
+    default_md = sha256
+    default_bits = 4096
+    req_extensions = req_ext
+    x509_extensions = req_ext
+    distinguished_name = req_dn
+    [ req_ext ]
+    subjectKeyIdentifier = hash
+    basicConstraints = critical, CA:true, pathlen:0
+    keyUsage = critical, digitalSignature, nonRepudiation, keyEncipherment, keyCertSign
+    subjectAltName=@san
+    [ san ]
+    DNS.1 = istiod.istio-system.svc
+    [ req_dn ]
+    O = Istio
+    CN = Intermediate CA
+    L = west
+    ```
+    </details>
 
 4. Create a certificate signing request by running the following command:
-  ```bash
-  openssl req -new -config west/intermediate.conf \
-    -key west/ca-key.pem \
-    -out west/cluster-ca.csr
-  ```
+    ```bash
+    openssl req -new -config west/intermediate.conf \
+      -key west/ca-key.pem \
+      -out west/cluster-ca.csr
+    ```
 5. Create the intermediate CA certificate for the **West** cluster by running the following command:
-  ```bash
-  openssl x509 -req -sha256 -days 3650 \
-    -CA root-cert.pem \
-    -CAkey root-key.pem -CAcreateserial \
-    -extensions req_ext -extfile west/intermediate.conf \
-    -in west/cluster-ca.csr \
-    -out west/ca-cert.pem
-  ```
+    ```bash
+    openssl x509 -req -sha256 -days 3650 \
+      -CA root-cert.pem \
+      -CAkey root-key.pem -CAcreateserial \
+      -extensions req_ext -extfile west/intermediate.conf \
+      -in west/cluster-ca.csr \
+      -out west/ca-cert.pem
+    ```
 6. Create a certificate chain from the intermediate and root CA certificate for the west cluster by running the following command:
-  ```bash
-  cat west/ca-cert.pem root-cert.pem > west/cert-chain.pem && cp root-cert.pem west
-  ```
+    ```bash
+    cat west/ca-cert.pem root-cert.pem > west/cert-chain.pem && cp root-cert.pem west
+    ```
 
 </Steps>
 
@@ -243,54 +243,54 @@ export CTX_CLUSTER2=<your cluster2 context>
 ### Apply the certificates to the **East** cluster of the multi-cluster topology
 
 1. Create a namespace called `istio-system` by running the following command:
-  ```bash
-  kubectl --context "${CTX_CLUSTER1}" create namespace istio-system
-  ```
+    ```bash
+    kubectl --context "${CTX_CLUSTER1}" create namespace istio-system
+    ```
 2. Configure Istio to use `network1` as the default network for the pods on the **East** cluster by running the following command:
-  ```bash
-  kubectl --context "${CTX_CLUSTER1}" label namespace istio-system topology.istio.io/network=network1
-  ```
+    ```bash
+    kubectl --context "${CTX_CLUSTER1}" label namespace istio-system topology.istio.io/network=network1
+    ```
 3. Create the CA certificates, certificate chain, and the private key for Istio on the **East** cluster by running the following command:
-  ```bash
-  kubectl get secret -n istio-system --context "${CTX_CLUSTER1}" cacerts || kubectl create secret generic cacerts -n istio-system --context "${CTX_CLUSTER1}" \
-    --from-file=east/ca-cert.pem \
-    --from-file=east/ca-key.pem \
-    --from-file=east/root-cert.pem \
-    --from-file=east/cert-chain.pem
-  ```
+    ```bash
+    kubectl get secret -n istio-system --context "${CTX_CLUSTER1}" cacerts || kubectl create secret generic cacerts -n istio-system --context "${CTX_CLUSTER1}" \
+      --from-file=east/ca-cert.pem \
+      --from-file=east/ca-key.pem \
+      --from-file=east/root-cert.pem \
+      --from-file=east/cert-chain.pem
+    ```
 
-:::note
+    :::note
 
-If you followed the instructions in "Creating certificates for a multi-cluster mesh", your certificates will reside in the `east/` directory.
-If your certificates reside in a different directory, modify the syntax accordingly.
+    If you followed the instructions in "Creating certificates for a multi-cluster mesh", your certificates will reside in the `east/` directory.
+    If your certificates reside in a different directory, modify the syntax accordingly.
 
-:::
+    :::
 
 ### Apply the certificates to the **West** cluster of the multi-cluster topology
 
 1. Create a namespace called `istio-system` by running the following command:
-  ```bash
-  kubectl --context "${CTX_CLUSTER2}" create namespace istio-system
-  ```
+    ```bash
+    kubectl --context "${CTX_CLUSTER2}" create namespace istio-system
+    ```
 2. Configure Istio to use `network2` as the default network for the pods on the **East** cluster by running the following command:
-  ```bash
-  kubectl --context "${CTX_CLUSTER2}" label namespace istio-system topology.istio.io/network=network2
-  ```
+    ```bash
+    kubectl --context "${CTX_CLUSTER2}" label namespace istio-system topology.istio.io/network=network2
+    ```
 3. Create the CA certificates, certificate chain, and the private key for Istio on the **East** cluster by running the following command:
-  ```bash
-  kubectl get secret -n istio-system --context "${CTX_CLUSTER2}" cacerts || kubectl create secret generic cacerts -n istio-system --context "${CTX_CLUSTER2}" \
-    --from-file=west/ca-cert.pem \
-    --from-file=west/ca-key.pem \
-    --from-file=west/root-cert.pem \
-    --from-file=west/cert-chain.pem
-  ```
+    ```bash
+    kubectl get secret -n istio-system --context "${CTX_CLUSTER2}" cacerts || kubectl create secret generic cacerts -n istio-system --context "${CTX_CLUSTER2}" \
+      --from-file=west/ca-cert.pem \
+      --from-file=west/ca-key.pem \
+      --from-file=west/root-cert.pem \
+      --from-file=west/cert-chain.pem
+    ```
 
-:::note
+    :::note
 
-If you followed the instructions in "Creating certificates for a multi-cluster mesh", your certificates will reside in the `west/` directory.
-If your certificates reside in a different directory, modify the syntax accordingly.
+    If you followed the instructions in "Creating certificates for a multi-cluster mesh", your certificates will reside in the `west/` directory.
+    If your certificates reside in a different directory, modify the syntax accordingly.
 
-:::
+    :::
 
 </Steps>
 
