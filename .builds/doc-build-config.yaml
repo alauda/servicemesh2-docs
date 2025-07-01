@@ -2,4 +2,4 @@ project: alauda
 namespace: alauda-dev
 integration: github
 integration_class: github
-integration_project: alauda-mesh
+integration_project: alauda

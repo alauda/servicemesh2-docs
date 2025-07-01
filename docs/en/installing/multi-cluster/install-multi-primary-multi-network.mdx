@@ -1,0 +1,148 @@
+---
+weight: 20
+---
+
+# Installing a multi-primary multi-network mesh
+
+Install Istio in the multi-primary multi-network topology on two clusters.
+
+:::note
+
+In this procedure, `CLUSTER1` is the **East** cluster and `CLUSTER2` is the **West** cluster.
+
+:::
+
+You can adapt these instructions for a mesh spanning more than two clusters.
+
+**Prerequisites**
+
+- You have installed the Alauda Service Mesh 2 Operator on all of the clusters that comprise the mesh.
+- You have completed "Creating certificates for a multi-cluster mesh".
+- You have completed "Applying certificates to a multi-cluster topology".
+- You have `istioctl` installed locally so that you can use to run these instructions.
+
+## Procedure
+
+<Steps>
+
+### Create an `ISTIO_VERSION` environment variable that defines the Istio version to install
+
+```bash
+export ISTIO_VERSION=1.24.5
+```
+
+### Install Istio on the **East** cluster
+
+1. Create an `Istio` resource on the **East** cluster by running the following command:
+    ```bash
+    cat <<EOF | kubectl --context "${CTX_CLUSTER1}" apply -f -
+    apiVersion: sailoperator.io/v1
+    kind: Istio
+    metadata:
+    name: default
+    spec:
+    version: v${ISTIO_VERSION}
+    namespace: istio-system
+    values:
+        global:
+        meshID: mesh1
+        multiCluster:
+            clusterName: cluster1
+        network: network1
+    EOF
+    ```
+2. Wait for the control plane to return the `Ready` status condition by running the following command:
+    ```bash
+    kubectl --context "${CTX_CLUSTER1}" wait --for condition=Ready istio/default --timeout=3m
+    ```
+3. Create an East-West gateway on the **East** cluster by running the following command:
+    ```bash
+    kubectl --context "${CTX_CLUSTER1}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net1.yaml
+    ```
+4. Expose the services through the gateway by running the following command:
+    ```bash
+    kubectl --context "${CTX_CLUSTER1}" apply -n istio-system -f https://raw.githubusercontent.com/istio-ecosystem/sail-operator/main/docs/deployment-models/resources/expose-services.yaml
+    ```
+
+### Install Istio on the **West** cluster
+
+1. Create an `Istio` resource on the **West** cluster by running the following command:
+    ```bash
+    cat <<EOF | kubectl --context "${CTX_CLUSTER2}" apply -f -
+    apiVersion: sailoperator.io/v1
+    kind: Istio
+    metadata:
+    name: default
+    spec:
+    version: v${ISTIO_VERSION}
+    namespace: istio-system
+    values:
+        global:
+        meshID: mesh1
+        multiCluster:
+            clusterName: cluster2
+        network: network2
+    EOF
+    ```
+2. Wait for the control plane to return the `Ready` status condition by running the following command:
+    ```bash
+    kubectl --context "${CTX_CLUSTER2}" wait --for condition=Ready istio/default --timeout=3m
+    ```
+3. Create an East-West gateway on the **West** cluster by running the following command:
+    ```bash
+    kubectl --context "${CTX_CLUSTER2}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net2.yaml
+    ```
+4. Expose the services through the gateway by running the following command:
+    ```bash
+    kubectl --context "${CTX_CLUSTER2}" apply -n istio-system -f https://raw.githubusercontent.com/istio-ecosystem/sail-operator/main/docs/deployment-models/resources/expose-services.yaml
+    ```
+
+### Create the `istio-reader-service-account` service account for the **East** cluster
+
+```bash
+kubectl --context="${CTX_CLUSTER1}" create serviceaccount istio-reader-service-account -n istio-system
+```
+
+### Create the `istio-reader-service-account` service account for the **West** cluster
+
+```bash
+kubectl --context="${CTX_CLUSTER2}" create serviceaccount istio-reader-service-account -n istio-system
+```
+
+### Add the `cluster-reader` role to the **East** cluster
+
+```bash
+kubectl --context="${CTX_CLUSTER1}" create clusterrolebinding cluster-reader-istio-reader-sa \
+  --clusterrole=cluster-reader \
+  --serviceaccount=istio-system:istio-reader-service-account
+```
+
+### Add the `cluster-reader` role to the **West** cluster
+
+```bash
+kubectl --context="${CTX_CLUSTER2}" create clusterrolebinding cluster-reader-istio-reader-sa \
+  --clusterrole=cluster-reader \
+  --serviceaccount=istio-system:istio-reader-service-account
+```
+
+### Install a remote secret on the **East** cluster that provides access to the API server on the **West** cluster
+
+```bash
+istioctl create-remote-secret \
+  --context="${CTX_CLUSTER2}" \
+  --name=cluster2 \
+  --create-service-account=false | \
+  kubectl --context="${CTX_CLUSTER1}" apply -f -
+```
+
+### Install a remote secret on the **West** cluster that provides access to the API server on the **East** cluster
+
+```bash
+istioctl create-remote-secret \
+  --context="${CTX_CLUSTER1}" \
+  --name=cluster1 \
+  --create-service-account=false | \
+  kubectl --context="${CTX_CLUSTER2}" apply -f -
+```
+
+</Steps>
