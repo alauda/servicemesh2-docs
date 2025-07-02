@@ -12,6 +12,18 @@ In this procedure, `CLUSTER1` is the **East** cluster and `CLUSTER2` is the **We
 
 You can adapt these instructions for a mesh spanning more than two clusters.
 
+**Topology**
+
+Service workloads across cluster boundaries communicate indirectly, via dedicated gateways for east-west traffic.
+The gateway in each cluster must be reachable from the other cluster.
+
+<figure>
+  <p align="center" width="100%">
+    ![](/multicluster/topo-multiprimary-multinetwork.svg)
+    <figcaption><strong>Multi-Primary Multi-Network Topology</strong></figcaption>
+  </p>
+</figure>
+
 **Prerequisites**
 
 - You have installed the Alauda Service Mesh 2 Operator on all of the clusters that comprise the mesh.
@@ -58,7 +70,7 @@ You can adapt these instructions for a mesh spanning more than two clusters.
      ```
   4. Expose the services through the gateway by running the following command:
      ```bash
-     kubectl --context "${CTX_CLUSTER1}" apply -n istio-system -f https://raw.githubusercontent.com/istio-ecosystem/sail-operator/main/docs/deployment-models/resources/expose-services.yaml
+     kubectl --context "${CTX_CLUSTER1}" apply -n istio-system -f https://raw.githubusercontent.com/aladua-mesh/sail-operator/main/docs/deployment-models/resources/expose-services.yaml
      ```
 
   ### Install Istio on the **West** cluster
@@ -91,7 +103,7 @@ You can adapt these instructions for a mesh spanning more than two clusters.
      ```
   4. Expose the services through the gateway by running the following command:
      ```bash
-     kubectl --context "${CTX_CLUSTER2}" apply -n istio-system -f https://raw.githubusercontent.com/istio-ecosystem/sail-operator/main/docs/deployment-models/resources/expose-services.yaml
+     kubectl --context "${CTX_CLUSTER2}" apply -n istio-system -f https://raw.githubusercontent.com/aladua-mesh/sail-operator/main/docs/deployment-models/resources/expose-services.yaml
      ```
 
   ### Create the `istio-reader-service-account` service account for the **East** cluster
