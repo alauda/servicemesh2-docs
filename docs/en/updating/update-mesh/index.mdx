@@ -26,7 +26,7 @@ To ensure that your Alauda Service Mesh stays current with the latest security p
 
 OLM provides the following channels for the Alauda Service Mesh Operator:
 
-- **Stable** channel: tracks the most recent version of the Alauda Service Mesh 2 Operator and the latest supported version of Istio. This channel enables upgrades to new operator versions and corresponding Istio updates as soon as they are released. Use the `stable` channel to stay current with the latest features, bug fixes, and security updates.
+- **Stable** channel: tracks the most recent version of the Alauda Service Mesh v2 Operator and the latest supported version of Istio. This channel enables upgrades to new operator versions and corresponding Istio updates as soon as they are released. Use the `stable` channel to stay current with the latest features, bug fixes, and security updates.
 - **Versioned** channel: restricts updates to patch-level releases within a specific minor version. For example, `stable-2.0` provides access to the latest `2.0.8` patch version. When a new patch release becomes available, you can upgrade the Operator to the newer patch version. To move to a newer minor release, you must manually switch to a different channel. You can use a versioned channel to maintain a consistent minor version while applying only patch updates.
 
 ### About Operator update process
@@ -39,7 +39,7 @@ This triggers a control plane update when a new version is available in the Oper
 
 ## About Istio update process
 
-After updating the Alauda Service Mesh 2 Operator, update the Istio control plane to the latest supported version. The `Istio` resource configuration determines how the control plane upgrade is performed, including which steps require manual action and which are handled automatically.
+After updating the Alauda Service Mesh v2 Operator, update the Istio control plane to the latest supported version. The `Istio` resource configuration determines how the control plane upgrade is performed, including which steps require manual action and which are handled automatically.
 
 The `Istio` resource configuration includes the following fields that are relevant to the upgrade process:
 
@@ -55,7 +55,7 @@ The `Istio` resource configuration includes the following fields that are releva
 
 ### About Istio control plane update strategies
 
-The update strategy affects how the update process is performed. The `spec.updateStrategy` field in the `Istio` resource configuration determines how the Alauda Service Mesh 2 Operator updates the Istio control plane. When the Operator detects a change in the `spec.version` field or identifies a new minor release with a configured `vX.Y-latest` alias, it initiates an upgrade procedure. For each mesh, you select one of two strategies:
+The update strategy affects how the update process is performed. The `spec.updateStrategy` field in the `Istio` resource configuration determines how the Alauda Service Mesh v2 Operator updates the Istio control plane. When the Operator detects a change in the `spec.version` field or identifies a new minor release with a configured `vX.Y-latest` alias, it initiates an upgrade procedure. For each mesh, you select one of two strategies:
 
 - `InPlace`
 - `RevisionBased`
