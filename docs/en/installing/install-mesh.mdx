@@ -12,12 +12,10 @@ Installing Alauda Service Mesh consists four major parts:
 - Customizing the Istio configuration
 
 :::warning
-
 Before installing Alauda Service Mesh v2, make sure you are not running Alauda Service Mesh and Alauda Service Mesh v2 in the same cluster,
 because it will lead to conflicts currently.
 
 Migration guide will be provided in an upcoming release.
-
 :::
 
 ## About deploying Istio using the Alauda Service Mesh v2 Operator
@@ -75,7 +73,6 @@ It's required to create these `Istio` and `IstioCNI` resources in separate names
 
 ### Creating the namespace for Istio
 
-
 ```bash
 kubectl create namespace istio-system
 kubectl label namespace istio-system cpaas.io/project=cpaas-system
@@ -110,9 +107,7 @@ Wait for `.status.state` field of the `Istio` resource to be `Ready`.
 ### Creating the namespace for IstioCNI
 
 :::info
-
 You can skip this section if Istio CNI is not required for your environments.
-
 :::
 
 ```bash
@@ -122,9 +117,7 @@ kubectl create namespace istio-cni
 ### Creating the IstioCNI resource using web console
 
 :::info
-
 You can skip this section if Istio CNI is not required for your environments.
-
 :::
 
 Create an Istio Container Network Interface (CNI) resource, which contains the configuration file for the Istio CNI plugin.
