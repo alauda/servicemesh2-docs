@@ -1,0 +1,46 @@
+---
+weight: 17
+---
+
+# About the Istio CNI update process
+
+The Istio Container Network Interface (CNI) update process uses in-place updates. When the `IstioCNI` resource changes, the daemonset automatically replaces the existing `istio-cni-node` pods with the specified version of the CNI plugin.
+
+You can use the following field to manage version updates:
+
+- `spec.version`
+
+  defines the CNI plugin version to install. Specify the value in the format `vX.Y.Z`, where `X.Y.Z` represents the desired version. For example, use `v1.24.6` to install the CNI plugin version `1.24.6`.
+
+To update the CNI plugin, modify the `spec.version` field with the target version. The `IstioCNI` resource also includes a `values` field that exposes configuration options from the `istio-cni` chart.
+
+## Updating the Istio CNI resource version
+
+You can update the Istio CNI resource version by changing the version in the resource. Then, the Service Mesh Operator deploys a new version of the CNI plugin that replaces the old version of the CNI plugin. The `istio-cni-node` pods automatically reconnect to the new CNI plugin.
+
+**Prerequisites**
+
+- You are logged in to the Alauda Container Platform web console as cluster-admin.
+- You have installed the Alauda Service Mesh 2 Operator, and deployed Istio.
+- You have installed the Istio CNI plugin with the desired version. In this example, the `IstioCNI` resource named `default` is deployed in the `istio-cni` namespace.
+
+**Procedure**
+
+1. Change the version in the `Istio` resource. For example, to update to Istio `1.24.6`, set the spec.version field to `v1.24.6` by running the following command:
+
+   ```bash
+   kubectl patch istiocni default --type='merge' -p '{"spec":{"version":"v1.24.6"}}'
+   ```
+
+2. Confirm that the new version of the CNI plugin is ready by running the following command:
+
+   ```bash
+   kubectl get istiocni default
+   ```
+
+   **Example Output**
+
+   ```
+   NAME      READY   STATUS    VERSION   AGE
+   default   True    Healthy   v1.24.6   91m
+   ```
