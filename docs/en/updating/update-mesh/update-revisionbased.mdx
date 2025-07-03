@@ -85,7 +85,7 @@ You can use the following section to understand the update process. You can skip
 
 ## Updating Istio control plane with RevisionBased strategy
 
-When updating Istio using the `RevisionBased` strategy, you can upgrade by more than one minor version at a time. The Alauda Service Mesh Operator creates a new `IstioRevision` resource for each change to the `.spec.version` field and deploys a corresponding control plane instance. To migrate workloads to the new control plane, set the `istio.io/rev` label on the namespace to match the name of the `IstioRevision` resource, and then restart the workloads.
+When updating Istio using the `RevisionBased` strategy, you can upgrade by more than one minor version at a time. The Alauda Service Mesh v2 Operator creates a new `IstioRevision` resource for each change to the `.spec.version` field and deploys a corresponding control plane instance. To migrate workloads to the new control plane, set the `istio.io/rev` label on the namespace to match the name of the `IstioRevision` resource, and then restart the workloads.
 
 **Prerequisites**
 
@@ -115,7 +115,7 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
        type: RevisionBased
    ```
 
-   The Service Mesh Operator deploys a new version of the control plane alongside the old version of the control plane. The sidecars remain connected to the old control plane.
+   The Service Mesh v2 Operator deploys a new version of the control plane alongside the old version of the control plane. The sidecars remain connected to the old control plane.
 
 2. Confirm that both `Istio` and `IstioRevision` resources are ready with the new revision.
 
@@ -213,6 +213,6 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
       kubectl get istiorevision
       ```
 
-The Alauda Service Mesh Operator deletes the old `IstioRevision` resource and the associated control plane after the grace period defined in the `spec.updateStrategy.inactiveRevisionDeletionGracePeriodSeconds` field expires. The default grace period is `30` seconds.
+The Alauda Service Mesh v2 Operator deletes the old `IstioRevision` resource and the associated control plane after the grace period defined in the `spec.updateStrategy.inactiveRevisionDeletionGracePeriodSeconds` field expires. The default grace period is `30` seconds.
 
 You can increase the grace period to allow sufficient time to test the new control plane before removing the previous revision. Set a higher value during canary upgrades to ensure workload stability before fully transitioning.
