@@ -41,7 +41,7 @@ For example output:
 
 ```
 NAME              NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
-default-v1-24-5   istio-system             True    Healthy   False    v1.24.5   40s
+default-v1-24-6   istio-system             True    Healthy   False    v1.24.6   40s
 ```
 
 ### Enabling sidecar injection with default revision
@@ -54,9 +54,7 @@ When the name of `IstioRevision` is `default`, you can use the following labels 
 | Pod          | `sidecar.istio.io/inject=true` | `sidecar.istio.io/inject=false` |
 
 :::note
-
 You can also enable injection by applying the `istio.io/rev: default` label to the namespace or pod.
-
 :::
 
 ### Enabling sidecar injection with other revisions
@@ -72,9 +70,7 @@ For instance, using the example revision `default-v1-24-5` from above, the follo
 | Pod          | `istio.io/rev=default-v1-24-5` | `sidecar.istio.io/inject=false` |
 
 :::note
-
 When both `istio-injection` and `istio.io/rev` labels are applied, the `istio-injection` label takes precedence and treats the namespace as part of the default revision.
-
 :::
 
 The injector is configured with the following logic:

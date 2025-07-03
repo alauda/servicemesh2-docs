@@ -1,6 +1,11 @@
 {
   "devDependencies": {
     "@alauda/doom": "^1.5.1",
+    "remark-directive": "^4.0.0",
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-mdx": "^3.1.0",
+    "remark-stringify": "^11.0.0",
     "typescript": "^5.8.3"
   },
   "scripts": {

@@ -1,0 +1,171 @@
+---
+weight: 50
+---
+
+# About InPlace strategy
+
+The `InPlace` update strategy runs only one revision of the control plane at a time. During an update, all the workloads immediately connect to the new control plane version. To maintain compatibility between the sidecars and the control plane, you can upgrade only one minor version at a time.
+
+The `InPlace` strategy updates and restarts the existing Istio control plane in place. During this process, only one instance of the control plane exists, eliminating the need to move workloads to a new control plane instance. To complete the update, restart the application workloads and gateways to refresh the Envoy proxies.
+
+While the `InPlace` strategy offers simplicity and efficiency, there’s a slight possibility of application traffic interruption if a workload pod updates, restarts, or scales while the control plane is restarting. You can mitigate this risk by running multiple replicas of the Istio control plane (istiod).
+
+## Selecting InPlace strategy
+
+To select the `InPlace` strategy, set the `spec.updateStrategy.type` value in the Istio resource to `InPlace`.
+
+**Example specification to select InPlace update strategy**
+
+```yaml
+kind: Istio
+spec:
+  updateStrategy:
+    type: InPlace
+```
+
+You can set this value while creating the resource or edit it later. If you edit the resource after creation, make the change before updating the Istio control plane.
+
+## Installing with InPlace update strategy
+
+You can install the Istio control plane, Istio CNI, and the Bookinfo demo application using the `InPlace` update strategy.
+
+:::note
+You can use the following section to understand the update process. You can skip this installation if the cluster already includes an Istio deployment.
+:::
+
+**Procedure**
+
+1. Create the `istio-system` namespace by running the following command:
+
+   ```bash
+   kubectl create ns istio-system
+   ```
+
+2. Attach the workloads to a control plane deployed using the `InPlace` strategy:
+
+   1. Label the namespace to automatically include all workloads by entering the following command:
+
+      ```bash
+      kubectl label namespace <namespace_name> istio.io/rev=<revision_name>
+      ```
+
+   2. Apply the revision label to individual workloads by modifying the pod template in the `Deployment` resource. For example:
+
+      ```yaml
+      apiVersion: apps/v1
+      kind: Deployment
+      spec:
+        template:
+          metadata:
+            labels:
+              istio.io/rev: <revision_name>
+      ```
+
+3. If the revision name is `default`, attach the workloads to the revision by running the following command. The following example labels the namespace with `istio-injection: enabled` label.
+
+   ```bash
+   kubectl label namespace <namespace_name> istio-injection=enabled
+   ```
+
+4. Deploy the Istio control plane using the `InPlace` update strategy. The following example configuration creates an `Istio` resource named `default` in the `istio-system` namespace:
+
+   **Example configuration**
+
+   ```yaml
+   apiVersion: sailoperator.io/v1
+   kind: Istio
+   metadata:
+     name: default
+   spec:
+     namespace: istio-system
+     version: v1.24.6
+     updateStrategy:
+       type: InPlace
+   ```
+
+5. *Optional*: Install the Istio CNI plugin with the desired version. The following example configuration creates an `IstioCNI` resource named default in the `istio-cni` namespace:
+
+   ```yaml
+   apiVersion: sailoperator.io/v1
+   kind: IstioCNI
+   metadata:
+     name: default
+   spec:
+     version: v1.24.6
+     namespace: istio-cni
+   ```
+
+## Updating Istio control plane with InPlace strategy
+
+When updating Istio using the `InPlace` strategy, you can increment the version by only one minor release at a time. To update by more than one minor version, you must increment the version and restart the workloads after each update. Restarting workloads ensures compatibility between the sidecar and control plane versions. The update process is complete after restarting all workloads.
+
+**Prerequisites**
+
+- You are logged in to the Alauda Container Platform web console as cluster-admin.
+- You have installed the Alauda Service Mesh v2 Operator, and deployed Istio.
+- You have installed `istioctl` on your local machine.
+- You have configured the Istio control plane to use the `InPlace` update strategy. In this example, the `Istio` resource named `default` is deployed in the `istio-system` namespace.
+- *Optional*: You have installed the Istio CNI plugin with the desired version. In this example, the `IstioCNI` resource named `default` is deployed in the `istio-cni` namespace.
+- You have labeled the `bookinfo` namespace to enable sidecar injection.
+- You have application workloads running in the cluster. In this example, the bookinfo application is deployed in the `bookinfo` namespace.
+
+**Procedure**
+
+1. Change the version in the `Istio` resource. For example, to update to Istio `1.24.6`, set the spec.version field to `v1.24.6` by running the following command:
+
+   ```bash
+   kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.24.6"}}'
+   ```
+
+   **Version update in Istio CR**
+
+   ```yaml
+   kind: Istio
+   spec:
+     version: v1.24.6
+     updateStrategy:
+       type: InPlace
+   ```
+
+   The Service Mesh Operator deploys a new version of the control plane that replaces the old version of the control plane. The sidecars automatically reconnect to the new control plane.
+
+2. Confirm that the new version of the control plane is ready by running the following command:
+
+   ```bash
+   kubectl get istio
+   ```
+
+   **Example output**
+
+   ```
+   NAME      REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
+   default   1           1       1        default           Healthy   v1.24.6   8m10s
+   ```
+
+3. Restart the application workloads so that the new version of the sidecar gets injected by running the following command:
+
+   ```bash
+   kubectl rollout restart deployment -n bookinfo
+   ```
+
+**Verification**
+
+Verify that the new version of the sidecar is running by entering the following command:
+
+```bash
+istioctl proxy-status
+```
+
+**Example output**
+
+```
+NAME                                                    CLUSTER        CDS                LDS                EDS                RDS                ECDS        ISTIOD                                     VERSION
+details-v1-7d775cb4f6-5t9zm.bookinfo                    Kubernetes     SYNCED (2m25s)     SYNCED (2m25s)     SYNCED (2m17s)     SYNCED (2m25s)     IGNORED     istiod-default-v1-24-6-c98fd9675-r7bfw     1.24.6
+productpage-v1-7c4b6b857-mxrw6.bookinfo                 Kubernetes     SYNCED (2m35s)     SYNCED (2m35s)     SYNCED (2m17s)     SYNCED (2m35s)     IGNORED     istiod-default-v1-24-6-c98fd9675-r7bfw     1.24.6
+ratings-v1-5b896f8544-r552l.bookinfo                    Kubernetes     SYNCED (2m21s)     SYNCED (2m21s)     SYNCED (2m17s)     SYNCED (2m21s)     IGNORED     istiod-default-v1-24-6-c98fd9675-r7bfw     1.24.6
+reviews-v1-746f96c9d4-9pw8k.bookinfo                    Kubernetes     SYNCED (2m17s)     SYNCED (2m17s)     SYNCED (2m17s)     SYNCED (2m17s)     IGNORED     istiod-default-v1-24-6-c98fd9675-r7bfw     1.24.6
+reviews-v2-97bdf5876-4mzx5.bookinfo                     Kubernetes     SYNCED (2m35s)     SYNCED (2m35s)     SYNCED (2m17s)     SYNCED (2m35s)     IGNORED     istiod-default-v1-24-6-c98fd9675-r7bfw     1.24.6
+reviews-v3-77d9db6844-djgjk.bookinfo                    Kubernetes     SYNCED (2m19s)     SYNCED (2m19s)     SYNCED (2m17s)     SYNCED (2m19s)     IGNORED     istiod-default-v1-24-6-c98fd9675-r7bfw     1.24.6
+```
+
+The column `VERSION` should match with the new control plane version.

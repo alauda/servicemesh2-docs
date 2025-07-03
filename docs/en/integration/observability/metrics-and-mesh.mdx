@@ -3,3 +3,111 @@ weight: 20
 ---
 
 # Metrics and Service Mesh
+
+## Using metrics
+
+Monitoring plugin such as **Prometheus** or **VictoriaMetrics** should be installed to provide metrics for the Alauda Service Mesh v2 Operator and Istio control plane.
+
+When you have added your application to the mesh, you can monitor the in-cluster health and performance of your applications running on Alauda Container Platform with metrics and customized alerts for CPU and memory usage, network connectivity, and other resource usage.
+
+## Configuring Monitoring with Service Mesh
+
+You can integrate Alauda Service Mesh with user-workload monitoring to enable observability in your service mesh. User-workload monitoring provides access to essential built-in tools and is required to run Kiali, the dedicated console for Istio.
+
+**Prerequisites**
+
+- Alauda Service Mesh is installed.
+
+**Procedure**
+
+1. Create a YAML file named `servicemonitor.yml` to monitor the Istio control plane:
+
+   **Example `ServiceMonitor` object**
+
+   ```yaml
+   apiVersion: monitoring.coreos.com/v1
+   kind: ServiceMonitor
+   metadata:
+     name: istiod-monitor
+     namespace: istio-system
+   spec:
+     targetLabels:
+     - app
+     selector:
+       matchLabels:
+         istio: pilot
+     endpoints:
+     - port: http-monitoring
+       interval: 30s
+   ```
+
+2. Apply the YAML file by running the following command:
+
+   ```bash
+   kubectl apply -f servicemonitor.yml
+   ```
+
+3. Create a YAML file named `podmonitor.yml` to collect metrics from the Istio proxies (workloads):
+
+   **Example PodMonitor object**
+
+   ```yaml
+   apiVersion: monitoring.coreos.com/v1
+   kind: PodMonitor
+   metadata:
+     name: istio-proxies-monitor
+     namespace: istio-system  # [!code callout]
+   spec:
+     selector:
+       matchExpressions:
+       - key: istio-prometheus-ignore
+         operator: DoesNotExist
+     podMetricsEndpoints:
+     - path: /stats/prometheus
+       interval: 30s
+       relabelings:
+       - action: keep
+         sourceLabels: ["__meta_kubernetes_pod_container_name"]
+         regex: "istio-proxy"
+       - action: keep
+         sourceLabels: ["__meta_kubernetes_pod_annotationpresent_prometheus_io_scrape"]
+       - action: replace
+         regex: (\d+);(([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4})
+         replacement: '[$2]:$1'
+         sourceLabels: ["__meta_kubernetes_pod_annotation_prometheus_io_port","__meta_kubernetes_pod_ip"]
+         targetLabel: "__address__"
+       - action: replace
+         regex: (\d+);((([0-9]+?)(\.|$)){4})
+         replacement: '$2:$1'
+         sourceLabels: ["__meta_kubernetes_pod_annotation_prometheus_io_port","__meta_kubernetes_pod_ip"]
+         targetLabel: "__address__"
+       - sourceLabels: ["__meta_kubernetes_pod_label_app_kubernetes_io_name","__meta_kubernetes_pod_label_app"]
+         separator: ";"
+         targetLabel: "app"
+         action: replace
+         regex: "(.+);.*|.*;(.+)"
+         replacement: "${1}${2}"
+       - sourceLabels: ["__meta_kubernetes_pod_label_app_kubernetes_io_version","__meta_kubernetes_pod_label_version"]
+         separator: ";"
+         targetLabel: "version"
+         action: replace
+         regex: "(.+);.*|.*;(.+)"
+         replacement: "${1}${2}"
+       - sourceLabels: ["__meta_kubernetes_namespace"]
+         action: replace
+         targetLabel: namespace
+       - action: replace
+         replacement: "the-mesh-identification-string"
+         targetLabel: mesh_id
+   ```
+
+   <Callouts>
+     1. Specifies that the `PodMonitor` object must be applied in all mesh namespaces, including the Istio control plane namespace, because Alauda Container Platform monitoring ignores the `namespaceSelector` spec in `ServiceMonitor` and `PodMonitor` objects.
+     2. Specify the actual mesh ID.
+   </Callouts>
+
+4. Apply the YAML file by running the following command:
+
+   ```bash
+   kubectl apply -f podmonitor.yml
+   ```
