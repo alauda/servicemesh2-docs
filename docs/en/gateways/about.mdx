@@ -411,41 +411,37 @@ You can use this procedure to create ingress or egress gateways.
      selector:
        matchLabels:
        istio: <gateway_name>
-   template:
-     metadata:
-       annotations:
-         inject.istio.io/templates: gateway  # [!code callout]
-       labels:
-         istio: <gateway_name>  # [!code callout]
-         sidecar.istio.io/inject: "true"  # [!code callout]
-     spec:
-       containers:
-         - name: istio-proxy
-           image: auto  # [!code callout]
-           securityContext:
-             capabilities:
-               drop:
-                 - ALL
-             allowPrivilegeEscalation: false
-             privileged: false
-             readOnlyRootFilesystem: true
-             runAsNonRoot: true
-           ports:
-             - containerPort: 15090
-               protocol: TCP
-               name: http-envoy-prom
-           resources:
-             limits:
-               cpu: 2000m
-               memory: 1024Mi
-             requests:
-               cpu: 100m
-               memory: 128Mi
-       securityContext:
-         sysctls:
-         - name: net.ipv4.ip_unprivileged_port_start
-           value: "0"
-       serviceAccountName: secret-reader  # [!code callout]
+     template:
+       metadata:
+         annotations:
+           inject.istio.io/templates: gateway  # [!code callout]
+         labels:
+           istio: <gateway_name>  # [!code callout]
+           sidecar.istio.io/inject: "true"  # [!code callout]
+       spec:
+         containers:
+           - name: istio-proxy
+             image: auto  # [!code callout]
+             securityContext:
+               capabilities:
+                 drop:
+                   - ALL
+               allowPrivilegeEscalation: false
+               privileged: false
+               readOnlyRootFilesystem: true
+               runAsNonRoot: true
+             ports:
+               - containerPort: 15090
+                 protocol: TCP
+                 name: http-envoy-prom
+             resources:
+               limits:
+                 cpu: 2000m
+                 memory: 1024Mi
+               requests:
+                 cpu: 100m
+                 memory: 128Mi
+         serviceAccountName: secret-reader  # [!code callout]
    ```
 
    <Callouts>
