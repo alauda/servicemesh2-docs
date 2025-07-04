@@ -46,8 +46,8 @@ You can use this procedure to create ingress or egress gateways.
    In this approach, the gateway acts as a dedicated gateway for the application in that namespace.
    :::
 
-2. Create a YAML file named `secret-reader.yml` that defines the service account, role, and role binding for the gateway deployment. These settings enable the gateway to read the secrets, which is required for obtaining TLS credentials.
-   ```yaml
+2. Create a YAML file named `secret-reader.yaml` that defines the service account, role, and role binding for the gateway deployment. These settings enable the gateway to read the secrets, which is required for obtaining TLS credentials.
+   ```yaml title="secret-reader.yaml"
    apiVersion: v1
    kind: ServiceAccount
    metadata:
@@ -80,12 +80,12 @@ You can use this procedure to create ingress or egress gateways.
 
 3. Apply the YAML file by running the following command:
    ```bash
-   kubectl apply -f secret-reader.yml
+   kubectl apply -f secret-reader.yaml
    ```
 
-4. Create a YAML file named `gateway-deployment.yml` that defines the Kubernetes `Deployment` object for the gateway.
+4. Create a YAML file named `gateway-deployment.yaml` that defines the Kubernetes `Deployment` object for the gateway.
 
-   ```yaml
+   ```yaml title="gateway-deployment.yaml"
    apiVersion: apps/v1
    kind: Deployment
    metadata:
@@ -144,7 +144,7 @@ You can use this procedure to create ingress or egress gateways.
 
 5. Apply the YAML file by running the following command:
    ```bash
-   kubectl apply -f gateway-deployment.yml
+   kubectl apply -f gateway-deployment.yaml
    ```
 
 6. Verify that the gateway `Deployment` rollout was successful by running the following command:
@@ -162,9 +162,9 @@ You can use this procedure to create ingress or egress gateways.
    deployment "<gateway_name>" successfully rolled out
    ```
 
-7. Create a YAML file named `gateway-service.yml` that contains the Kubernetes `Service` object for the gateway.
+7. Create a YAML file named `gateway-service.yaml` that contains the Kubernetes `Service` object for the gateway.
 
-   ```yaml
+   ```yaml title="gateway-service.yaml"
    apiVersion: v1
    kind: Service
    metadata:
@@ -197,29 +197,29 @@ You can use this procedure to create ingress or egress gateways.
 
 8. Apply the YAML file by running the following command:
    ```bash
-   kubectl apply -f gateway-service.yml
+   kubectl apply -f gateway-service.yaml
    ```
 
 9. Verify that the gateway service is targeting the endpoint of the gateway pods by running the following command:
 
-   ```bash
-   kubectl get endpoints <gateway_name> -n <gateway_namespace>
-   ```
+```bash
+kubectl get endpoints <gateway_name> -n <gateway_namespace>
+```
 
-   You should see output similar to the following example:
+You should see output similar to the following example:
 
-   **Example output**
+**Example output**
 
-   ```
-   NAME              ENDPOINTS                             AGE
-   <gateway_name>    10.131.0.181:8080,10.131.0.181:8443   1m
-   ```
+```
+NAME              ENDPOINTS                             AGE
+<gateway_name>    10.131.0.181:8080,10.131.0.181:8443   1m
+```
 
-10. *Optional*: Create a YAML file named `gateway-hpa.yml` that defines a horizontal pod autoscaler for the gateway.
+10. *Optional*: Create a YAML file named `gateway-hpa.yaml` that defines a horizontal pod autoscaler for the gateway.
     The following example sets the minimum replicas to `2` and the maximum replicas to `5` and scales the replicas up when average CPU utilization exceeds 80% of the CPU resource limit.
     This limit is specified in the pod template of the deployment for the gateway.
 
-    ```yaml
+    ```yaml title="gateway-service.yaml"
     apiVersion: autoscaling/v2
     kind: HorizontalPodAutoscaler
     metadata:
@@ -247,13 +247,13 @@ You can use this procedure to create ingress or egress gateways.
 
 11. *Optional*: Apply the YAML file by running the following command:
     ```bash
-    kubectl apply -f gateway-hpa.yml
+    kubectl apply -f gateway-service.yaml
     ```
 
-12. *Optional*: Create a YAML file named `gateway-pdb.yml` that defines a pod disruption budget for the gateway.
+12. *Optional*: Create a YAML file named `gateway-pdb.yaml` that defines a pod disruption budget for the gateway.
     The following example allows gateway pods to be evicted only when at least `1` healthy gateway pod will remain on the cluster after the eviction.
 
-    ```yaml
+    ```yaml title="gateway-pdb.yaml"
     apiVersion: policy/v1
     kind: PodDisruptionBudget
     metadata:
@@ -272,5 +272,5 @@ You can use this procedure to create ingress or egress gateways.
 
 13. *Optional*: Apply the YAML file by running the following command:
     ```bash
-    kubectl apply -f gateway-pdb.yml
+    kubectl apply -f gateway-pdb.yaml
     ```

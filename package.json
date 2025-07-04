@@ -1,6 +1,6 @@
 {
   "devDependencies": {
-    "@alauda/doom": "^1.5.1",
+    "@alauda/doom": "^1.8.1",
     "remark-directive": "^4.0.0",
     "remark-frontmatter": "^5.0.0",
     "remark-gfm": "^4.0.1",
