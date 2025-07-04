@@ -83,7 +83,7 @@ You can use the following section to understand the update process. You can skip
        type: InPlace
    ```
 
-5. *Optional*: Install the Istio CNI plugin with the desired version. The following example configuration creates an `IstioCNI` resource named default in the `istio-cni` namespace:
+5. Install the Istio CNI plugin with the desired version. The following example configuration creates an `IstioCNI` resource named default in the `istio-cni` namespace:
 
    ```yaml
    apiVersion: sailoperator.io/v1
@@ -93,6 +93,8 @@ You can use the following section to understand the update process. You can skip
    spec:
      version: v1.24.6
      namespace: istio-cni
+     values:
+       provider: multus
    ```
 
 ## Updating Istio control plane with InPlace strategy
@@ -102,10 +104,11 @@ When updating Istio using the `InPlace` strategy, you can increment the version 
 **Prerequisites**
 
 - You are logged in to the Alauda Container Platform web console as cluster-admin.
+- You have installed the Alauda Container Platform Networking for Multus plugin.
 - You have installed the Alauda Service Mesh v2 Operator, and deployed Istio.
 - You have installed `istioctl` on your local machine.
 - You have configured the Istio control plane to use the `InPlace` update strategy. In this example, the `Istio` resource named `default` is deployed in the `istio-system` namespace.
-- *Optional*: You have installed the Istio CNI plugin with the desired version. In this example, the `IstioCNI` resource named `default` is deployed in the `istio-cni` namespace.
+- You have installed the Istio CNI plugin with the desired version. In this example, the `IstioCNI` resource named `default` is deployed in the `istio-cni` namespace.
 - You have labeled the `bookinfo` namespace to enable sidecar injection.
 - You have application workloads running in the cluster. In this example, the bookinfo application is deployed in the `bookinfo` namespace.
 
