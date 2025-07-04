@@ -7,7 +7,7 @@ weight: 10
 Installing Alauda Service Mesh consists four major parts:
 
 - Installing the Alauda Service Mesh v2 Operator
-- Deploying Istio CNI if required
+- Deploying Istio CNI
 - Deploying Istio control plane
 - Customizing the Istio configuration
 
@@ -32,6 +32,7 @@ The Operator might create additional `IstioRevision` instances, when the `Istio`
 
 - The Alauda Service Mesh v2 must be uploaded.
 - You are logged in to the Alauda Container Platform web console as cluster-admin.
+- The Alauda Container Platform Networking for Multus plugin must be installed.
 
 **Procedure**
 
@@ -63,7 +64,7 @@ Installing Alauda Service Mesh v2 also provisions two categories of custom resou
 
 ## About Istio deployment
 
-To deploy Istio, you must create `Istio` resource. For Huawei CCE or environments that prohibit the use of `NET_ADMIN` and `NET_RAW` permissions in business workloads, `IstioCNI` resource is also required.
+To deploy Istio, you must create `Istio` and `IstioCNI` resources.
 
 The `Istio` resource is responsible for deploying and configuring the Istio Control Plane.
 
@@ -87,6 +88,8 @@ The Alauda Service Mesh v2 Operator leverages this resource's configuration to d
 
 - The Alauda Service Mesh v2 Operator must be installed.
 - You are logged in to the Alauda Container Platform web console as cluster-admin.
+- The Alauda Container Platform Networking for Multus plugin must be installed.
+-
 
 **Procedure**
 
@@ -102,13 +105,9 @@ The Alauda Service Mesh v2 Operator leverages this resource's configuration to d
 
 **Verification**
 
-Wait for `.status.state` field of the `Istio` resource to be `Ready`.
+Wait for `.status.state` field of the `Istio` resource to be `Healthy`.
 
 ### Creating the namespace for IstioCNI
-
-:::info
-You can skip this section if Istio CNI is not required for your environments.
-:::
 
 ```bash
 kubectl create namespace istio-cni
@@ -116,17 +115,14 @@ kubectl create namespace istio-cni
 
 ### Creating the IstioCNI resource using web console
 
-:::info
-You can skip this section if Istio CNI is not required for your environments.
-:::
-
 Create an Istio Container Network Interface (CNI) resource, which contains the configuration file for the Istio CNI plugin.
 The Alauda Service Mesh v2 Operator uses this resource's configuration to deploy the CNI pod.
 
 **Prerequisites**
 
-- The Alauda Service Mesh v2 Operator must be installed.
 - You are logged in to the Alauda Container Platform web console as cluster-admin.
+- The Alauda Service Mesh v2 Operator must be installed.
+- The Alauda Container Platform Networking for Multus plugin must be installed.
 
 **Procedure**
 
@@ -138,11 +134,24 @@ The Alauda Service Mesh v2 Operator uses this resource's configuration to deploy
 6. Click **Create**.
 7. Locate and Select **IstioCNI** and then click **Create**.
 8. Select the `istio-cni` from the **Namespace** drop down.
-9. Click **Create**.
+9. Click **YAML** tab.
+10. Add the following YAML snippet to the **YAML** code editor:
+    ```yaml
+    apiVersion: sailoperator.io/v1
+    kind: IstioCNI
+    spec:
+      # Applying the following contents to the yaml code editor:
+      values:
+        provider: multus  # [!code callout]
+    ```
+    <Callouts>
+      1. Indicates that we should use Multus as the CNI provider.
+    </Callouts>
+11. Click **Create**.
 
 **Verification**
 
-Wait for `.status.state` field of the `IstioCNI` resource to be `Ready`.
+Wait for `.status.state` field of the `IstioCNI` resource to be `Healthy`.
 
 ## Customizing Istio configuration
 
