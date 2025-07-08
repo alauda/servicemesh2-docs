@@ -1,0 +1,107 @@
+---
+weight: 900
+---
+
+# Enabling mutual Transport Layer Security
+
+You can use Alauda Service Mesh for your application to customize the communication security between the complex array of microservices. Mutual Transport Layer Security (mTLS) is a protocol that enables two parties to authenticate each other.
+
+## About mutual Transport Layer Security (mTLS)
+
+In Alauda Service Mesh, mTLS settings can be configured using the `Istio` resource.
+
+`STRICT` mTLS mode can be configured using the `PeerAuthentication` and `DestinationRule` resources.
+
+Review the following `Istio` resources and concepts to configure mTLS settings properly:
+
+- `PeerAuthentication`
+
+  defines the type of mTLS traffic a sidecar accepts. In `PERMISSIVE` mode, both plaintext and mTLS traffic are accepted. In `STRICT` mode, only mTLS traffic is allowed.
+
+- `DestinationRule`
+
+  configures the type of TLS traffic a sidecar sends. In `DISABLE` mode, the sidecar sends plaintext. In `SIMPLE`, `MUTUAL`, and `ISTIO_MUTUAL` modes, the sidecar establishes a TLS connection.
+
+- `Auto mTLS`
+
+  ensures that all inter-mesh traffic is encrypted with mTLS by default, regardless of the `PeerAuthentication` mode configuration. `Auto mTLS` is controlled by the global mesh configuration field `enableAutoMtls`, which is enabled by default in Alauda Service Mesh. The mTLS setting operates entirely between sidecar proxies, requiring no changes to application or service code.
+
+By default, `PeerAuthentication` is set to `PERMISSIVE` mode, allowing sidecars in the Service Mesh to accept both plain-text and mTLS-encrypted traffic.
+
+## Enabling strict mTLS mode by using the namespace
+
+You can restrict workloads to accept only encrypted mTLS traffic by enabling the `STRICT` mode in `PeerAuthentication`.
+
+**Example `PeerAuthentication` policy for a namespace**
+
+```yaml
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: <namespace>  # [!code callout]
+spec:
+  mtls:
+    mode: STRICT
+```
+
+<Callouts>
+  1. Which `<namespace>` to apply the `STRICT` mTLS mode.
+</Callouts>
+
+You can enable mTLS for all destination hosts in the `<namespace>` by creating a `DestinationRule` resource with `MUTUAL` or `ISTIO_MUTUAL` mode when `auto mTLS` is **disabled** and `PeerAuthentication` is set to `STRICT` mode.
+
+**Example `DestinationRule` policy for a namespace**
+
+```yaml
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: enable-mtls
+  namespace: <namespace>  # [!code callout]
+spec:
+  host: "*.<namespace>.svc.cluster.local"  # [!code callout]
+  trafficPolicy:
+   tls:
+    mode: ISTIO_MUTUAL
+```
+
+## Enabling strict mTLS across the whole service mesh
+
+You can configure mTLS across the entire mesh by applying the `PeerAuthentication` policy to the `istiod` namespace, such as `istio-system`. The `istiod` namespace name must match to the `spec.namespace` field of your `Istio` resource.
+
+**Example `PeerAuthentication` policy for the whole mesh**
+
+```yaml
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: istio-system
+spec:
+  mtls:
+    mode: STRICT
+```
+
+Additionally, create a `DestinationRule` resource to disable mTLS for communication with the API server, as it does not have a sidecar. Apply similar `DestinationRule` configurations for other services without sidecars.
+
+**Example `DestinationRule` policy for the whole mesh**
+
+```yaml
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: api-server
+  namespace: istio-system
+spec:
+  host: kubernetes.default.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: DISABLE
+```
+
+## Validating encryptions with Kiali
+
+The Kiali console offers several ways to validate whether or not your applications, services, and workloads have mTLS encryption enabled.
+
+The **Services Detail Overview** page displays a **Security** icon on the graph edges where at least one request with mTLS enabled is present. Also note that Kiali displays a lock icon in the **Network** section next to ports that are configured for mTLS.

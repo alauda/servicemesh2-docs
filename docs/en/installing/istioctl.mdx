@@ -1,0 +1,68 @@
+---
+weight: 800
+---
+
+# Istioctl tool
+
+Alauda Service Mesh 2 supports `istioctl`, the official command line utility for the Istio project that includes many diagnostic and debugging utilities.
+
+## Installing the Istioctl tool
+
+Install the `istioctl` command-line utility to debug and diagnose Istio service mesh deployments.
+
+**Prerequisites**
+
+- The Alauda Service Mesh 2 Operator is installed and running.
+- You have created at least one `Istio` resource.
+
+**Procedure**
+
+1. Confirm which version of the `Istio` resource runs on the installation by running the following command:
+
+   ```bash
+   kubectl get istio -ojsonpath="{range .items[*]}{.spec.version}{'\n'}{end}" | sed s/^v// | sort
+   ```
+
+   If there are multiple Istio resources with different versions, choose the latest version. The latest version is displayed last.
+
+2. Navigate to [https://github.com/istio/istio/releases](https://github.com/istio/istio/releases).
+
+3. Locate the appropriate version and os arch from GitHub releases page.
+
+4. Extract the `istioctl` binary file.
+
+   1. If you are using a Linux operating system, run the following command:
+
+      ```bash
+      tar xzf istioctl-<VERSION>-<OS>-<ARCH>.tar.gz
+      ```
+
+   2. If you are using an Apple Mac operating system, unpack and extract the archive.
+
+   3. If you are using a Microsoft Windows operating system, use the zip software to extract the archive.
+
+5. Move to the uncompressed directory by running the following command:
+
+   ```bash
+   cd istioctl-<VERSION>-<OS>-<ARCH>
+   ```
+
+6. Add the `istioctl` client to the path by running the following command:
+
+   ```bash
+   export PATH=$PWD:$PATH
+   ```
+
+7. Confirm that the `istioctl` client version and the Istio control plane version match or are within one version by running the following command:
+
+   ```bash
+   istioctl version
+   ```
+
+   **Example output**
+
+   ```
+   client version: 1.20.0
+   control plane version: 1.24.6-asm.r0
+   data plane version: none
+   ```
