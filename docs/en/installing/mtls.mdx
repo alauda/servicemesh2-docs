@@ -4,7 +4,7 @@ weight: 900
 
 # Enabling mutual Transport Layer Security
 
-You can use Alauda Service Mesh for your application to customize the communication security between the complex array of microservices. Mutual Transport Layer Security (mTLS) is a protocol that enables two parties to authenticate each other.
+Alauda Service Mesh supports configuring secure communication between services using Mutual Transport Layer Security (mTLS), a protocol that ensures mutual authentication between service clients and servers.
 
 ## About mutual Transport Layer Security (mTLS)
 
@@ -14,23 +14,25 @@ In Alauda Service Mesh, mTLS settings can be configured using the `Istio` resour
 
 Review the following `Istio` resources and concepts to configure mTLS settings properly:
 
-- `PeerAuthentication`
+- **PeerAuthentication**
+  Defines the mTLS mode accepted by sidecar proxies.
+  - `PERMISSIVE`: Accepts both plaintext and mTLS traffic.
+  - `STRICT`: Only mTLS traffic is accepted.
 
-  defines the type of mTLS traffic a sidecar accepts. In `PERMISSIVE` mode, both plaintext and mTLS traffic are accepted. In `STRICT` mode, only mTLS traffic is allowed.
+- **DestinationRule**
+  Defines the TLS mode used for traffic sent from sidecar proxies.
+  - `DISABLE`: Sends plaintext traffic.
+  - `SIMPLE`, `MUTUAL`, `ISTIO_MUTUAL`: Sends traffic using TLS.
 
-- `DestinationRule`
-
-  configures the type of TLS traffic a sidecar sends. In `DISABLE` mode, the sidecar sends plaintext. In `SIMPLE`, `MUTUAL`, and `ISTIO_MUTUAL` modes, the sidecar establishes a TLS connection.
-
-- `Auto mTLS`
-
-  ensures that all inter-mesh traffic is encrypted with mTLS by default, regardless of the `PeerAuthentication` mode configuration. `Auto mTLS` is controlled by the global mesh configuration field `enableAutoMtls`, which is enabled by default in Alauda Service Mesh. The mTLS setting operates entirely between sidecar proxies, requiring no changes to application or service code.
+- **Auto mTLS**
+  Automatically enables mTLS for inter-mesh communication, regardless of the `PeerAuthentication` mode. This feature is controlled by the `enableAutoMtls` field in the mesh configuration and is enabled by default.
+  Auto mTLS operates at the proxy level and requires no changes to application code.
 
 By default, `PeerAuthentication` is set to `PERMISSIVE` mode, allowing sidecars in the Service Mesh to accept both plain-text and mTLS-encrypted traffic.
 
 ## Enabling strict mTLS mode by using the namespace
 
-You can restrict workloads to accept only encrypted mTLS traffic by enabling the `STRICT` mode in `PeerAuthentication`.
+You can enforce strict mTLS mode for all workloads in a specific namespace by applying a `PeerAuthentication` policy.
 
 **Example `PeerAuthentication` policy for a namespace**
 
@@ -68,7 +70,7 @@ spec:
 
 ## Enabling strict mTLS across the whole service mesh
 
-You can configure mTLS across the entire mesh by applying the `PeerAuthentication` policy to the `istiod` namespace, such as `istio-system`. The `istiod` namespace name must match to the `spec.namespace` field of your `Istio` resource.
+You can enforce strict mTLS cluster-wide by applying a `PeerAuthentication` policy in the control plane namespace (e.g., `istio-system`). The namespace must match the value of the `spec.namespace` field in the `Istio` resource.
 
 **Example `PeerAuthentication` policy for the whole mesh**
 
@@ -104,4 +106,6 @@ spec:
 
 The Kiali console offers several ways to validate whether or not your applications, services, and workloads have mTLS encryption enabled.
 
-The **Services Detail Overview** page displays a **Security** icon on the graph edges where at least one request with mTLS enabled is present. Also note that Kiali displays a lock icon in the **Network** section next to ports that are configured for mTLS.
+- Navigate to the **Services Detail Overview** page.
+- A lock icon is displayed on graph edges where mTLS is active.
+- In the **Network** section of the UI, mTLS-enabled ports are also marked with a lock icon.

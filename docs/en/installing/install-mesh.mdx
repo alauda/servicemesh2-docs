@@ -7,31 +7,30 @@ weight: 10
 Installing Alauda Service Mesh consists four major parts:
 
 - Installing the Alauda Service Mesh v2 Operator
-- Deploying Istio CNI
-- Deploying Istio control plane
-- Customizing the Istio configuration
+- Deploying the Istio CNI plugin
+- Deploying the Istio control plane
+- Customizing Istio configuration
 
 :::warning
-Before installing Alauda Service Mesh v2, make sure you are not running Alauda Service Mesh and Alauda Service Mesh v2 in the same cluster,
-because it will lead to conflicts currently.
+Do not install Alauda Service Mesh and Alauda Service Mesh v2 in the same Kubernetes cluster, as this may result in functional conflicts.
 
-Migration guide will be provided in an upcoming release.
+Migration guide will be available in a future release.
 :::
 
-## About deploying Istio using the Alauda Service Mesh v2 Operator
+## Deploying Istio with the Alauda Service Mesh v2 Operator
 
 To deploy Istio using Alauda Service Mesh v2 Operator, `Istio` resource is required to be created.
 The Operator then creates an `IstioRevision` resources, representing a distinct revision of the Istio control plane.
 The Istio control plane is subsequently deployed based on these `IstioRevision` resources.
 
-The Operator might create additional `IstioRevision` instances, when the `Istio` resource's update strategy is set to `RevisionBased`.
+If the update strategy of the `Istio` resource is set to `RevisionBased`, the Operator may create additional `IstioRevision` resources to manage control plane upgrades.
 
 ## Installing the Alauda Service Mesh v2 Operator
 
 **Prerequisites**
 
 - The Alauda Service Mesh v2 must be uploaded.
-- You are logged in to the Alauda Container Platform web console as cluster-admin.
+- You must be logged in to the Alauda Container Platform web console as **cluster-admin**.
 - The Alauda Container Platform Networking for Multus plugin must be installed.
 
 **Procedure**
@@ -49,26 +48,23 @@ The Operator might create additional `IstioRevision` instances, when the `Istio`
 
 **Verification**
 
-Confirm that the **Installation Info** tile shows `Succeeded`.
+Verify that the Operator installation status is reported as `Succeeded` in the **Installation Info** section.
 
-### About Service Mesh custom resource definitions
+### Custom Resource Definitions Installed by the Operator
 
-Installing Alauda Service Mesh v2 also provisions two categories of custom resource definitions (CRDs) that administrators can use to configure Istio for the service mesh:
+The Operator installs the following categories of Custom Resource Definitions (CRDs):
 
-- **Sail Operator CRDs** defines custom resources for installing and maintaining the Istio components.
-  They belong to the `sailoperator.io` API group and include `Istio`, `IstioRevision`, `IstioCNI`, and `ZTunnel` resource kinds.
-  For configuration details, refer to the `sailoperator.io` [API reference](https://github.com/alauda-mesh/sail-operator/blob/main/docs/api-reference/sailoperator.io.md) documentation.
+- **Sail Operator CRDs**:
+  These CRDs belong to the `sailoperator.io` API group and define custom resources for managing Istio components, including `Istio`, `IstioRevision`, `IstioCNI`, and `ZTunnel`.
+  Refer to the [Sail Operator API reference](https://github.com/alauda-mesh/sail-operator/blob/main/docs/api-reference/sailoperator.io.md) for details.
 
-- **Istio CRDs** are associated with mesh configuration, service and traffic management.
-  Those CRDs define custom resources in several `istio.io` API groups, such as `networking.istio.io`, `security.istio.io`, and `telemetry.istio.io`, see the [Istio documentation](https://istio.io/latest/docs/) for more information.
+- **Istio CRDs**:
+  These CRDs manage mesh configuration, service discovery, traffic routing, and observability. They belong to the `istio.io` API groups such as `networking.istio.io`, `security.istio.io`, and `telemetry.istio.io`.
+  See the [Istio documentation](https://istio.io/latest/docs/) for configuration guidance.
 
-## About Istio deployment
+## Deploying Istio Components
 
-To deploy Istio, you must create `Istio` and `IstioCNI` resources.
-
-The `Istio` resource is responsible for deploying and configuring the Istio Control Plane.
-
-The `IstioCNI` resource handles the deployment and configuration of the Istio Container Network Interface (CNI) plugin.
+Both `Istio` and `IstioCNI` custom resources must be created to deploy the control plane and the Istio CNI plugin.
 
 It's required to create these `Istio` and `IstioCNI` resources in separate namespaces.
 
@@ -79,7 +75,7 @@ kubectl create namespace istio-system
 kubectl label namespace istio-system cpaas.io/project=cpaas-system
 ```
 
-### Creating the Istio resource using web console
+### Creating the `Istio` Resource via Web Console
 
 Create the `Istio` resource that will contain the YAML configuration for your Istio deployment.
 The Alauda Service Mesh v2 Operator leverages this resource's configuration to deploy the Istio Control Plane.
@@ -87,9 +83,8 @@ The Alauda Service Mesh v2 Operator leverages this resource's configuration to d
 **Prerequisites**
 
 - The Alauda Service Mesh v2 Operator must be installed.
-- You are logged in to the Alauda Container Platform web console as cluster-admin.
+- You are logged in to the Alauda Container Platform web console as **cluster-admin**.
 - The Alauda Container Platform Networking for Multus plugin must be installed.
--
 
 **Procedure**
 
@@ -105,7 +100,7 @@ The Alauda Service Mesh v2 Operator leverages this resource's configuration to d
 
 **Verification**
 
-Wait for `.status.state` field of the `Istio` resource to be `Healthy`.
+Wait until the `.status.state` field of the `Istio` resource to be `Healthy`.
 
 ### Creating the namespace for IstioCNI
 
@@ -151,7 +146,7 @@ The Alauda Service Mesh v2 Operator uses this resource's configuration to deploy
 
 **Verification**
 
-Wait for `.status.state` field of the `IstioCNI` resource to be `Healthy`.
+Wait until the `.status.state` field of the `IstioCNI` resource to be `Healthy`.
 
 ## Customizing Istio configuration
 
