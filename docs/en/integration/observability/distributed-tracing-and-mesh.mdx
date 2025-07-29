@@ -6,5 +6,112 @@ weight: 30
 
 ## Configuring distributed tracing platform with Service Mesh
 
-TBD TBD TBD
+Alauda Service Mesh supports distributed tracing through integration with the following components:
 
+- **Alauda Build of Jaeger**: A customized distribution based on the open source [Jaeger](https://www.jaegertracing.io/) project. It provides end-to-end visibility into requests across complex distributed systems.
+
+- **Alauda Build of OpenTelemetry**: Based on the [OpenTelemetry](https://opentelemetry.io/) project, this component simplifies telemetry data collection across metrics, logs, and traces by managing the OpenTelemetry Collector and workload instrumentation.
+
+The [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) acts as an intermediary for telemetry signals. It supports multiple data formats and provides a standardized pipeline for processing and exporting telemetry to backends such as Jaeger.
+
+### Configuring distributed tracing data collection with Service Mesh
+
+You can integrate Alauda Service Mesh with OpenTelemetry to instrument, generate, collect, and export OpenTelemetry traces, metrics, and logs to analyze and understand your software’s performance and behavior.
+
+**Prerequisites**
+
+- Alauda Build of Jaeger is installed.
+- Alauda Build of OpenTelemetry is installed.
+- A `Jaeger` instance is installed and configured in the `istio-system` namespace.
+- An Istio instance is created.
+- An Istio CNI instance is created.
+
+**Procedure**
+
+1. Navigate to Alauda Build of OpenTelemetry in OperatorHub and creates `OpenTelemetryCollector` in the `istio-system` namespace.
+
+   **Example OpenTelemetry Collector in `istio-system` namespace**
+
+   ```yaml
+   kind: OpenTelemetryCollector
+   apiVersion: opentelemetry.io/v1beta1
+   metadata:
+     name: otel
+     namespace: istio-system
+   spec:
+     observability:
+       metrics: {}
+     deploymentUpdateStrategy: {}
+     config:
+       exporters:
+         otlp:
+           endpoint: 'dns:///jaeger-collector-headless.istio-system:4317'  # [!code callout]
+           balancer_name: round_robin
+           tls:
+             insecure: true
+       receivers:
+         otlp:
+           protocols:
+             grpc:
+               endpoint: '0.0.0.0:4317'
+             http: {}
+       service:
+         pipelines:
+           traces:
+             exporters:
+               - otlp
+             receivers:
+               - otlp
+   ```
+
+   <Callouts>
+     1. The `endpoint` field is the `Jaeger` collector service in the `istio-system` namespace.
+   </Callouts>
+
+2. Update the `Istio` resource to enable tracing and define the OpenTelemetry tracing provider:
+
+   **Example: Enabling tracing via `meshConfig`**
+
+   ```yaml
+   apiVersion: sailoperator.io/v1
+   kind: Istio
+   metadata:
+     name: default
+     # ...
+   spec:
+     namespace: istio-system
+     # ...
+     values:
+       meshConfig:
+         enableTracing: true
+         extensionProviders:
+         - name: otel
+           opentelemetry:
+             port: 4317
+             service: otel-collector.istio-system.svc.cluster.local  # [!code callout]
+   ```
+
+   <Callouts>
+     1. The `service` field is the `OpenTelemetry` collector service in the `istio-system` namespace.
+   </Callouts>
+
+3. Create a `Telemetry` resource to enable the tracing provider defined in the `meshConfig`:
+
+   **Example Istio Telemetry resource**
+
+   ```yaml
+   apiVersion: telemetry.istio.io/v1
+   kind: Telemetry
+   metadata:
+     name: otel-demo
+     namespace: istio-system
+   spec:
+     tracing:
+       - providers:
+           - name: otel
+         randomSamplingPercentage: 100
+   ```
+
+   :::note
+   Once you verify that you can see traces, lower the `randomSamplingPercentage` value or set it to `default` to reduce the number of requests.
+   :::
