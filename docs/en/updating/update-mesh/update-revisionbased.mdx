@@ -69,7 +69,10 @@ You can use the following section to understand the update process. You can skip
      version: v1.24.6
      namespace: istio-cni
      values:
-       provider: multus
+       cni:
+         cniConfDir: /etc/cni/net.d
+         excludeNamespaces:
+           - kube-system
    ```
 
 4. Get the `IstioRevision` name by running the following command:

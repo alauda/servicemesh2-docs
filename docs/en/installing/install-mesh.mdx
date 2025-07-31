@@ -137,11 +137,11 @@ The Alauda Service Mesh v2 Operator uses this resource's configuration to deploy
     spec:
       # Applying the following contents to the yaml code editor:
       values:
-        provider: multus  # [!code callout]
+        cni:
+          cniConfDir: /etc/cni/net.d
+          excludeNamespaces:
+            - kube-system
     ```
-    <Callouts>
-      1. Indicates that we should use Multus as the CNI provider.
-    </Callouts>
 11. Click **Create**.
 
 **Verification**
