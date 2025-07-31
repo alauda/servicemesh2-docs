@@ -22,7 +22,7 @@ It provides:
 
 These capabilities enable users to diagnose service behavior, identify potential issues, and optimize mesh configuration from a unified interface.
 
-### Installing Alauda Build of Kiali
+## Installing Alauda Build of Kiali
 
 The following steps show how to install Alauda Build of Kiali.
 
@@ -43,7 +43,7 @@ The following steps show how to install Alauda Build of Kiali.
 
 Verify that the Operator installation status is reported as `Succeeded` in the **Installation Info** section.
 
-### Configuring Monitoring with Kiali
+## Configuring Monitoring with Kiali
 
 The following steps show how to integrate the Alauda Build of Kiali with user-workload monitoring.
 
@@ -55,114 +55,133 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
 
 **Procedure**
 
-1. Retrieve platform and monitoring configuration from the cluster.
+<Steps>
+  ### Retrieve the CA certificate for Alauda Container Platform in **Global** cluster:
 
-   ```bash
-   # CA certificate for ACP - base64-encoded
-   export PLATFORM_CA=$(kubectl -ncpaas-system get secret dex.tls -o jsonpath='{.data.ca\.crt}')
+  :::note
+  Run the following command in the **Global** cluster
+  :::
 
-   # OIDC Client configuration
-   export OIDC_ISSUER="$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.oidcIssuer}')"
-   export OIDC_CLIENT_ID="$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.oidcClientID}')"
-   export OIDC_CLIENT_SECRET="$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.oidcClientSecret}')"
+  ```bash
+  # CA certificate for ACP - base64-encoded
+  kubectl -ncpaas-system get secret dex.tls -o jsonpath='{.data.ca\.crt}'
+  ```
 
-   # Monitoring
-   export MONITORING_URL=$(kubectl get feature monitoring -o jsonpath='{.spec.accessInfo.database.address}')
-   ```
+  The output is a base64-encoded certificate. Store this value for use in later steps.
 
-2. Create a `Secret` named `kiali` in the `istio-system` namespace for OpenID authentication:
+  ### Retrieve platform configuration from the business cluster:
 
-   ```bash
-   kubectl create secret generic kiali --from-literal="oidc-secret=$OIDC_CLIENT_SECRET" -nistio-system
-   ```
+  ```bash
+  export PLATFORM_URL=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.platformURL}')
+  export CLUSTER_NAME=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.clusterName}')
 
-3. Synchronize basic auth secret for accessing monitoring database:
+  export OIDC_ISSUER=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.oidcIssuer}')
+  export OIDC_CLIENT_ID=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.oidcClientID}')
+  export OIDC_CLIENT_SECRET=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.oidcClientSecret}')
 
-   ```bash
-   SECRET_NAME=$(kubectl get feature monitoring -o jsonpath='{.spec.accessInfo.database.basicAuth.secretName}')
+  export MONITORING_URL=$(kubectl get feature monitoring -o jsonpath='{.spec.accessInfo.database.address}')
+  ```
 
-   AUTH_USERNAME=$(kubectl -ncpaas-system get secret "$SECRET_NAME" -o jsonpath="{.data.username}" | base64 -d)
-   AUTH_PASSWORD=$(kubectl -ncpaas-system get secret "$SECRET_NAME" -o jsonpath="{.data.password}" | base64 -d)
+  ### Create a `Secret` named `kiali` in the `istio-system` namespace for OpenID authentication:
 
-   # [!code callout:1]
-   kubectl create secret generic "kiali-monitoring-basic-auth" \
-     --from-literal="username=$AUTH_USERNAME" \
-     --from-literal="password=$AUTH_PASSWORD" \
-     -n istio-system
-   ```
+  ```bash
+  kubectl create secret generic kiali --from-literal="oidc-secret=$OIDC_CLIENT_SECRET" -nistio-system
+  ```
 
-   <Callouts>
-     1. Create a `Secret` named `kiali-monitoring-basic-auth` in the `istio-system` namespace for basic authentication to monitoring database (Prometheus or VictoriaMetrics).
-   </Callouts>
+  ### Create a `Secret` for monitoring database credentials:
 
-   **Example output:**
+  ```bash
+  SECRET_NAME=$(kubectl get feature monitoring -o jsonpath='{.spec.accessInfo.database.basicAuth.secretName}')
 
-   ```
-   secret/kiali-monitoring-basic-auth created
-   ```
+  AUTH_USERNAME=$(kubectl -ncpaas-system get secret "$SECRET_NAME" -o jsonpath="{.data.username}" | base64 -d)
+  AUTH_PASSWORD=$(kubectl -ncpaas-system get secret "$SECRET_NAME" -o jsonpath="{.data.password}" | base64 -d)
 
-4. Create a file named kiali.yaml with the following content. Replace placeholder values as needed, or render the variables with `envsubst` before applying:
+  kubectl create secret generic "kiali-monitoring-basic-auth" \
+    --from-literal="username=$AUTH_USERNAME" \
+    --from-literal="password=$AUTH_PASSWORD" \
+    -n istio-system
+  ```
 
-   ```yaml title="kiali.yaml"
-   apiVersion: kiali.io/v1alpha1
-   kind: Kiali
-   metadata:
-     name: kiali
-     namespace: istio-system
-   spec:
-     auth:
-       openid:
-         api_proxy: https://erebus.cpaas-system  # [!code callout]
-         api_proxy_ca_data: ${PLATFORM_CA}  # [!code callout]
-         insecure_skip_verify_tls: true  # [!code callout]
-         issuer_uri: ${OIDC_ISSUER}  # [!code callout]
-         client_id: ${OIDC_CLIENT_ID}  # [!code callout]
-         username_claim: email
-       strategy: openid
-     deployment:
-       view_only_mode: false
-       replicas: 1  # [!code callout]
-       resources:
-         requests:
-           cpu: "100m"
-           memory: "64Mi"
-         limits:
-           memory: "1Gi"
-       # Enable ingress (via /kiali)
-       ingress:
-          enabled: true
-          class_name: global-alb2
-     external_services:
-       prometheus:
-         auth:
-           type: basic
-           username: secret:kiali-monitoring-basic-auth:username  # [!code callout]
-           password: secret:kiali-monitoring-basic-auth:password  # [!code callout]
-           insecure_skip_verify: true
-         url: ${MONITORING_URL}  # [!code callout]
-   ```
+  **Example output:**
 
-   <Callouts>
-     1. `api_proxy` points to **erebus** to map ACP user tokens to Kubernetes tokens.
-     2. `api_proxy_ca_data` is the base64‑encoded CA certificate used by **erebus**.
-     3. `insecure_skip_verify_tls` can be set to `false` when not using a self-signed CA certificate.
-     4. `issuer_uri` is the OIDC issuer URL for **dex**.
-     5. `client_id` is the OIDC client ID for **dex**.
-     6. `replicas` specifies the number of replicas for the Kiali deployment, should be at least `2` in production environments.
-     7. `username` references the monitoring basic‑auth username stored in the `kiali-monitoring-basic-auth` Secret.
-     8. `password` references the monitoring basic‑auth password stored in the `kiali-monitoring-basic-auth` Secret.
-     9. `url` is the monitoring endpoint for Prometheus or VictoriaMetrics.
-   </Callouts>
+  ```
+  secret/kiali-monitoring-basic-auth created
+  ```
 
-5. Apply the configuration, render the manifest with `envsubst`:
+  ### Create a file named kiali.yaml with the following content. Replace placeholder values as needed:
 
-   ```bash
-   envsubst < kiali.yaml | kubectl apply -f -
-   ```
+  ```yaml title="kiali.yaml"
+  apiVersion: kiali.io/v1alpha1
+  kind: Kiali
+  metadata:
+    name: kiali
+    namespace: istio-system
+  spec:
+    server:
+      web_root: /clusters/${CLUSTER_NAME}/kiali  # [!code callout]
+    auth:
+      openid:
+        api_proxy: ${PLATFORM_URL}/kubernetes/${CLUSTER_NAME}  # [!code callout]
+        api_proxy_ca_data: ${PLATFORM_CA}  # [!code callout]
+        insecure_skip_verify_tls: true  # [!code callout]
+        issuer_uri: ${OIDC_ISSUER}  # [!code callout]
+        client_id: ${OIDC_CLIENT_ID}  # [!code callout]
+        username_claim: email
+      strategy: openid
+    deployment:
+      view_only_mode: false
+      replicas: 1  # [!code callout]
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"
+        limits:
+          memory: "1Gi"
+      ingress:
+         enabled: true
+         class_name: global-alb2
+    external_services:
+      prometheus:
+        auth:
+          type: basic
+          username: secret:kiali-monitoring-basic-auth:username  # [!code callout]
+          password: secret:kiali-monitoring-basic-auth:password  # [!code callout]
+          insecure_skip_verify: true
+        url: ${MONITORING_URL}  # [!code callout]
+  ```
 
-6. When the `Kiali` resource is ready, access the Kiali dashboard at `<platform-url>/kiali`.
+  <Callouts>
+    1. `web_root` is the path under platform url for accessing the Kiali dashboard.
+    2. `api_proxy` points to **erebus** to map ACP user tokens to Kubernetes tokens.
+    3. `api_proxy_ca_data` is the base64‑encoded CA certificate used by **erebus**.
+    4. `insecure_skip_verify_tls` can be set to `false` when not using a self-signed CA certificate.
+    5. `issuer_uri` is the OIDC issuer URL for **dex**.
+    6. `client_id` is the OIDC client ID for **dex**.
+    7. `replicas` specifies the number of replicas for the Kiali deployment, should be at least `2` in production environments.
+    8. `username` references the monitoring basic‑auth username stored in the `kiali-monitoring-basic-auth` Secret.
+    9. `password` references the monitoring basic‑auth password stored in the `kiali-monitoring-basic-auth` Secret.
+    10. `url` is the monitoring endpoint for Prometheus or VictoriaMetrics.
+  </Callouts>
 
-### Integrating distributed tracing platform with Alauda Build of Kiali
+  ### Apply the configuration, render the manifest with `envsubst`:
+
+  ```bash
+  # Replace <platform-ca> with the real base64-encoded CA certificate saved previously.
+  export PLATFORM_CA=<platform-ca>  # [!code callout]
+
+  envsubst < kiali.yaml | kubectl apply -f -
+  ```
+
+  <Callouts>
+    1. Replace `<platform-ca>` with the real base64-encoded CA certificate saved previously.
+  </Callouts>
+
+  ### Access the Kiali console:
+
+  When the `Kiali` resource is ready, access the Kiali dashboard at `<platform-url>/clusters/<cluster>/kiali`.
+</Steps>
+
+## Integrating distributed tracing platform with Alauda Build of Kiali
 
 After integration with a distributed tracing platform, the Alauda Build of Kiali enables visualization of request traces directly in the Kiali console. These traces provide insight into inter-service communication within the service mesh and can help identify latency, failures, or bottlenecks in request paths.
 
