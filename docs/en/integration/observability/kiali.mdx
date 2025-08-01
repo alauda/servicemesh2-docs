@@ -149,19 +149,25 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
           password: secret:kiali-monitoring-basic-auth:password  # [!code callout]
           insecure_skip_verify: true
         url: ${MONITORING_URL}  # [!code callout]
+    kiali_feature_flags:
+      ui_defaults:
+        i18n: # [!code callout]
+          language: en
+          show_selector: true
   ```
 
   <Callouts>
     1. `web_root` is the path under platform url for accessing the Kiali dashboard.
     2. `api_proxy` points to **erebus** to map ACP user tokens to Kubernetes tokens.
     3. `api_proxy_ca_data` is the base64‑encoded CA certificate used by **erebus**.
-    5. `issuer_uri` is the OIDC issuer URL for **dex**.
-    6. `client_id` is the OIDC client ID for **dex**.
-    7. `replicas` specifies the number of replicas for the Kiali deployment, should be at least `2` in production environments.
-    8. `class_name` is the ingress class name for the Kiali ingress.
-    9. `username` references the monitoring basic‑auth username stored in the `kiali-monitoring-basic-auth` Secret.
-    10. `password` references the monitoring basic‑auth password stored in the `kiali-monitoring-basic-auth` Secret.
-    11. `url` is the monitoring endpoint for Prometheus or VictoriaMetrics.
+    4. `issuer_uri` is the OIDC issuer URL for **dex**.
+    5. `client_id` is the OIDC client ID for **dex**.
+    6. `replicas` specifies the number of replicas for the Kiali deployment, should be at least `2` in production environments.
+    7. `class_name` is the ingress class name for the Kiali ingress.
+    8. `username` references the monitoring basic‑auth username stored in the `kiali-monitoring-basic-auth` Secret.
+    9. `password` references the monitoring basic‑auth password stored in the `kiali-monitoring-basic-auth` Secret.
+    10. `url` is the monitoring endpoint for Prometheus or VictoriaMetrics.
+    11. `i18n` specifies the default language and whether to show the language selector.
   </Callouts>
 
   ### Apply the configuration, render the manifest with `envsubst`:
