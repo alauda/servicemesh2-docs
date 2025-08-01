@@ -49,16 +49,16 @@ The gateway in each cluster must be reachable from the other cluster.
      apiVersion: sailoperator.io/v1
      kind: Istio
      metadata:
-     name: default
+       name: default
      spec:
-     version: v${ISTIO_VERSION}
-     namespace: istio-system
-     values:
+       version: v${ISTIO_VERSION}
+       namespace: istio-system
+       values:
          global:
-         meshID: mesh1
-         multiCluster:
+           meshID: mesh1
+           network: network1
+           multiCluster:
              clusterName: cluster1
-         network: network1
      EOF
      ```
   2. Wait for the control plane to return the `Ready` status condition by running the following command:
@@ -82,16 +82,16 @@ The gateway in each cluster must be reachable from the other cluster.
      apiVersion: sailoperator.io/v1
      kind: Istio
      metadata:
-     name: default
+       name: default
      spec:
-     version: v${ISTIO_VERSION}
-     namespace: istio-system
-     values:
+       version: v${ISTIO_VERSION}
+       namespace: istio-system
+       values:
          global:
-         meshID: mesh1
-         multiCluster:
+           meshID: mesh1
+           network: network2
+           multiCluster:
              clusterName: cluster2
-         network: network2
      EOF
      ```
   2. Wait for the control plane to return the `Ready` status condition by running the following command:
