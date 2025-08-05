@@ -140,6 +140,7 @@ The Alauda Service Mesh v2 Operator uses this resource's configuration to deploy
         cni:
           cniConfDir: /etc/cni/net.d
           excludeNamespaces:
+            - istio-cni
             - kube-system
     ```
 11. Click **Create**.

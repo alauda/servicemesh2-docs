@@ -145,7 +145,8 @@ spec:
     cni:
       cniConfDir: /etc/cni/net.d
       excludeNamespaces:
-      - kube-system
+        - istio-cni
+        - kube-system
 ```
 
 To upgrade the plugin, update the `spec.version` field.
