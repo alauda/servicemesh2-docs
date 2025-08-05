@@ -20,94 +20,123 @@ You can integrate Alauda Service Mesh with user-workload monitoring to enable ob
 
 **Procedure**
 
-1. Create a YAML file named `servicemonitor.yaml` to monitor the Istio control plane:
+<Steps>
+  ### Create a YAML file named `servicemonitor.yaml` to monitor the Istio control plane:
 
-   **Example `ServiceMonitor` object**
+  **Example `ServiceMonitor` object**
 
-   ```yaml title="servicemonitor.yaml"
-   apiVersion: monitoring.coreos.com/v1
-   kind: ServiceMonitor
-   metadata:
-     name: istiod-monitor
-     namespace: istio-system
-   spec:
-     targetLabels:
-     - app
-     selector:
-       matchLabels:
-         istio: pilot
-     endpoints:
-     - port: http-monitoring
-       interval: 30s
-   ```
+  ```yaml title="servicemonitor.yaml"
+  apiVersion: monitoring.coreos.com/v1
+  kind: ServiceMonitor
+  metadata:
+    name: istiod-monitor
+    namespace: istio-system
+  spec:
+    targetLabels:
+    - app
+    selector:
+      matchLabels:
+        istio: pilot
+    endpoints:
+    - port: http-monitoring
+      interval: 60s
+  ```
 
-2. Apply the YAML file by running the following command:
+  ### Apply the YAML file by running the following command:
 
-   ```bash
-   kubectl apply -f servicemonitor.yaml
-   ```
+  ```bash
+  kubectl apply -f servicemonitor.yaml
+  ```
 
-3. Create a YAML file named `podmonitor.yaml` to collect metrics from the Istio proxies (workloads):
+  ### Create a YAML file named `podmonitor.yaml` to collect metrics from the Istio proxies (workloads):
 
-   **Example PodMonitor object**
+  **Example PodMonitor object**
 
-   ```yaml title="podmonitor.yaml"
-   apiVersion: monitoring.coreos.com/v1
-   kind: PodMonitor
-   metadata:
-     name: istio-proxies-monitor
-     namespace: istio-system  # [!code callout]
-   spec:
-     selector:
-       matchExpressions:
-       - key: istio-prometheus-ignore
-         operator: DoesNotExist
-     podMetricsEndpoints:
-     - path: /stats/prometheus
-       interval: 30s
-       relabelings:
-       - action: keep
-         sourceLabels: ["__meta_kubernetes_pod_container_name"]
-         regex: "istio-proxy"
-       - action: keep
-         sourceLabels: ["__meta_kubernetes_pod_annotationpresent_prometheus_io_scrape"]
-       - action: replace
-         regex: (\d+);(([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4})
-         replacement: '[$2]:$1'
-         sourceLabels: ["__meta_kubernetes_pod_annotation_prometheus_io_port","__meta_kubernetes_pod_ip"]
-         targetLabel: "__address__"
-       - action: replace
-         regex: (\d+);((([0-9]+?)(\.|$)){4})
-         replacement: '$2:$1'
-         sourceLabels: ["__meta_kubernetes_pod_annotation_prometheus_io_port","__meta_kubernetes_pod_ip"]
-         targetLabel: "__address__"
-       - sourceLabels: ["__meta_kubernetes_pod_label_app_kubernetes_io_name","__meta_kubernetes_pod_label_app"]
-         separator: ";"
-         targetLabel: "app"
-         action: replace
-         regex: "(.+);.*|.*;(.+)"
-         replacement: "${1}${2}"
-       - sourceLabels: ["__meta_kubernetes_pod_label_app_kubernetes_io_version","__meta_kubernetes_pod_label_version"]
-         separator: ";"
-         targetLabel: "version"
-         action: replace
-         regex: "(.+);.*|.*;(.+)"
-         replacement: "${1}${2}"
-       - sourceLabels: ["__meta_kubernetes_namespace"]
-         action: replace
-         targetLabel: namespace
-       - action: replace
-         replacement: "the-mesh-identification-string"
-         targetLabel: mesh_id
-   ```
+  ```yaml title="podmonitor.yaml"
+  apiVersion: monitoring.coreos.com/v1
+  kind: PodMonitor
+  metadata:
+    name: istio-proxies-monitor
+    namespace: istio-system  # [!code callout]
+  spec:
+    selector:
+      matchExpressions:
+      - key: istio-prometheus-ignore
+        operator: DoesNotExist
+    namespaceSelector:
+      any: true
+    jobLabel: envoy-stats
+    podMetricsEndpoints:
+    - path: /stats/prometheus
+      interval: 60s
+      relabelings:
+      - action: keep
+        sourceLabels: [ __meta_kubernetes_pod_container_name ]
+        regex: "istio-proxy"
+      - action: keep
+        sourceLabels: [__meta_kubernetes_pod_annotationpresent_prometheus_io_scrape]
+      - sourceLabels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: "$1:$2"
+        targetLabel: __address__
+      - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_name, __meta_kubernetes_pod_label_app]
+        separator: ";"
+        targetLabel: "app"
+        action: replace
+        regex: "(.+);.*|.*;(.+)"
+        replacement: "${1}${2}"
+      - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_version, __meta_kubernetes_pod_label_version]
+        separator: ";"
+        targetLabel: "version"
+        action: replace
+        regex: "(.+);.*|.*;(.+)"
+        replacement: "${1}${2}"
+      - sourceLabels: [__meta_kubernetes_namespace]
+        action: replace
+        targetLabel: namespace
+      - action: drop
+        regex: "true"
+        sourceLabels: [__meta_kubernetes_pod_container_init]
+  ```
 
-   <Callouts>
-     1. Specifies that the `PodMonitor` object must be applied in all mesh namespaces, including the Istio control plane namespace, because Alauda Container Platform monitoring ignores the `namespaceSelector` spec in `ServiceMonitor` and `PodMonitor` objects.
-     2. Specify the actual mesh ID.
-   </Callouts>
+  <Callouts>
+    1. Specifies that the `PodMonitor` object must be applied in all mesh namespaces, including the Istio control plane namespace, because Alauda Container Platform monitoring ignores the `namespaceSelector` spec in `ServiceMonitor` and `PodMonitor` objects.
+  </Callouts>
 
-4. Apply the YAML file by running the following command:
+  ### Apply the YAML file by running the following command:
 
-   ```bash
-   kubectl apply -f podmonitor.yaml
-   ```
+  ```bash
+  kubectl apply -f podmonitor.yaml
+  ```
+
+  ### Create a YAML file named `asm-telemetry.yaml` to configure prometheus metrics to istio proxies (workloads):
+
+  **Example Istio Telemetry resource**
+
+  ```yaml title="asm-telemetry.yaml"
+  apiVersion: telemetry.istio.io/v1
+  kind: Telemetry
+  metadata:
+    name: asm-default
+    namespace: istio-system
+  spec:
+    metrics:
+      - providers:
+          - name: prometheus
+        overrides:
+          - tagOverrides:
+              mesh_id:  # [!code callout]
+                value: node.metadata['MESH_ID']
+  ```
+
+  <Callouts>
+    1. Add `mesh_id` label to prometheus metrics.
+  </Callouts>
+
+  ### Apply the YAML file by running the following command:
+
+  ```bash
+  kubectl apply -f asm-telemetry.yaml
+  ```
+</Steps>
