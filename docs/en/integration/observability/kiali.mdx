@@ -152,6 +152,9 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
       grafana:
         enabled: false  # Since Grafana is not bundled in ACP anymore, it is disabled by default
       prometheus:
+        # Only required in multi cluster
+        query_scope:  # [!code callout]
+           mesh_id: <mesh_id>
         auth:
           type: basic
           username: secret:kiali-monitoring-basic-auth:username  # [!code callout]
@@ -178,10 +181,11 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
     6. `client_id` is the OIDC client ID for **dex**.
     7. `replicas` specifies the number of replicas for the Kiali deployment, should be at least `2` in production environments.
     8. `class_name` is the ingress class name for the Kiali ingress.
-    9. `username` references the monitoring basic‑auth username stored in the `kiali-monitoring-basic-auth` Secret.
-    10. `password` references the monitoring basic‑auth password stored in the `kiali-monitoring-basic-auth` Secret.
-    11. `url` is the monitoring endpoint for Prometheus or VictoriaMetrics.
-    12. `i18n` specifies the default language and whether to show the language selector.
+    9. Required in multi cluster mesh. `<mesh_id>` should be the same as the `.spec.values.global.meshId` in `Istio` resource.
+    10. `username` references the monitoring basic‑auth username stored in the `kiali-monitoring-basic-auth` Secret.
+    11. `password` references the monitoring basic‑auth password stored in the `kiali-monitoring-basic-auth` Secret.
+    12. `url` is the monitoring endpoint for Prometheus or VictoriaMetrics.
+    13. `i18n` specifies the default language and whether to show the language selector.
   </Callouts>
 
   ### Apply the configuration, render the manifest with `envsubst`:
@@ -223,6 +227,9 @@ This capability supports the analysis of request flow behavior, aiding in root c
    spec:
      external_services:
        tracing:
+         # Only required in multi cluster
+         query_scope:
+           istio.mesh_id: <mesh_id>  # [!code callout]
          enabled: true  # [!code callout]
          provider: jaeger  # [!code callout]
          use_grpc: true
@@ -234,9 +241,10 @@ This capability supports the analysis of request flow behavior, aiding in root c
    ```
 
    <Callouts>
-     1. Specifies whether tracing is enabled.
-     2. Specifies the tracing provider (`jaeger` or `tempo`).
-     3. Specifies the internal URL for the Jaeger API.
+     1. Required in multi cluster mesh. `<mesh_id>` should be the same as the `.spec.values.global.meshId` in `Istio` resource.
+     2. Specifies whether tracing is enabled.
+     3. Specifies the tracing provider (`jaeger` or `tempo`).
+     4. Specifies the internal URL for the Jaeger API.
    </Callouts>
 
 2. Save the updated spec in `kiali_cr.yaml`.
