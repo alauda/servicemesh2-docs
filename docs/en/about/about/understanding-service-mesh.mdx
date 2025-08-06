@@ -47,7 +47,6 @@ To specify the namespace in which control plane components should run, set the `
 The `spec.namespace` field is immutable. To relocate a control plane to a different namespace, delete the existing `Istio` resource and recreate it with a new namespace.
 :::
 
-
 All customization options are exposed through the `spec.values` field:
 
 **Example Istio resource CRD**
@@ -117,7 +116,7 @@ metadata:
 spec:
   targetRef:
     kind: Istio  # [!code callout]
-    name: prod  # [!code callout]
+    name: default  # [!code callout]
 ```
 
 <Callouts>
@@ -195,11 +194,10 @@ Custom alerts and dashboards can be configured to observe CPU, memory, and netwo
 Alauda Service Mesh supports distributed tracing through integration with:
 
 - **Alauda Build of Jaeger**
-    Based on the [Jaeger](https://www.jaegertracing.io/) project, this component visualizes end-to-end request flows and latency across microservices.
+  Based on the [Jaeger](https://www.jaegertracing.io/) project, this component visualizes end-to-end request flows and latency across microservices.
 
 - **Alauda Build of OpenTelemetry**
-    Based on the [OpenTelemetry](https://opentelemetry.io/) project, this component simplifies telemetry data collection and forwarding.
-
+  Based on the [OpenTelemetry](https://opentelemetry.io/) project, this component simplifies telemetry data collection and forwarding.
 
 The **OpenTelemetry Collector** supports data ingestion in multiple formats, processes telemetry data (traces, metrics, logs), and forwards them to storage or visualization backends. See the [OpenTelemetry Collector documentation](https://opentelemetry.io/docs/collector/) for more details.
 

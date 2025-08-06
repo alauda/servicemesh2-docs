@@ -38,12 +38,13 @@ The gateway in each cluster must be reachable from the other cluster.
   ### Create an `ISTIO_VERSION` environment variable that defines the Istio version to install
 
   ```bash
-  export ISTIO_VERSION=1.24.6
+  export ISTIO_VERSION=1.26.3
   ```
 
   ### Install Istio on the **East** cluster
 
   1. Create an `Istio` resource on the **East** cluster by running the following command:
+
      ```bash
      cat <<EOF | kubectl --context "${CTX_CLUSTER1}" apply -f -
      apiVersion: sailoperator.io/v1
@@ -61,22 +62,37 @@ The gateway in each cluster must be reachable from the other cluster.
              clusterName: cluster1
      EOF
      ```
+
   2. Wait for the control plane to return the `Ready` status condition by running the following command:
+
      ```bash
      kubectl --context "${CTX_CLUSTER1}" wait --for condition=Ready istio/default --timeout=3m
      ```
+
   3. Create an East-West gateway on the **East** cluster by running the following command:
-     ```bash
-     kubectl --context "${CTX_CLUSTER1}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net1.yaml
-     ```
+
+     <details>
+       <summary>Click to expand</summary>
+
+       ```bash
+       kubectl --context "${CTX_CLUSTER1}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net1.yaml
+       ```
+     </details>
+
   4. Expose the services through the gateway by running the following command:
-     ```bash
-     kubectl --context "${CTX_CLUSTER1}" apply -n istio-system -f https://raw.githubusercontent.com/aladua-mesh/sail-operator/main/docs/deployment-models/resources/expose-services.yaml
-     ```
+
+     <details>
+       <summary>Click to expand</summary>
+
+       ```bash
+       kubectl --context "${CTX_CLUSTER1}" apply -n istio-system -f https://raw.githubusercontent.com/aladua-mesh/sail-operator/main/docs/deployment-models/resources/expose-services.yaml
+       ```
+     </details>
 
   ### Install Istio on the **West** cluster
 
   1. Create an `Istio` resource on the **West** cluster by running the following command:
+
      ```bash
      cat <<EOF | kubectl --context "${CTX_CLUSTER2}" apply -f -
      apiVersion: sailoperator.io/v1
@@ -94,17 +110,23 @@ The gateway in each cluster must be reachable from the other cluster.
              clusterName: cluster2
      EOF
      ```
+
   2. Wait for the control plane to return the `Ready` status condition by running the following command:
+
      ```bash
      kubectl --context "${CTX_CLUSTER2}" wait --for condition=Ready istio/default --timeout=3m
      ```
+
   3. Create an East-West gateway on the **West** cluster by running the following command:
+
      ```bash
      kubectl --context "${CTX_CLUSTER2}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net2.yaml
      ```
+
   4. Expose the services through the gateway by running the following command:
+
      ```bash
-     kubectl --context "${CTX_CLUSTER2}" apply -n istio-system -f https://raw.githubusercontent.com/aladua-mesh/sail-operator/main/docs/deployment-models/resources/expose-services.yaml
+     kubectl --context "${CTX_CLUSTER2}" apply -n istio-system -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/expose-services.yaml
      ```
 
   ### Create the `istio-reader-service-account` service account for the **East** cluster

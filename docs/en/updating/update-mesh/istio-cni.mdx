@@ -10,7 +10,7 @@ You can use the following field to manage version updates:
 
 - `spec.version`
 
-  defines the CNI plugin version to install. Specify the value in the format `vX.Y.Z`, where `X.Y.Z` represents the desired version. For example, use `v1.24.6` to install the CNI plugin version `1.24.6`.
+  defines the CNI plugin version to install. Specify the value in the format `vX.Y.Z`, where `X.Y.Z` represents the desired version. For example, use `v1.26.3` to install the CNI plugin version `1.26.3`.
 
 To update the CNI plugin, modify the `spec.version` field with the target version. The `IstioCNI` resource also includes a `values` field that exposes configuration options from the `istio-cni` chart.
 
@@ -26,10 +26,10 @@ You can update the Istio CNI resource version by changing the version in the res
 
 **Procedure**
 
-1. Change the version in the `Istio` resource. For example, to update to Istio `1.24.6`, set the spec.version field to `v1.24.6` by running the following command:
+1. Change the version in the `Istio` resource. For example, to update to Istio `1.26.3`, set the spec.version field to `v1.26.3` by running the following command:
 
    ```bash
-   kubectl patch istiocni default --type='merge' -p '{"spec":{"version":"v1.24.6"}}'
+   kubectl patch istiocni default --type='merge' -p '{"spec":{"version":"v1.26.3"}}'
    ```
 
 2. Confirm that the new version of the CNI plugin is ready by running the following command:
@@ -42,5 +42,5 @@ You can update the Istio CNI resource version by changing the version in the res
 
    ```
    NAME      READY   STATUS    VERSION   AGE
-   default   True    Healthy   v1.24.6   91m
+   default   True    Healthy   v1.26.3   91m
    ```

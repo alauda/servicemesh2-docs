@@ -19,7 +19,7 @@ To deploy Istio with the `RevisionBased` strategy, create the `Istio` resource w
 ```yaml
 kind: Istio
 spec:
-  version: v1.24.6
+  version: v1.26.3
   updateStrategy:
     type: RevisionBased
 ```
@@ -53,7 +53,7 @@ You can use the following section to understand the update process. You can skip
      name: default
    spec:
      namespace: istio-system
-     version: v1.24.6
+     version: v1.26.3
      updateStrategy:
        type: RevisionBased
    ```
@@ -66,7 +66,7 @@ You can use the following section to understand the update process. You can skip
    metadata:
      name: default
    spec:
-     version: v1.24.6
+     version: v1.26.3
      namespace: istio-cni
      values:
        cni:
@@ -86,7 +86,7 @@ You can use the following section to understand the update process. You can skip
 
    ```
    NAME              TYPE    READY   STATUS    IN USE   VERSION   AGE
-   default-v1-24-6   Local   True    Healthy   False    v1.24.6   3m4s
+   default-v1-26-3   Local   True    Healthy   False    v1.26.3   3m4s
    ```
 
 ## Updating Istio control plane with RevisionBased strategy
@@ -106,10 +106,10 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 
 **Procedure**
 
-1. Change the version in the `Istio` resource. For example, to update to Istio `1.24.6`, set the spec.version field to `v1.24.6` by running the following command:
+1. Change the version in the `Istio` resource. For example, to update to Istio `1.26.3`, set the spec.version field to `v1.26.3` by running the following command:
 
    ```bash
-   kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.24.6"}}'
+   kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.26.3"}}'
    ```
 
    **Version update in Istio CR**
@@ -117,7 +117,7 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
    ```yaml
    kind: Istio
    spec:
-     version: v1.24.6
+     version: v1.26.3
      updateStrategy:
        type: RevisionBased
    ```
@@ -136,7 +136,7 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 
       ```
       NAME      REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
-      default   2           2       1        default-v1-2-6   Healthy   v1.24.6   9m23s
+      default   2           2       1        default-v1-2-6   Healthy   v1.26.3   9m23s
       ```
 
    2. Confirm that `IstioRevision` resource is ready by running the following command:
@@ -149,8 +149,8 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 
       ```
       NAME              TYPE    READY   STATUS    IN USE   VERSION   AGE
-      default-v1-24-5   Local   True    Healthy   True     v1.24.4   10m
-      default-v1-24-6   Local   True    Healthy   False    v1.24.6   66s
+      default-v1-24-6   Local   True    Healthy   True     v1.24.6   10m
+      default-v1-26-3   Local   True    Healthy   False    v1.26.3   66s
       ```
 
 3. Confirm that there are two control plane pods running, one for each revision by running the following command:
@@ -163,8 +163,8 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 
    ```
    NAME                                      READY   STATUS    RESTARTS   AGE
-   istiod-default-v1-24-5-c98fd9675-r7bfw    1/1     Running   0          10m
-   istiod-default-v1-24-6-7495cdc7bf-v8t4g   1/1     Running   0          113s
+   istiod-default-v1-24-6-c98fd9675-r7bfw    1/1     Running   0          10m
+   istiod-default-v1-26-3-7495cdc7bf-v8t4g   1/1     Running   0          113s
    ```
 
 4. Confirm that the workload sidecars are still connected to the previous control plane by running the following command:
