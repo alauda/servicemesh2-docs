@@ -4,7 +4,7 @@ weight: 300
 
 # Sidecar injection
 
-In order to take advantage of all of Istio’s features, pods in the service mesh must be running an Istio sidecar proxy.
+In order to take advantage of all of Istio's features, pods in the service mesh must be running an Istio sidecar proxy.
 
 ## About sidecar injection
 
@@ -15,8 +15,8 @@ ensures any new pods in that namespace include a sidecar.
 
 The revision label is also used to dictates which Istio control plane instance the sidecar will associate with.
 
-Note that unlike manual injection, automatic injection occurs at the pod-level. You won’t see any change to the deployment itself.
-Instead, you’ll want to check individual pods (via `kubectl describe`) to see the injected proxy.
+Note that unlike manual injection, automatic injection occurs at the pod-level. You won't see any change to the deployment itself.
+Instead, you'll want to check individual pods (via `kubectl describe`) to see the injected proxy.
 
 ## Identifying the revision name
 

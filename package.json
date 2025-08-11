@@ -1,16 +1,17 @@
 {
   "devDependencies": {
-    "@alauda/doom": "^1.8.1",
+    "@alauda/doom": "^1.10.9",
     "remark-directive": "^4.0.0",
     "remark-frontmatter": "^5.0.0",
     "remark-gfm": "^4.0.1",
     "remark-mdx": "^3.1.0",
     "remark-stringify": "^11.0.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.2"
   },
   "scripts": {
     "dev": "doom dev",
     "build": "doom build",
+    "lint": "doom lint",
     "serve": "doom serve",
     "translate": "doom translate"
   },
