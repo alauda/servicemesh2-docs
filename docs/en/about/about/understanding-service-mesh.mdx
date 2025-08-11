@@ -30,10 +30,10 @@ Alauda Service Mesh integrates with the following:
 
 ## Alauda Service Mesh resources
 
-Alauda Service Mesh v2 Operator manages the lifecycle of Istio control planes by leveraging Istio’s Helm chart APIs. Rather than introducing new configuration schemas, the operator exposes existing Istio configuration through custom resources.
+Alauda Service Mesh v2 Operator manages the lifecycle of Istio control planes by leveraging Istio's Helm chart APIs. Rather than introducing new configuration schemas, the operator exposes existing Istio configuration through custom resources.
 
 :::note
-- Although Alauda Service Mesh APIs are based on Istio’s Helm chart APIs, Helm charts themselves are not supported.
+- Although Alauda Service Mesh APIs are based on Istio's Helm chart APIs, Helm charts themselves are not supported.
 - All configuration options available in the Istio Helm charts are accessible via the `values` field in the Alauda Service Mesh custom resource definitions (CRDs).
 :::
 
@@ -82,7 +82,7 @@ Alauda Service Mesh supports the following control plane update strategies:
 - `InPlace`:
   The Alauda Service Mesh v2 Operator immediately replaces your existing control plane resources with the ones for the new version.
 - `RevisionBased`:
-  Uses Istio’s canary update mechanism by creating a second control plane to which you can migrate your workloads to complete the update.
+  Uses Istio's canary update mechanism by creating a second control plane to which you can migrate your workloads to complete the update.
 
 When an `Istio` resource is created, the operator generates a unique revision name based on the `updateStrategy` and automatically creates an associated `IstioRevision` resource.
 
@@ -126,7 +126,7 @@ spec:
 
 ### `IstioCNI` resource
 
-The lifecycle of Istio’s Container Network Interface (CNI) plugin is managed separately when using Alauda Service Mesh v2 Operator. To install Istio’s CNI plugin, you create an `IstioCNI` resource.
+The lifecycle of Istio's Container Network Interface (CNI) plugin is managed separately when using Alauda Service Mesh v2 Operator. To install Istio's CNI plugin, you create an `IstioCNI` resource.
 
 The `IstioCNI` resource is a cluster-wide resource as it installs a daemon set that operates on all nodes of your cluster. You can select a version by setting the `spec.version` field, as you can see in the example that follows.
 
