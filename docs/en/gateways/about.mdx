@@ -13,11 +13,11 @@ Gateway injection utilizes the same mechanism as sidecar injection to deploy the
 
 1. Create a Kubernetes `Deployment` and a corresponding `Service` in a namespace visible to the Istio control plane.
 2. Annotate and label the deployment so the Istio control plane injects an Envoy proxy configured as a gateway.
-3. Apply Istio’s `Gateway` and `VirtualService` resources to control ingress or egress traffic.
+3. Apply Istio's `Gateway` and `VirtualService` resources to control ingress or egress traffic.
 
 ### Linux Kernel Compatibility Notice
 
-For nodes running Linux kernel versions earlier than 4.11 (e.g., CentOS 7), additional configuration is required prior to gateway installation.
+For nodes running Linux kernel versions earlier than 4.11 (e.g., CentOS 7), additional configuration is required prior to gateway installation.
 
 :::info
 Skip this section if your kernel version is 4.11 or later.
@@ -509,15 +509,15 @@ The following procedure applies to both ingress and egress gateway deployments.
    </Callouts>
 
 9.  Apply the YAML file by running the following command:
-   ```bash
-   kubectl apply -f gateway-service.yaml
-   ```
+    ```bash
+    kubectl apply -f gateway-service.yaml
+    ```
 
 10. Verify that the gateway service is targeting the endpoint of the gateway pods by running the following command:
 
-```bash
-kubectl get endpoints <gateway_name> -n <gateway_namespace>
-```
+    ```bash
+    kubectl get endpoints <gateway_name> -n <gateway_namespace>
+    ```
 
 You should see output similar to the following example:
 
