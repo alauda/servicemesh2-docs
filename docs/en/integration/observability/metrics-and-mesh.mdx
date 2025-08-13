@@ -58,6 +58,10 @@ You can integrate Alauda Service Mesh with user-workload monitoring to enable ob
   metadata:
     name: istio-proxies-monitor
     namespace: istio-system  # [!code callout]
+  labels:
+    # monitoring=pods & prometheus=kube-prometheus is required in ACP prometheus.
+    monitoring: pods
+    prometheus: kube-prometheus
   spec:
     selector:
       matchExpressions:
