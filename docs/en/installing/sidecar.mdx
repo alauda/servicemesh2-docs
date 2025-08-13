@@ -25,13 +25,13 @@ Each revision is managed by corresponding `IstioRevision` resource, which is aut
 
 The naming convention for an `IstioRevision` is based on the `spec.updateStrategy.type` setting in the `Istio` resource:
 
-- `InPlace`: the revision shares the same name as the `Istio` resource name.
-- `RevisionBased`: the revision will follow the format `<Istio resource name>-v<version>`.
+- `InPlace`: The revision shares the same name as the parent `Istio` resource.
+- `RevisionBased`: The revision is named using the format `<istio-resource-name>-v<version>`.
 
 Typically, each `Istio` resource corresponds to a single `IstioRevision`.
 However, during a revision-based upgrade, multiple `IstioRevision` resources may exist, each representing a distinct control plane.
 
-To see available revision names, use the following command:
+To list available revisions, use the following command:
 
 ```bash
 kubectl get istiorevisions
@@ -41,7 +41,7 @@ For example output:
 
 ```
 NAME              NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
-default-v1-24-6   istio-system             True    Healthy   False    v1.24.6   40s
+default-v1-26-3   istio-system             True    Healthy   False    v1.26.3   40s
 ```
 
 ### Enabling sidecar injection with default revision
@@ -62,12 +62,12 @@ You can also enable injection by applying the `istio.io/rev: default` label to t
 When then name of `IstioRevision` is not `default`, you'll need to use the specific `IstioRevision` name with the `istio.io/rev` label.
 This links the pod to the desired control plane and enables sidecar injection.
 
-For instance, using the example revision `default-v1-24-5` from above, the following labels would enable sidecar injection:
+For instance, using the example revision `default-v1-26-3` from above, the following labels would enable sidecar injection:
 
 | **Resource** | **Enabled label**              | **Disabled label**              |
 | ------------ | ------------------------------ | ------------------------------- |
-| Namespace    | `istio.io/rev=default-v1-24-5` | `istio-injection=disabled`      |
-| Pod          | `istio.io/rev=default-v1-24-5` | `sidecar.istio.io/inject=false` |
+| Namespace    | `istio.io/rev=default-v1-26-3` | `istio-injection=disabled`      |
+| Pod          | `istio.io/rev=default-v1-26-3` | `sidecar.istio.io/inject=false` |
 
 :::note
 When both `istio-injection` and `istio.io/rev` labels are applied, the `istio-injection` label takes precedence and treats the namespace as part of the default revision.
