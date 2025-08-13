@@ -27,11 +27,11 @@ Alauda Service Mesh integrates with the following:
 
 ## Alauda Service Mesh resources
 
-Alauda Service Mesh v2 Operator manages the lifecycle of your Istio control planes. Instead of creating a new configuration schema, Alauda Service Mesh v2 Operator APIs are built around Istio’s Helm chart APIs.
+Alauda Service Mesh v2 Operator manages the lifecycle of your Istio control planes. Instead of creating a new configuration schema, Alauda Service Mesh v2 Operator APIs are built around Istio's Helm chart APIs.
 
 :::note
-- Though Alauda Service Mesh APIs are built around Istio’s Helm chart APIs, Helm charts are not supported.
-- All installation and configuration options that are exposed by Istio’s Helm charts are available through the Alauda Service Mesh Custom Resource Definition (CRD) `values` fields.
+- Though Alauda Service Mesh APIs are built around Istio's Helm chart APIs, Helm charts are not supported.
+- All installation and configuration options that are exposed by Istio's Helm charts are available through the Alauda Service Mesh Custom Resource Definition (CRD) `values` fields.
 :::
 
 ### Istio resource
@@ -82,7 +82,7 @@ The Alauda Service Mesh v2 Operator immediately replaces your existing control p
 
 `RevisionBased`
 
-Uses Istio’s canary update mechanism by creating a second control plane to which you can migrate your workloads to complete the update.
+Uses Istio's canary update mechanism by creating a second control plane to which you can migrate your workloads to complete the update.
 
 After creating an Istio resource, Alauda Service Mesh generates a revision name for the resource based on the `updateStrategy`, and creates a corresponding `IstioRevision`.
 
@@ -126,7 +126,7 @@ spec:
 
 ### IstioCNI resource
 
-The lifecycle of Istio’s Container Network Interface (CNI) plugin is managed separately when using Alauda Service Mesh v2 Operator. To install Istio’s CNI plugin, you create an `IstioCNI` resource.
+The lifecycle of Istio's Container Network Interface (CNI) plugin is managed separately when using Alauda Service Mesh v2 Operator. To install Istio's CNI plugin, you create an `IstioCNI` resource.
 
 The `IstioCNI` resource is a cluster-wide resource as it installs a daemon set that operates on all nodes of your cluster. You can select a version by setting the `spec.version` field, as you can see in the example that follows. To update the CNI plugin, change the version field to the version you want to install. Like the `Istio` resource, it also has a `values` field that exposes all of the options provided in the `istio-cni` chart:
 
@@ -180,7 +180,7 @@ Istio is a Kiali requirement. Istio is the component that provides and controls 
 
 #### Prometheus
 
-A dedicated Prometheus instance is optional. When Istio telemetry is enabled, metrics data are stored in Prometheus. Kiali uses this Prometheus data to determine the mesh topology, display metrics, calculate health, show possible problems, and so on. Kiali communicates directly with Prometheus and assumes the data schema used by Istio Telemetry. Prometheus is an Istio dependency and a hard dependency for Kiali, and many of Kiali’s features will not work without Prometheus.
+A dedicated Prometheus instance is optional. When Istio telemetry is enabled, metrics data are stored in Prometheus. Kiali uses this Prometheus data to determine the mesh topology, display metrics, calculate health, show possible problems, and so on. Kiali communicates directly with Prometheus and assumes the data schema used by Istio Telemetry. Prometheus is an Istio dependency and a hard dependency for Kiali, and many of Kiali's features will not work without Prometheus.
 
 #### Alauda Container Platform API
 
@@ -188,7 +188,7 @@ Kiali uses the Alauda Container Platform API to fetch and resolve service mesh c
 
 #### Tracing
 
-Tracing is optional, but when you install Jaeger and OpenTelemetry is configured, the Kiali console includes a tab to display distributed tracing data, and tracing integration on the graph itself. Note that tracing data will not be available if you disable Istio’s distributed tracing feature. Also note that the user must have access to the namespace where the user needs to see tracing data.
+Tracing is optional, but when you install Jaeger and OpenTelemetry is configured, the Kiali console includes a tab to display distributed tracing data, and tracing integration on the graph itself. Note that tracing data will not be available if you disable Istio's distributed tracing feature. Also note that the user must have access to the namespace where the user needs to see tracing data.
 
 #### Grafana
 
