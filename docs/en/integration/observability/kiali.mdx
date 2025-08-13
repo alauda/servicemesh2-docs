@@ -254,7 +254,7 @@ This capability supports the analysis of request flow behavior, aiding in root c
 3. Run the following command to apply the configuration:
 
    ```bash
-   kubectl -ncpaas-system patch kiali kiali --type merge -p "$(cat kiali_cr.yaml)"
+   kubectl -nistio-system patch kiali kiali --type merge -p "$(cat kiali_cr.yaml)"
    ```
 
    **Example output:**
