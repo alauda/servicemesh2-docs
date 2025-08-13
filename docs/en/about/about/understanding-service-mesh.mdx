@@ -142,7 +142,7 @@ spec:
   namespace: istio-cni
   values:
     cni:
-      cniConfDir: /etc/cni/net.d
+      cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
       excludeNamespaces:
         - istio-cni
         - kube-system

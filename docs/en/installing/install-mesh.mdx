@@ -138,7 +138,7 @@ The Alauda Service Mesh v2 Operator uses this resource's configuration to deploy
       # Applying the following contents to the yaml code editor:
       values:
         cni:
-          cniConfDir: /etc/cni/net.d
+          cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
           excludeNamespaces:
             - istio-cni
             - kube-system
