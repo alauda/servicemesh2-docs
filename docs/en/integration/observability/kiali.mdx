@@ -6,22 +6,264 @@ weight: 80
 
 ## Using Alauda Build of Kiali
 
-Once you have added your application to the mesh, you can use Alauda Build of Kiali to view the data flow through your application.
+The **Alauda Build of Kiali** provides observability and visualization capabilities for applications deployed within the service mesh. After adding an application to the mesh, the Alauda Build of Kiali can be used to inspect traffic flow and monitor mesh behavior.
 
 ### About Kiali
 
-You can use Alauda Build of Kiali to view configurations, monitor traffic, and analyze traces in a single console. It is based on the open source [Kiali](https://github.com/kiali/kiali) project.
+The Alauda Build of Kiali is derived from the open source [Kiali project](https://github.com/kiali/kiali) and serves as the management console for Alauda Service Mesh.
 
-Alauda Build of Kiali is the management console for Alauda Service Mesh. It provides dashboards, observability, and robust configuration and validation capabilities. It shows the structure of your service mesh by inferring traffic topology and displays the health of your mesh. Kiali provides detailed metrics, powerful validation, access to Grafana, and strong integration with the distributed tracing components such as Jaeger or OpenTelemetry.
+It provides:
 
-### Installing Alauda Build of Kiali
+- Visualization of mesh topology and real-time traffic flow
+- Insight into application health status and performance metrics
+- Centralized access to configuration and validation tools
+- Integration with Grafana for metric dashboards
+- Support for distributed tracing via Jaeger or OpenTelemetry
 
-TBD TBD TBD
+These capabilities enable users to diagnose service behavior, identify potential issues, and optimize mesh configuration from a unified interface.
 
-### Configuring Monitoring with Kiali
+## Installing Alauda Build of Kiali
 
-TBD TBD TBD
+The following steps show how to install Alauda Build of Kiali.
 
-### Integrating distributed tracing platform with Alauda Build of Kiali
+**Prerequisites**
 
-TBD TBD TBD
+- You are logged in to the Alauda Container Platform web console as **cluster-admin**.
+
+**Procedure**
+
+1. In the Alauda Container Platform web console, navigate to **Administrator**.
+2. Select **Marketplace** > **OperatorHub**.
+3. Search for the Alauda Build of Kiali.
+4. Locate the Alauda Build of Kiali, and click to select it.
+5. Click **Install**.
+6. Click **Install** and **Confirm** to install the Operator.
+
+**Verification**
+
+Verify that the Operator installation status is reported as `Succeeded` in the **Installation Info** section.
+
+## Configuring Monitoring with Kiali
+
+The following steps show how to integrate the Alauda Build of Kiali with user-workload monitoring.
+
+**Prerequisites**
+
+- Alauda Service Mesh is installed.
+- Monitoring has been configured with Service Mesh. See [Configuring Monitoring with Service Mesh](./metrics-and-mesh.mdx).
+- Alauda Build of Kiali is installed.
+
+**Procedure**
+
+<Steps>
+  ### Retrieve the CA certificate for Alauda Container Platform in **Global** cluster:
+
+  :::note
+  Run the following command in the **Global** cluster
+  :::
+
+  ```bash
+  # CA certificate for ACP - base64-encoded
+  kubectl -ncpaas-system get secret dex.tls -o jsonpath='{.data.ca\.crt}'
+  ```
+
+  The output is a base64-encoded certificate. Store this value for use in later steps.
+
+  ### Retrieve platform configuration from the business cluster:
+
+  ```bash
+  export PLATFORM_URL=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.platformURL}')
+  export CLUSTER_NAME=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.clusterName}')
+  export ALB_CLASS_NAME=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.systemAlbIngressClassName}')
+
+  export OIDC_ISSUER=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.oidcIssuer}')
+  export OIDC_CLIENT_ID=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.oidcClientID}')
+  export OIDC_CLIENT_SECRET=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.oidcClientSecret}')
+
+  export MONITORING_URL=$(kubectl get feature monitoring -o jsonpath='{.spec.accessInfo.database.address}')
+  ```
+
+  ### Create a `Secret` named `kiali` in the `istio-system` namespace for OpenID authentication:
+
+  ```bash
+  kubectl create secret generic kiali --from-literal="oidc-secret=$OIDC_CLIENT_SECRET" -nistio-system
+  ```
+
+  **Example output:**
+
+  ```
+  secret/kiali created
+  ```
+
+  ### Create a `Secret` for monitoring database credentials:
+
+  ```bash
+  SECRET_NAME=$(kubectl get feature monitoring -o jsonpath='{.spec.accessInfo.database.basicAuth.secretName}')
+
+  AUTH_USERNAME=$(kubectl -ncpaas-system get secret "$SECRET_NAME" -o jsonpath="{.data.username}" | base64 -d)
+  AUTH_PASSWORD=$(kubectl -ncpaas-system get secret "$SECRET_NAME" -o jsonpath="{.data.password}" | base64 -d)
+
+  kubectl create secret generic "kiali-monitoring-basic-auth" \
+    --from-literal="username=$AUTH_USERNAME" \
+    --from-literal="password=$AUTH_PASSWORD" \
+    -n istio-system
+  ```
+
+  **Example output:**
+
+  ```
+  secret/kiali-monitoring-basic-auth created
+  ```
+
+  ### Create a file named kiali.yaml with the following content. Replace placeholder values as needed:
+
+  ```yaml title="kiali.yaml"
+  apiVersion: kiali.io/v1alpha1
+  kind: Kiali
+  metadata:
+    name: kiali
+    namespace: istio-system
+  spec:
+    server:
+      web_port: 443  # [!code callout]
+      web_root: /clusters/${CLUSTER_NAME}/kiali  # [!code callout]
+    auth:
+      openid:
+        api_proxy: ${PLATFORM_URL}/kubernetes/${CLUSTER_NAME}  # [!code callout]
+        api_proxy_ca_data: ${PLATFORM_CA}  # [!code callout]
+        insecure_skip_verify_tls: true
+        issuer_uri: ${OIDC_ISSUER}  # [!code callout]
+        client_id: ${OIDC_CLIENT_ID}  # [!code callout]
+        username_claim: email
+      strategy: openid
+    deployment:
+      view_only_mode: false
+      replicas: 1  # [!code callout]
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"
+        limits:
+          memory: "1Gi"
+      ingress:
+        enabled: true
+        class_name: ${ALB_CLASS_NAME}  # [!code callout]
+    external_services:
+      grafana:
+        enabled: false  # Since Grafana is not bundled in ACP anymore, it is disabled by default
+      prometheus:
+        # Only required in multi cluster
+        query_scope:  # [!code callout]
+           mesh_id: <mesh_id>
+        auth:
+          type: basic
+          username: secret:kiali-monitoring-basic-auth:username  # [!code callout]
+          password: secret:kiali-monitoring-basic-auth:password  # [!code callout]
+          insecure_skip_verify: true
+        # only required when using VictoriaMetrics, remove this field when using Prometheus
+        thanos_proxy:  # [!code callout]
+          enabled: true
+          retention_period: 30d
+          scrape_interval: 60s
+        url: ${MONITORING_URL}  # [!code callout]
+    kiali_feature_flags:
+      ui_defaults:
+        i18n: # [!code callout]
+          language: en
+          show_selector: true
+  ```
+
+  <Callouts>
+    1. `web_port` is the port for accessing the Kiali dashboard.
+    2. `web_root` is the path under platform url for accessing the Kiali dashboard.
+    3. `api_proxy` points to **erebus** to map ACP user tokens to Kubernetes tokens.
+    4. `api_proxy_ca_data` is the base64‑encoded CA certificate used by **erebus**.
+    5. `issuer_uri` is the OIDC issuer URL for **dex**.
+    6. `client_id` is the OIDC client ID for **dex**.
+    7. `replicas` specifies the number of replicas for the Kiali deployment, should be at least `2` in production environments.
+    8. `class_name` is the ingress class name for the Kiali ingress.
+    9. Required in multi cluster mesh. `<mesh_id>` should be the same as the `.spec.values.global.meshId` in `Istio` resource.
+    10. `username` references the monitoring basic‑auth username stored in the `kiali-monitoring-basic-auth` Secret.
+    11. `password` references the monitoring basic‑auth password stored in the `kiali-monitoring-basic-auth` Secret.
+    12. `thanos_proxy` is only required when using VictoriaMetrics, remove this field when using Prometheus.
+    13. `url` is the monitoring endpoint for Prometheus or VictoriaMetrics.
+    14. `i18n` specifies the default language and whether to show the language selector.
+  </Callouts>
+
+  ### Apply the configuration, render the manifest with `envsubst`:
+
+  ```bash
+  # Replace <platform-ca> with the real base64-encoded CA certificate saved previously.
+  export PLATFORM_CA=<platform-ca>  # [!code callout]
+
+  envsubst < kiali.yaml | kubectl apply -f -
+  ```
+
+  <Callouts>
+    1. Replace `<platform-ca>` with the real base64-encoded CA certificate saved previously.
+  </Callouts>
+
+  ### Access the Kiali console:
+
+  When the `Kiali` resource is ready, access the Kiali dashboard at `<platform-url>/clusters/<cluster>/kiali`.
+</Steps>
+
+## Integrating distributed tracing platform with Alauda Build of Kiali
+
+After integration with a distributed tracing platform, the Alauda Build of Kiali enables visualization of request traces directly in the Kiali console. These traces provide insight into inter-service communication within the service mesh and can help identify latency, failures, or bottlenecks in request paths.
+
+This capability supports the analysis of request flow behavior, aiding in root cause identification and performance optimization across services in the mesh.
+
+**Prerequisites**
+
+- Alauda Service Mesh is installed.
+- Distributed tracing platform such as Alauda Build of Jaeger is installed and successfully configured.
+
+**Procedure**
+
+1. Update the `Kiali` resource spec configuration for tracing:
+
+   **Example `Kiali` resource `spec` configuration for tracing**
+
+   ```yaml
+   spec:
+     external_services:
+       tracing:
+         # Only required in multi cluster
+         query_scope:
+           istio.mesh_id: <mesh_id>  # [!code callout]
+         enabled: true  # [!code callout]
+         provider: jaeger  # [!code callout]
+         use_grpc: true
+         internal_url: "http://jaeger-prod-query.cpaas-system:16685/jaeger"  # [!code callout]
+         # (Optional) Public facing URL of Jaeger
+         # external_url: "http://my-jaeger-host/jaeger"
+         # When external_url is not defined, disable_version_check should be set to true
+         disable_version_check: true
+   ```
+
+   <Callouts>
+     1. Required in multi cluster mesh. `<mesh_id>` should be the same as the `.spec.values.global.meshId` in `Istio` resource.
+     2. Specifies whether tracing is enabled.
+     3. Specifies the tracing provider (`jaeger` or `tempo`).
+     4. Specifies the internal URL for the Jaeger API.
+   </Callouts>
+
+2. Save the updated spec in `kiali_cr.yaml`.
+
+3. Run the following command to apply the configuration:
+
+   ```bash
+   kubectl -ncpaas-system patch kiali kiali --type merge -p "$(cat kiali_cr.yaml)"
+   ```
+
+   **Example output:**
+
+   ```
+   kiali.kiali.io/kiali patched
+   ```
+
+**Verification**
+
+1. Navigate to the Kiali UI.
+2. Navigate to **Workload** **Traces** tab to see traces in the Kiali UI.

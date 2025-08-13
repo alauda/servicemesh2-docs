@@ -4,19 +4,28 @@ weight: 10
 
 # About Alauda Service Mesh
 
-Alauda Service Mesh, which is based on the open source [Istio](https://istio.io) project, addresses a variety of problems in a microservice architecture by creating a centralized point of control in an application.
+Alauda Service Mesh is built on the open source [Istio](https://istio.io) project and provides a centralized control plane for managing microservices-based architectures. It enables consistent traffic management, security, policy enforcement, and observability across distributed applications.
 
 ## Introduction to Alauda Service Mesh
 
-Alauda Service Mesh adds a transparent layer on existing distributed applications without requiring any changes to the application code. The mesh introduces an easy way to create a network of deployed services that provides discovery, load balancing, service-to-service authentication, failure recovery, metrics, and monitoring. A service mesh also provides more complex operational functionality, including A/B testing, canary releases, access control, and end-to-end authentication.
+Alauda Service Mesh introduces a transparent, infrastructure-level abstraction that integrates with existing applications without requiring modifications to application code. It facilitates communication between services and enhances the reliability, security, and observability of service interactions.
 
-Microservice architectures split the work of enterprise applications into modular services, which can make scaling and maintenance easier. However, as an enterprise application built on a microservice architecture grows in size and complexity, it becomes difficult to understand and manage. Service Mesh can address those architecture problems by capturing or intercepting traffic between services and can modify, redirect, or create new requests to other services.
+The service mesh supports core networking capabilities such as service discovery, load balancing, service-to-service authentication, failure recovery, metrics collection, and monitoring. It also enables advanced deployment strategies and operational features, including A/B testing, canary deployments, fine-grained access control, and end-to-end authentication.
+
+In microservices architectures, applications are decomposed into independently deployable services. While this approach improves scalability and maintainability, it can introduce challenges related to service communication, observability, and control. Alauda Service Mesh addresses these challenges by intercepting traffic between services and enabling centralized management of communication policies and telemetry.
 
 ## Core features
 
-Alauda Service Mesh provides a number of key capabilities uniformly across a network of services:
+Alauda Service Mesh provides the following core capabilities across the service network:
 
-- **Traffic Management** - Control the flow of traffic and API calls between services, make calls more reliable, and make the network more robust in the face of adverse conditions.
-- **Service Identity and Security** - Provide services in the mesh with a verifiable identity and provide the ability to protect service traffic as it flows over networks of varying degrees of trustworthiness.
-- **Policy Enforcement** - Apply organizational policy to the interaction between services, ensure access policies are enforced and resources are fairly distributed among consumers. Policy changes are made by configuring the mesh, not by changing application code.
-- **Telemetry** - Gain understanding of the dependencies between services and the nature and flow of traffic between them, providing the ability to quickly identify issues.
+- **Traffic Management**
+  Enables control over the flow of traffic and API calls between services. This includes routing, retries, failovers, and fault injection, which help improve service reliability and network resilience.
+
+- **Service Identity and Security**
+  Assigns cryptographic identities to services and secures service-to-service communication through mutual TLS (mTLS). This ensures traffic integrity and confidentiality in environments with varying levels of trust.
+
+- **Policy Enforcement**
+  Applies organizational policies to service communication. This includes access control, rate limiting, and quota enforcement. Policy configuration is decoupled from application logic and is managed through the mesh control plane.
+
+- **Telemetry and Observability**
+  Collects detailed metrics, logs, and tracing data to provide visibility into service behavior, dependencies, and traffic patterns. This enables faster troubleshooting and improved performance monitoring.

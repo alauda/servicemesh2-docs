@@ -40,7 +40,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
   ### Create an `ISTIO_VERSION` environment variable that defines the Istio version to install
 
   ```bash
-  export ISTIO_VERSION=1.24.6
+  export ISTIO_VERSION=1.26.3
   ```
 
   ### Install Istio on the **East** cluster
@@ -91,7 +91,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
   4. Create an East-West gateway on the **East** cluster by running the following command:
 
      ```bash
-     kubectl --context "${CTX_CLUSTER1}" apply -f https://raw.githubusercontent.com/aladua-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net1.yaml
+     kubectl --context "${CTX_CLUSTER1}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net1.yaml
      ```
 
   5. Expose the control plane through the gateway so that services in the **West** cluster can access the control plane by running the following command:
@@ -166,7 +166,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
   7. Create an East-West gateway on the **West** cluster by running the following command:
 
      ```bash
-     kubectl --context "${CTX_CLUSTER2}" apply -f https://raw.githubusercontent.com/aladua-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net2.yaml
+     kubectl --context "${CTX_CLUSTER2}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net2.yaml
      ```
 
      :::note
