@@ -53,7 +53,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
 
   2. Create an `Istio` resource on the **East** cluster by running the following command:
 
-     ```bash
+     ```yaml
      cat <<EOF | kubectl --context "${CTX_CLUSTER1}" apply -f -
      apiVersion: sailoperator.io/v1
      kind: Istio
