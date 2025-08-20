@@ -1,0 +1,26 @@
+---
+weight: 10
+---
+
+# Alauda Service Mesh v2.0
+
+Alauda Service Mesh v2.0 is built on the [Istio](https://istio.io/) project and is installed using a new Istio Operator derived from the [Sail Operator](https://github.com/istio-ecosystem/sail-operator) (hosted in the **istio-ecosystem** GitHub organization). The Operator provides an expanded set of custom resource definitions (CRDs) to manage Istio components.
+
+## Supported component versions
+
+- `Istio` version: v1.24.6 and v1.26.3
+- `Kiali operator` version: v2.11.0
+
+## Features
+
+- Provides support for `istioctl`, the Istio command-line tool that offers diagnostic and debugging utilities.
+- Support multi-cluster deployment models:
+    - Multi-primary
+    - Primary-remote
+- Enables canary-style upgrades of the Istio control plane via the Istio revision mechanism.
+- Support for the `IstioRevisionTag` resource — a stable revision tag that acts as an alias for Istio control plane revisions.
+- Includes management for the Istio Container Network Interface through the `IstioCNI` CRD, which handles the CNI daemonset lifecycle.
+- Metrics and tracing integrations
+    - **Monitoring components**: Leverages Prometheus or VictoriaMetrics for metrics collection and Alertmanager for alerting.
+    - **Distributed Tracing Platform**: Provides end-to-end distributed tracing capabilities using components such as Jaeger and OpenTelemetry.
+    - **Alauda Build of Kiali**: Offers visualization and operational insights into the service mesh, including real-time traffic topology, configuration validation, and tracing integration.
