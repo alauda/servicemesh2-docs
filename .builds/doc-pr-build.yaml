@@ -38,4 +38,4 @@ spec:
             value: product-docs-pr-pipeline
       params:
         - name: doc-base
-          value: servicemeshv2
+          value: servicemesh
