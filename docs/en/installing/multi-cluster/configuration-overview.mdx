@@ -6,8 +6,9 @@ weight: 10
 
 To configure a multi-cluster topology you must perform the following actions:
 
-- Install the Alauda Container Platform Networking for Multus plugin for each cluster.
+- Install the Alauda Container Platform Networking for Multus plugin for each cluster, and kube-ovn must be v4.1.5 or later.
 - Install the Alauda Service Mesh Operator for each cluster.
+- The API Server in each cluster must be accessible to the other clusters in the mesh. 
 - Create or have access to root and intermediate certificates for each cluster.
 - Apply the security certificates for each cluster.
 - Install Istio for each cluster.
@@ -238,6 +239,7 @@ In this procedure, `CLUSTER1` is the **East** cluster and `CLUSTER2` is the **We
   1. Create a namespace called `istio-system` by running the following command:
      ```bash
      kubectl --context "${CTX_CLUSTER1}" create namespace istio-system
+     kubectl --context "${CTX_CLUSTER1}" label namespace istio-system cpaas.io/project=cpaas-system
      ```
   2. Configure Istio to use `network1` as the default network for the pods on the **East** cluster by running the following command:
      ```bash
@@ -263,6 +265,7 @@ In this procedure, `CLUSTER1` is the **East** cluster and `CLUSTER2` is the **We
   1. Create a namespace called `istio-system` by running the following command:
      ```bash
      kubectl --context "${CTX_CLUSTER2}" create namespace istio-system
+     kubectl --context "${CTX_CLUSTER2}" label namespace istio-system cpaas.io/project=cpaas-system
      ```
   2. Configure Istio to use `network2` as the default network for the pods on the **East** cluster by running the following command:
      ```bash
