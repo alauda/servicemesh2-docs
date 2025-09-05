@@ -97,7 +97,7 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 
 - You are logged in to the Alauda Container Platform web console as **cluster-admin**.
 - You have installed the Alauda Service Mesh v2 Operator, and deployed Istio.
-- You have installed the Alauda Container Platform Networking for Multus plugin.
+- You have installed the Alauda Container Platform Networking for Multus plugin, and kube-ovn must be v4.1.5 or later.
 - You have installed `istioctl` on your local machine.
 - You have configured the Istio control plane to use the `RevisionBased` update strategy. In this example, the `Istio` resource named `default` is deployed in the `istio-system` namespace.
 - You have installed the Istio CNI plugin with the desired version. In this example, the `IstioCNI` resource named `default` is deployed in the `istio-cni` namespace.

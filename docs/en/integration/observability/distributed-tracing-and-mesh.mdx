@@ -4,6 +4,19 @@ weight: 30
 
 # Distributed Tracing and Service Mesh
 
+## Building applications to support trace context propagation
+
+Although Istio proxies can automatically send spans, extra information is needed to join those spans into a single trace. Applications must propagate this information in HTTP headers, so that when proxies send spans, the backend can join them together into a single trace.
+
+To do this, each application must collect headers from each incoming request and forward the headers to all outgoing requests triggered by that incoming request. The choice of headers to forward depends on the configured trace backend. The following is a summary:
+
+All applications should forward the following headers:
+
+- `x-request-id`: an Envoy-specific header that is used to consistently sample logs and traces.
+- `traceparent` and `tracestate`: [W3C standard headers](https://www.w3.org/TR/trace-context/)
+
+For other observability tools, refer to their documentation.
+
 ## Configuring distributed tracing platform with Service Mesh
 
 Alauda Service Mesh supports distributed tracing through integration with the following components:
@@ -20,15 +33,37 @@ You can integrate Alauda Service Mesh with OpenTelemetry to instrument, generate
 
 **Prerequisites**
 
-- Alauda Build of Jaeger is installed.
-- Alauda Build of OpenTelemetry is installed.
-- A `Jaeger` instance is installed and configured in the `cpaas-system` namespace.
+- <ExternalSiteLink name="acp" href="/observability/tracing/installation.html#installing-the-jaeger-operator" children="Alauda Build of Jaeger is installed" />.
+- <ExternalSiteLink name="acp" href="/observability/tracing/installation.html#installing-the-opentelemetry-operator" children="Alauda Build of OpenTelemetry is installed" />.
 - An Istio instance is created.
 - An Istio CNI instance is created.
 
 **Procedure**
 
 <Steps>
+  ### Install a `Jaeger` instance in the `istio-system` namespace.
+
+  Refer to the installation script in <ExternalSiteLink name="acp" href="/observability/tracing/installation.html#deploying-a-jaeger-instance" children="Deploying a Jaeger Instance" /> and use the example command below to deploy an Istio-dedicated `Jaeger`:
+
+  :::info
+  The `--jaeger-es-index-prefix` parameter sets the index prefix in Elasticsearch where trace data is stored.
+
+  - For a single-cluster service mesh, we recommend ending the prefix with the cluster name, for example `istio-tracing-cluster-1`.
+  - For a multi-cluster service mesh, traces from all clusters must be stored in the same index; we recommend ending the prefix with the meshID, for example `istio-tracing-mesh-1`.
+  :::
+
+  ```bash
+  ./install-jaeger.sh \
+    --es-url='https://xxx' \
+    --es-user-base64='xxx' \
+    --es-pass-base64='xxx' \
+    --target-namespace='istio-system' \
+    --jaeger-basepath-suffix='/istio/jaeger' \
+    --jaeger-es-index-prefix='istio-tracing-xxx'
+  ```
+
+  After the installation completes successfully, you can access the Jaeger UI to query traces at `<platform-url>/clusters/<cluster>/istio/jaeger`.
+
   ### Navigate to Alauda Build of OpenTelemetry in OperatorHub and creates `OpenTelemetryCollector` in the `istio-system` namespace.
 
   **Example OpenTelemetry Collector in `istio-system` namespace**
@@ -49,7 +84,7 @@ You can integrate Alauda Service Mesh with OpenTelemetry to instrument, generate
       exporters:
         debug: {}
         otlp:
-          endpoint: 'dns:///jaeger-prod-collector-headless.cpaas-system:4317'  # [!code callout]
+          endpoint: 'dns:///jaeger-prod-collector-headless.istio-system:4317'  # [!code callout]
           balancer_name: round_robin
           tls:
             insecure: true
@@ -71,7 +106,7 @@ You can integrate Alauda Service Mesh with OpenTelemetry to instrument, generate
   ```
 
   <Callouts>
-    1. The `endpoint` field is the `Jaeger` collector service in the `cpaas-system` namespace.
+    1. The `endpoint` field is the `Jaeger` collector service in the `istio-system` namespace.
   </Callouts>
 
   ### Update the `Istio` resource to enable tracing and define the OpenTelemetry tracing provider:
@@ -121,6 +156,6 @@ You can integrate Alauda Service Mesh with OpenTelemetry to instrument, generate
   ```
 
   :::note
-  Once you verify that you can see traces, lower the `randomSamplingPercentage` value or set it to `default` to reduce the number of requests.
+  Once you verify that you can see traces, lower the `randomSamplingPercentage` value to reduce the number of requests.
   :::
 </Steps>
