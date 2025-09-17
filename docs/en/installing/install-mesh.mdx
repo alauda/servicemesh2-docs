@@ -68,40 +68,6 @@ Both `Istio` and `IstioCNI` custom resources must be created to deploy the contr
 
 It's required to create these `Istio` and `IstioCNI` resources in separate namespaces.
 
-### Creating the namespace for Istio
-
-```bash
-kubectl create namespace istio-system
-kubectl label namespace istio-system cpaas.io/project=cpaas-system
-```
-
-### Creating the `Istio` Resource via Web Console
-
-Create the `Istio` resource that will contain the YAML configuration for your Istio deployment.
-The Alauda Service Mesh v2 Operator leverages this resource's configuration to deploy the Istio Control Plane.
-
-**Prerequisites**
-
-- The Alauda Service Mesh v2 Operator must be installed.
-- You are logged in to the Alauda Container Platform web console as **cluster-admin**.
-- The Alauda Container Platform Networking for Multus plugin must be installed, and kube-ovn must be v4.1.5 or later.
-
-**Procedure**
-
-1. In the Alauda Container Platform web console, navigate to **Administrator**.
-2. Select **Marketplace** > **OperatorHub**.
-3. Search for the Alauda Service Mesh v2.
-4. Locate the Alauda Service Mesh v2, and click to select it.
-5. Click **All Instances** tab.
-6. Click **Create**.
-7. Locate and Select **Istio** and then click **Create**.
-8. Select the `istio-system` from the **Namespace** drop down.
-9. Click **Create**.
-
-**Verification**
-
-Wait until the `.status.state` field of the `Istio` resource to be `Healthy`.
-
 ### Creating the namespace for IstioCNI
 
 ```bash
@@ -148,6 +114,40 @@ The Alauda Service Mesh v2 Operator uses this resource's configuration to deploy
 **Verification**
 
 Wait until the `.status.state` field of the `IstioCNI` resource to be `Healthy`.
+
+### Creating the namespace for Istio
+
+```bash
+kubectl create namespace istio-system
+kubectl label namespace istio-system cpaas.io/project=cpaas-system
+```
+
+### Creating the `Istio` Resource via Web Console
+
+Create the `Istio` resource that will contain the YAML configuration for your Istio deployment.
+The Alauda Service Mesh v2 Operator leverages this resource's configuration to deploy the Istio Control Plane.
+
+**Prerequisites**
+
+- The Alauda Service Mesh v2 Operator must be installed.
+- You are logged in to the Alauda Container Platform web console as **cluster-admin**.
+- The Alauda Container Platform Networking for Multus plugin must be installed, and kube-ovn must be v4.1.5 or later.
+
+**Procedure**
+
+1. In the Alauda Container Platform web console, navigate to **Administrator**.
+2. Select **Marketplace** > **OperatorHub**.
+3. Search for the Alauda Service Mesh v2.
+4. Locate the Alauda Service Mesh v2, and click to select it.
+5. Click **All Instances** tab.
+6. Click **Create**.
+7. Locate and Select **Istio** and then click **Create**.
+8. Select the `istio-system` from the **Namespace** drop down.
+9. Click **Create**.
+
+**Verification**
+
+Wait until the `.status.state` field of the `Istio` resource to be `Healthy`.
 
 ## Customizing Istio configuration
 
