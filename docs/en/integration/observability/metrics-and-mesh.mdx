@@ -133,7 +133,7 @@ You can integrate Alauda Service Mesh with user-workload monitoring to enable ob
         overrides:
           - tagOverrides:
               mesh_id:  # [!code callout]
-                value: node.metadata['MESH_ID']
+                value: xds.node.metadata['MESH_ID']
   ```
 
   <Callouts>
