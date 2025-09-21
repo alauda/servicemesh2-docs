@@ -2,12 +2,7 @@
 weight: 10
 ---
 
-# About gateways
-
-A **gateway** is a dedicated Envoy proxy deployment paired with a Kubernetes Service, operating at the edge of the service mesh. It enables fine-grained control over traffic that enters or leaves the mesh.
-In Alauda Service Mesh, gateways are installed via **gateway injection**.
-
-## About gateway injection
+# About gateway injection
 
 Gateway injection utilizes the same mechanism as sidecar injection to deploy the Envoy proxy into gateway pods. To deploy a gateway:
 
@@ -15,7 +10,7 @@ Gateway injection utilizes the same mechanism as sidecar injection to deploy the
 2. Annotate and label the deployment so the Istio control plane injects an Envoy proxy configured as a gateway.
 3. Apply Istio's `Gateway` and `VirtualService` resources to control ingress or egress traffic.
 
-### Linux Kernel Compatibility Notice
+## Linux Kernel Compatibility Notice \{#linux-kernel-compatibility-notice}
 
 For nodes running Linux kernel versions earlier than 4.11 (e.g., CentOS 7), additional configuration is required prior to gateway installation.
 
@@ -23,11 +18,11 @@ For nodes running Linux kernel versions earlier than 4.11 (e.g., CentOS 7), addi
 Skip this section if your kernel version is 4.11 or later.
 :::
 
-**Prerequisites**
+### Prerequisites
 
 - Install `jq` locally to process JSON in these steps.
 
-**Procedure**
+### Procedure
 
 1. Create a YAML file named `gateway-injection-template.txt` that contains the default injection template for gateways.
 
@@ -330,260 +325,3 @@ Skip this section if your kernel version is 4.11 or later.
    ```bash
    kubectl wait --for condition=Ready istio/default --timeout=3m
    ```
-
-### Installing a gateway via gateway injection
-
-This procedure explains how to install a gateway by using gateway injection.
-
-:::info
-The following procedure applies to both ingress and egress gateway deployments.
-:::
-
-**Prerequisites**
-
-- Alauda Service Mesh v2 Operator is installed.
-- An Istio control plane is deployed.
-
-**Procedure**
-
-1. Create a namespace for the gateway:
-
-   ```bash
-   kubectl create namespace <gateway_namespace>
-   ```
-
-   :::note
-   Install the gateway and the Istio control plane in different namespaces.
-
-   You can install the gateway in a dedicated gateway namespace.
-   This approach allows the gateway to be shared by many applications operating in different namespaces.
-   Alternatively, you can install the gateway in an application namespace.
-   In this approach, the gateway acts as a dedicated gateway for the application in that namespace.
-   :::
-
-2. Create a YAML file named `secret-reader.yaml` that defines the service account, role, and role binding for the gateway deployment. These settings enable the gateway to read the secrets, which is required for obtaining TLS credentials.
-
-   ```yaml title="secret-reader.yaml"
-   apiVersion: v1
-   kind: ServiceAccount
-   metadata:
-     name: secret-reader
-     namespace: <gateway_namespace>
-   ---
-   apiVersion: rbac.authorization.k8s.io/v1
-   kind: Role
-   metadata:
-     name: secret-reader
-     namespace: <gateway_namespace>
-   rules:
-     - apiGroups: [""]
-       resources: ["secrets"]
-       verbs: ["get", "watch", "list"]
-   ---
-   apiVersion: rbac.authorization.k8s.io/v1
-   kind: RoleBinding
-   metadata:
-     name:  secret-reader
-     namespace: <gateway_namespace>
-   roleRef:
-     apiGroup: rbac.authorization.k8s.io
-     kind: Role
-     name: secret-reader
-   subjects:
-     - kind: ServiceAccount
-       name:  secret-reader
-   ```
-
-4. Apply the YAML file by running the following command:
-   ```bash
-   kubectl apply -f secret-reader.yaml
-   ```
-
-5. Create a YAML file named `gateway-deployment.yaml` that defines the Kubernetes `Deployment` object for the gateway.
-
-   ```yaml title="gateway-deployment.yaml"
-   apiVersion: apps/v1
-   kind: Deployment
-   metadata:
-     name: <gateway_name>
-     namespace: <gateway_namespace>
-   spec:
-     selector:
-       matchLabels:
-         istio: <gateway_name>
-     template:
-       metadata:
-         annotations:
-           inject.istio.io/templates: gateway  # [!code callout]
-         labels:
-           istio: <gateway_name>  # [!code callout]
-           sidecar.istio.io/inject: "true"  # [!code callout]
-       spec:
-         containers:
-           - name: istio-proxy
-             image: auto  # [!code callout]
-             securityContext:
-               capabilities:
-                 drop:
-                   - ALL
-               allowPrivilegeEscalation: false
-               privileged: false
-               readOnlyRootFilesystem: true
-               runAsNonRoot: true
-             ports:
-               - containerPort: 15090
-                 protocol: TCP
-                 name: http-envoy-prom
-             resources:
-               limits:
-                 cpu: 2000m
-                 memory: 1024Mi
-               requests:
-                 cpu: 100m
-                 memory: 128Mi
-         serviceAccountName: secret-reader  # [!code callout]
-   ```
-
-   <Callouts>
-     1. Indicates that the Istio control plane uses the gateway injection template instead of the default sidecar template.
-     2. Ensure that a unique label is set for the gateway deployment.
-        A unique label is required so that Istio `Gateway` resources can select gateway workloads.
-     3. Enables gateway injection by setting the `sidecar.istio.io/inject` label to `true`.
-        If the name of the Istio resource is not default you must use the `istio.io/rev: <istio_revision>` label instead, where the revision represents the active revision of the Istio resource.
-     4. Sets the image field to `auto` so that the image automatically updates each time the pod starts.
-     5. Sets the `serviceAccountName` to the name of the `ServiceAccount` created previously.
-   </Callouts>
-
-6. Apply the YAML file by running the following command:
-
-   ```bash
-   kubectl apply -f gateway-deployment.yaml
-   ```
-
-7. Verify that the gateway `Deployment` rollout was successful by running the following command:
-
-   ```bash
-   kubectl rollout status deployment/<gateway_name> -n <gateway_namespace>
-   ```
-
-   You should see output similar to the following:
-
-   **Example output**
-
-   ```
-   Waiting for deployment "<gateway_name>" rollout to finish: 0 of 1 updated replicas are available...
-   deployment "<gateway_name>" successfully rolled out
-   ```
-
-8. Create a YAML file named `gateway-service.yaml` that contains the Kubernetes `Service` object for the gateway.
-
-   ```yaml title="gateway-service.yaml"
-   apiVersion: v1
-   kind: Service
-   metadata:
-     name: <gateway_name>
-     namespace: <gateway_namespace>
-   spec:
-     type: ClusterIP  # [!code callout]
-     selector:
-       istio: <gateway_name>  # [!code callout]
-     ports:
-       - name: status-port
-         port: 15021
-         protocol: TCP
-         targetPort: 15021
-       - name: http2
-         port: 80
-         protocol: TCP
-         targetPort: 80
-       - name: https
-         port: 443
-         protocol: TCP
-         targetPort: 443
-   ```
-
-   <Callouts>
-     1. When you set `spec.type` to `ClusterIP` the gateway `Service` object can be accessed only from within the cluster.
-        If the gateway has to handle ingress traffic from outside the cluster, set `spec.type` to `LoadBalancer`.
-     2. Set the `selector` to the unique label or set of labels specified in the pod template of the gateway deployment that you previously created.
-   </Callouts>
-
-9.  Apply the YAML file by running the following command:
-    ```bash
-    kubectl apply -f gateway-service.yaml
-    ```
-
-10. Verify that the gateway service is targeting the endpoint of the gateway pods by running the following command:
-
-    ```bash
-    kubectl get endpoints <gateway_name> -n <gateway_namespace>
-    ```
-
-You should see output similar to the following example:
-
-**Example output**
-
-```
-NAME              ENDPOINTS                             AGE
-<gateway_name>    10.131.0.181:8080,10.131.0.181:8443   1m
-```
-
-10. *Optional*: Create a YAML file named `gateway-hpa.yaml` that defines a horizontal pod autoscaler for the gateway.
-    The following example sets the minimum replicas to `2` and the maximum replicas to `5` and scales the replicas up when average CPU utilization exceeds 80% of the CPU resource limit.
-    This limit is specified in the pod template of the deployment for the gateway.
-
-    ```yaml title="gateway-service.yaml"
-    apiVersion: autoscaling/v2
-    kind: HorizontalPodAutoscaler
-    metadata:
-      name: <gateway_name>
-      namespace: <gateway_namespace>
-    spec:
-      minReplicas: 2
-      maxReplicas: 5
-      metrics:
-      - resource:
-          name: cpu
-          target:
-            averageUtilization: 80
-            type: Utilization
-        type: Resource
-      scaleTargetRef:
-        apiVersion: apps/v1
-        kind: Deployment
-        name: <gateway_name>  # [!code callout]
-    ```
-
-    <Callouts>
-      1. Set `spec.scaleTargetRef.name` to the name of the gateway deployment previously created.
-    </Callouts>
-
-11. *Optional*: Apply the YAML file by running the following command:
-    ```bash
-    kubectl apply -f gateway-service.yaml
-    ```
-
-12. *Optional*: Create a YAML file named `gateway-pdb.yaml` that defines a pod disruption budget for the gateway.
-    The following example allows gateway pods to be evicted only when at least `1` healthy gateway pod will remain on the cluster after the eviction.
-
-    ```yaml title="gateway-pdb.yaml"
-    apiVersion: policy/v1
-    kind: PodDisruptionBudget
-    metadata:
-      name: <gateway_name>
-      namespace: <gateway_namespace>
-    spec:
-      minAvailable: 1
-      selector:
-        matchLabels:
-          istio: <gateway_name>  # [!code callout]
-    ```
-
-    <Callouts>
-      1. Set the `spec.selector.matchLabels` to the unique label or set of labels specified in the pod template of the gateway deployment previously created.
-    </Callouts>
-
-13. *Optional*: Apply the YAML file by running the following command:
-    ```bash
-    kubectl apply -f gateway-pdb.yaml
-    ```

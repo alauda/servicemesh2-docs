@@ -1,0 +1,237 @@
+---
+weight: 10
+---
+
+# Routing egress traffic via a gateway with Istio APIs
+
+This section explains how to use Istio APIs to route outbound HTTP traffic via a gateway installed with gateway injection.
+
+## Prerequisites
+
+  - An Istio gateway has been installed using [gateway injection](../gateway-installation/installing-a-gateway-via-injection.mdx).
+
+## Procedure
+
+1.  Create a namespace named `curl` by executing the following command:
+
+    ```shell
+    kubectl create namespace curl
+    ```
+
+2.  Enable sidecar injection for the namespace. If your setup uses the `InPlace` upgrade strategy, run this command:
+
+    ```shell
+    kubectl label namespace curl istio-injection=enabled
+    ```
+
+    <Directive type="note">
+
+    If you are using the `RevisionBased` upgrade strategy, execute these commands:
+
+    1.  To discover your `<revision-name>`, run the following:
+
+        ```shell
+        kubectl get istiorevisions.sailoperator.io
+        ```
+
+        **Sample output:**
+
+        ```shell
+        NAME      TYPE    READY   STATUS    IN USE   VERSION   AGE
+        default   Local   True    Healthy   True     v1.26.3   3m33s
+        ```
+
+    2.  Label the namespace using the revision name to enable sidecar injection:
+
+        ```shell
+        kubectl label namespace curl istio.io/rev=default
+        ```
+    
+    </Directive>
+
+3.  Deploy the `curl` application by running this command:
+
+    ```shell
+    kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/curl/curl.yaml
+    ```
+
+4.  Initialize and export a `CURL_POD` environment variable containing the name of the curl pod:
+
+    ```shell
+    export CURL_POD=$(kubectl get pod -n curl -l app=curl -o jsonpath='{.items[0].metadata.name}')
+    ```
+
+5.  Create a YAML file with the name `http-se.yaml` to direct traffic from the mesh toward an external service. The example below defines a `ServiceEntry` for a specific URL.
+
+    **Example configuration**
+
+    ```yaml
+    apiVersion: networking.istio.io/v1
+    kind: ServiceEntry
+    metadata:
+      name: egress-se
+      namespace: curl
+    spec:
+      hosts:
+        - docs.alauda.io
+      ports:
+        - number: 80
+          name: http-port
+          protocol: HTTP
+      location: MESH_EXTERNAL
+      resolution: DNS
+    ```
+
+6.  Apply this YAML file by executing the command:
+
+    ```shell
+    kubectl apply -f http-se.yaml
+    ```
+
+7.  Confirm that the `ServiceEntry` configuration has been applied successfully. Send an HTTP request to the host specified in the previous step by running this command:
+
+    ```shell
+    kubectl exec "$CURL_POD" -n curl -c curl -- curl -sSL -o /dev/null -D - http://docs.alauda.io
+    ```
+
+    This command should yield HTTP status codes like `302` (redirect) or `200` (success), which confirms the connection is working.
+
+8.  Create a YAML file named `http-egress-gw.yaml` that establishes an egress `Gateway` and routes traffic from the mesh to the host defined for the external service.
+
+    **Example configuration**
+
+    ```yaml
+    apiVersion: networking.istio.io/v1alpha3
+    kind: Gateway
+    metadata:
+      name: egress-gw
+      namespace: <gateway_namespace> # Namespace where the egress gateway is deployed
+    spec:
+      selector:
+        istio: <gateway_name> # Selects the egress-gateway instance to handle this traffic
+      servers:
+        - port:
+            number: 80
+            name: http
+            protocol: HTTP
+          hosts:
+            - docs.alauda.io # External service host, not a full URL.
+    ---
+    apiVersion: networking.istio.io/v1alpha3
+    kind: DestinationRule
+    metadata:
+      name: egress-dr
+      namespace: <gateway_namespace> # Namespace where the egress gateway is deployed
+    spec:
+      host: <gateway_name>.<gateway_namespace>.svc.cluster.local
+      subsets:
+        - name: alauda-docs
+    ```
+
+9.  Apply the YAML file by executing the command:
+
+    ```shell
+    kubectl apply -f http-egress-gw.yaml
+    ```
+
+10. Create a YAML file with the name `http-egress-vs.yaml` to configure a `VirtualService` that will manage traffic flow from application sidecars, through the egress gateway, and to the external host.
+
+    **Example configuration**
+
+    ```yaml
+    apiVersion: networking.istio.io/v1alpha3
+    kind: VirtualService
+    metadata:
+      name: egress-vs
+      namespace: curl # Namespace where the curl pod is running
+    spec:
+      hosts:
+        - docs.alauda.io # External service host, not a full URL.
+      gateways:
+        - mesh
+        - <gateway_namespace>/egress-gw # Egress gateway name defined in the file that you used in the previous step.
+      http:
+        - match:
+            - gateways:
+                - mesh
+              port: 80
+          route:
+            - destination:
+                host: <gateway_name>.<gateway_namespace>.svc.cluster.local
+                subset: alauda-docs
+                port:
+                  number: 80
+              weight: 100
+        - match:
+            - gateways:
+                - <gateway_namespace>/egress-gw # Egress gateway name defined in the file that you used in the previous step.
+              port: 80
+          route:
+            - destination:
+                host: docs.alauda.io
+                port:
+                  number: 80
+              weight: 100
+    ```
+
+11. Apply this YAML file by running the following command:
+
+    ```shell
+    kubectl apply -f http-egress-vs.yaml
+    ```
+
+12. Reissue the HTTP request to the URL:
+
+    ```shell
+    kubectl exec "$CURL_POD" -n curl -c curl -- curl -sSL -o /dev/null -D - http://docs.alauda.io
+    ```
+
+    The terminal output should be similar to what is shown below:
+
+    **Example output**
+
+    ```shell
+    ...
+    HTTP/1.1 302 Moved Permanently
+    ...
+    location: <example_url>
+    ...
+
+    HTTP/2 200
+    Content-Type: text/html; charset=utf-8
+    ```
+
+13. Confirm that the request was routed via the gateway by running this command:
+
+    <Directive type="info" title="Enable access logging">
+    Access logging must be active for this verification step to function correctly. You can enable it by creating the following `Telemetry` resource.
+    
+    ```shell
+    kubectl apply -f - <<EOF
+    apiVersion: telemetry.istio.io/v1
+    kind: Telemetry
+    metadata:
+      name: gateway-access-log
+      namespace: <gateway_namespace>
+    spec:
+      selector:
+        matchLabels:
+          istio: <gateway_name>
+      accessLogging:
+        - providers:
+            - name: envoy
+    EOF
+    ```
+    </Directive>
+
+    ```shell
+    kubectl logs deployment/<gateway_name> -n <gateway_namespace> | tail -1
+    ```
+
+    Your terminal should display information similar to this output:
+
+    **Example output**
+
+    ```shell
+    [2025-09-21T07:45:45.331Z] "GET / HTTP/2" 302 - via_upstream - "-" 0 137 107 105 "10.3.0.56" "curl/8.15.0" "1503bbf4-1571-4d16-9d2b-c9817355284e" "docs.alauda.io" "119.28.207.230:80" outbound|80||docs.alauda.io 10.3.0.41:55194 10.3.0.41:80 10.3.0.56:60876 - -
+    ```
