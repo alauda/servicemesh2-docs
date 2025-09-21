@@ -1,0 +1,215 @@
+---
+weight: 20
+---
+
+# Exposing a service via Istio Gateway and VirtualService resources
+
+This guide demonstrates using Istio `Gateway` and `VirtualService` resources to configure a gateway deployed via gateway injection. These resources set up the gateway to expose a service inside the mesh to traffic from outside. Afterward, you expose the gateway to traffic external to the cluster by changing the gateway's `Service` to type `LoadBalancer`.
+
+## Prerequisites
+
+  - An Istio gateway has been installed using [gateway injection](../gateway-installation/installing-a-gateway-via-injection.mdx).
+
+## Procedure
+
+1.  Create a new namespace named `httpbin` by executing the command below:
+
+    ```shell
+    kubectl create namespace httpbin
+    ```
+
+2.  Enable sidecar injection for the namespace. If your setup uses the `InPlace` upgrade strategy, run this command:
+
+    ```shell
+    kubectl label namespace httpbin istio-injection=enabled
+    ```
+
+    <Directive type="note">
+
+    If you are using the `RevisionBased` upgrade strategy, execute these commands:
+
+    1.  To discover your `<revision-name>`, run the following:
+
+        ```shell
+        kubectl get istiorevisions.sailoperator.io
+        ```
+
+        **Sample output:**
+
+        ```shell
+        NAME      TYPE    READY   STATUS    IN USE   VERSION   AGE
+        default   Local   True    Healthy   True     v1.26.3   3m33s
+        ```
+
+    2.  Label the namespace using the revision name to enable sidecar injection:
+
+        ```shell
+        kubectl label namespace httpbin istio.io/rev=default
+        ```
+    
+    </Directive>
+
+3.  Deploy the `httpbin` sample service by running the following command:
+
+    ```shell
+    kubectl apply -n httpbin -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/httpbin/httpbin.yaml
+    ```
+
+4.  Create a file named `httpbin-gw.yaml` that contains an Istio `Gateway` resource definition. This resource configures the gateway proxies to open port 80 (HTTP) for the host `httpbin.example.com`.
+
+    ```yaml
+    apiVersion: networking.istio.io/v1
+    kind: Gateway
+    metadata:
+      name: httpbin-gateway
+      namespace: httpbin
+    spec:
+      selector:
+        istio: <gateway_name>  # [!code callout]
+      servers:
+        - port:
+            number: 80
+            name: http
+            protocol: HTTP
+          hosts:
+            - httpbin.example.com  # [!code callout]
+    ```
+
+    <Callouts>
+        1. Set the `selector` to match the unique label or labels defined in the pod template of the gateway proxy `Deployment`. By default, the Istio `Gateway` configuration applies to matching gateway pods across all namespaces.
+        2. In the `hosts` field, list the addresses that clients can use to access a mesh service on the corresponding port.
+    </Callouts>
+
+5.  Apply the YAML file with this command:
+
+    ```shell
+    kubectl apply -f httpbin-gw.yaml
+    ```
+
+6.  Create another YAML file named `httpbin-vs.yaml` for a `VirtualService`. This `VirtualService` will define rules to route traffic from the gateway proxy to the `httpbin` service.
+
+    ```yaml
+    apiVersion: networking.istio.io/v1
+    kind: VirtualService
+    metadata:
+      name: httpbin
+      namespace: httpbin
+    spec:
+      hosts:
+        - httpbin.example.com  # [!code callout]
+      gateways:
+        - httpbin-gateway  # [!code callout]
+      http:
+        - match:
+            - uri:
+                prefix: /status
+            - uri:
+                prefix: /headers
+          route:
+            - destination:  # [!code callout]
+                port:
+                  number: 8000
+                host: httpbin
+    ```
+    <Callouts>
+        1.  Define the `hosts` to which the `VirtualService` routing rules will apply. The specified `hosts` must be exposed by the Istio `Gateway` resource to which this `VirtualService` is attached.
+        2.  Attach the `VirtualService` to the Istio `Gateway` resource from the previous step by adding the `Gateway`'s name to the gateways list.
+        3.  Direct matching traffic to the previously deployed `httpbin` service by defining a `destination` that specifies the `host` and `port` of the `httpbin` `Service`.
+    </Callouts>
+
+7.  Apply the YAML file using this command:
+
+    ```shell
+    kubectl apply -f httpbin-vs.yaml
+    ```
+
+
+## Verification
+
+1.  Create a namespace for a `curl` client by executing this command:
+
+    ```shell
+    kubectl create namespace curl
+    ```
+
+2.  Deploy the `curl` client with the following command:
+
+    ```shell
+    kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/curl/curl.yaml
+    ```
+
+3. Store the name of the `curl` pod in a `CURL_POD` variable by running this command:
+
+    ```shell
+    CURL_POD=$(kubectl get pods -n curl -l app=curl -o jsonpath='{.items[*].metadata.name}')
+    ```
+
+4. From the `curl` client, send a request to the `/headers` endpoint of the `httpbin` application via the ingress gateway `Service`. Set the `Host` header to `httpbin.example.com` to align with the host specified in the Istio `Gateway` and `VirtualService`. Execute the following `curl` command:
+
+    ```shell
+    kubectl exec $CURL_POD -n curl -- \
+      curl -s -I \
+        -H Host:httpbin.example.com \
+        <gateway_name>.<gateway_namespace>.svc.cluster.local/headers
+    ```
+
+5. The response should show a `200 OK` HTTP status, confirming the request was successful.
+
+    **Example output**
+
+    ```shell
+    HTTP/1.1 200 OK
+    server: istio-envoy
+    ...
+    ```
+
+6. Send another request to an endpoint that lacks a corresponding URI prefix match in the `httpbin` `VirtualService` by running this command:
+
+    ```shell
+    kubectl exec $CURL_POD -n curl -- \
+      curl -s -I \
+        -H Host:httpbin.example.com \
+        <gateway_name>.<gateway_namespace>.svc.cluster.local/get
+    ```
+
+    The response should be a `404 Not Found` status. This is the expected outcome because the `/get` endpoint does not have a defined URI prefix match in the `httpbin` `VirtualService`.
+
+    **Example output**
+
+    ```shell
+    HTTP/1.1 404 Not Found
+    server: istio-envoy
+    ...
+    ```
+
+7. Expose the gateway proxy to traffic from outside the cluster by changing its `Service` type to `LoadBalancer`:
+
+    ```shell
+    kubectl patch service <gateway_name> -n <gateway_namespace> -p '{"spec": {"type": "LoadBalancer"}}'
+    ```
+
+8. Confirm that the `httpbin` service is accessible from outside the cluster using the gateway `Service`'s external hostname or IP address. Make sure to set the `INGRESS_HOST` variable correctly for your cluster's environment.
+
+    1.  Set the `INGRESS_HOST` variable with this command:
+
+        ```shell
+        INGRESS_HOST=$(kubectl get service <gateway_name> -n <gateway_namespace> -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        ```
+
+        <Directive type="danger" title=" ">
+
+        In certain environments, the load balancer may be exposed using a host name, instead of an IP address. In this case, the ingress gateway's `EXTERNAL-IP` value will not be an IP address, but rather a host name, and the above command will have failed to set the `INGRESS_HOST` environment variable. Use the following command to correct the `INGRESS_HOST` value:
+
+        ```shell
+        INGRESS_HOST=$(kubectl get service <gateway_name> -n <gateway_namespace> -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        ```
+
+        </Directive>
+
+    2.  Send a `curl` request to the `httpbin` service using the gateway's host by running this command:
+
+        ```shell
+        curl -s -I -H Host:httpbin.example.com http://$INGRESS_HOST/headers
+        ```
+
+9. Check that the response includes the `HTTP/1.1 200 OK` status, which confirms the request succeeded.

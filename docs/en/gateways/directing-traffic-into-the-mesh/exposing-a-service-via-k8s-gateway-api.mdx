@@ -1,0 +1,197 @@
+---
+weight: 30
+---
+
+# Exposing a service via Kubernetes Gateway API
+
+You can use the Kubernetes Gateway API to create `Gateway` and `HTTPRoute` resources to deploy a gateway. These resources configure the gateway to make a service inside the mesh accessible to traffic from outside. You can then change the gateway's `Service` to `LoadBalancer` to expose it to traffic external to the cluster.
+
+## Prerequisites
+
+- Alauda Service Mesh v2 Operator is installed.
+- An Istio control plane is deployed.
+
+## Procedure
+
+1.  Create a new namespace named `httpbin` with the following command:
+
+    ```shell
+    kubectl create namespace httpbin
+    ```
+
+2.  Deploy the `httpbin` sample service with this command:
+
+    ```shell
+    kubectl apply -n httpbin -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/httpbin/httpbin.yaml
+    ```
+
+3.  Create a file named `httpbin-k8s-gw.yaml` that defines a Kubernetes `Gateway` resource. This will configure gateway proxies to expose port 80 (HTTP) for the `httpbin.example.com` host.
+    
+    <Directive type="info" title="Automated deployment">
+    By default, each `Gateway` will automatically provision a `Service` and `Deployment`. These will be named `<Gateway name>-<GatewayClass name>` (with the exception of the `istio-waypoint` `GatewayClass`, which does not append a suffix). These configurations will be updated automatically if the `Gateway` changes (for example, if a new port is added).
+    </Directive>
+
+    **Example gateway resource file**
+
+    ```yaml
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: Gateway
+    metadata:
+      annotations:
+        networking.istio.io/service-type: ClusterIP  # [!code callout]
+      name: httpbin-gateway  # [!code callout]
+      namespace: httpbin  # [!code callout]
+    spec:
+      gatewayClassName: istio
+      listeners:
+        - name: http
+          hostname: "httpbin.example.com"  # [!code callout]
+          port: 80
+          protocol: HTTP
+          allowedRoutes:
+            namespaces:
+              from: All
+    ```
+
+    <Callouts>
+        1.  Specifies the gateway's `Service` type; defaults to `LoadBalancer`.
+        2.  Specifies the gateway's name.
+        3.  Specifies the gateway's namespace.
+        4.  Specifies the virtual hostname for clients to use when accessing a mesh service on this port.
+    </Callouts>
+
+4.  Apply the YAML file with this command:
+
+    ```shell
+    kubectl apply -f httpbin-k8s-gw.yaml
+    ```
+
+5.  Create a YAML file named `httpbin-hr.yaml` that defines an `HTTPRoute` resource. This resource specifies the rules for routing traffic from the gateway proxy to the `httpbin` service.
+
+    **Example HTTPRoute file**
+
+    ```yaml
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    metadata:
+      name: httpbin
+      namespace: httpbin
+    spec:
+      parentRefs:  # [!code callout]
+      - name: httpbin-gateway
+        namespace: httpbin
+      rules:
+      - matches:
+        - path:
+            type: PathPrefix
+            value: /status
+        - path:
+            type: PathPrefix
+            value: /headers
+        backendRefs:  # [!code callout]
+        - name: httpbin
+          port: 8000
+    ```
+
+    <Callouts>
+        1.  Links the `HTTPROUTE` resource to the Kubernetes `Gateway` created previously by adding the gateway's name to the list of gateways.
+        2.  Directs matching traffic to the `httpbin` service by defining a `backendRefs` entry that includes the name and port of the `httpbin` `Service`.
+    </Callouts>
+
+6.  Apply the YAML file by executing this command:
+
+    ```shell
+    kubectl apply -f httpbin-hr.yaml
+    ```
+
+7.  Confirm that the Gateway API service is ready and has an allocated address by running this command:
+
+    ```shell
+    kubectl wait --for=condition=programmed gtw httpbin-gateway -n httpbin
+    ```
+
+## Verification
+
+1.  Create a namespace for a `curl` client by executing this command:
+
+    ```shell
+    kubectl create namespace curl
+    ```
+
+2.  Deploy a `curl` client using the command below:
+
+    ```shell
+    kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/curl/curl.yaml
+    ```
+
+3.  Set a `CURL_POD` variable with the name of the `curl` pod with this command:
+
+    ```shell
+    CURL_POD=$(kubectl get pods -n curl -l app=curl -o jsonpath='{.items[*].metadata.name}')
+    ```
+
+4.  From the `curl` client, send a request to the `/headers` endpoint of the `httpbin` application via the ingress gateway `Service`. Set the `Host` header to `httpbin.example.com` to match the host specified in the Kubernetes `Gateway` and `HTTPROUTE` resources. Run the following `curl` command:
+
+    ```shell
+    kubectl exec $CURL_POD -n curl -- \
+      curl -s -I \
+        -H Host:httpbin.example.com \
+        httpbin-gateway-istio.httpbin.svc.cluster.local/headers
+    ```
+
+    The response should show a `200 OK` HTTP status, indicating a successful request.
+
+    **Example output**
+
+    ```shell
+    HTTP/1.1 200 OK
+    server: istio-envoy
+    ...
+    ```
+
+5.  Send a `curl` request to an endpoint without a matching Uniform Resource Identifier (URI) prefix in the `httpbin` `HTTPROUTE` by running this command:
+
+    ```shell
+    kubectl exec $CURL_POD -n curl -- \
+      curl -s -I \
+        -H Host:httpbin.example.com \
+        httpbin-gateway-istio.httpbin.svc.cluster.local/get
+    ```
+
+    The response will be a `404 Not Found` status. This is expected, as the `/get` endpoint does not have a matching URI prefix defined in the `httpbin` `HTTPROUTE` resource.
+
+    **Example output**
+
+    ```shell
+    HTTP/1.1 404 Not Found
+    server: istio-envoy
+    ...
+    ```
+
+6.  Expose the gateway proxy to external traffic by setting its `Service` type to the default `LoadBalancer`. Run this command:
+
+    ```shell
+    kubectl -n httpbin annotate gtw httpbin-gateway networking.istio.io/service-type-
+    ```
+
+7.  Verify that the `httpbin` service is accessible from outside the cluster by using the external hostname or IP address of the gateway `Service`. Ensure the `INGRESS_HOST` variable is set appropriately for your cluster's environment.
+
+    1.  Set the `INGRESS_HOST` variable by running this command:
+
+        ```shell
+        export INGRESS_HOST=$(kubectl get gtw httpbin-gateway -n httpbin -o jsonpath='{.status.addresses[0].value}')
+        ```
+
+    2.  Set the `INGRESS_PORT` variable by running this command:
+
+        ```shell
+        INGRESS_PORT=$(kubectl get gtw httpbin-gateway -n httpbin -o jsonpath='{.spec.listeners[?(@.name=="http")].port}')
+        ```
+
+    3.  Using the gateway host, send a `curl` request to the `httpbin` service with this command:
+
+        ```shell
+        curl -s -I -H Host:httpbin.example.com http://$INGRESS_HOST:$INGRESS_PORT/headers
+        ```
+
+8.  Verify that the response shows the `HTTP/1.1 200 OK` status, which confirms the request was successful.
