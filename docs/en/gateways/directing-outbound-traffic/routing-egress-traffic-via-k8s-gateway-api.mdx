@@ -8,7 +8,8 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
 
 ## Prerequisites
 
-  - An Istio gateway has been installed using [gateway injection](../gateway-installation/installing-a-gateway-via-injection.mdx).
+- Alauda Service Mesh v2 Operator is installed.
+- An Istio control plane is deployed.
 
 ## Procedure
 
@@ -98,10 +99,17 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
 3.  Check the status of the gateway configuration by running this command:
 
     ```shell
-    kubectl describe gtw -n egress-gateway
+    kubectl -n egress-gateway get gtw httpbin-egress-gateway
     ```
 
-    The desired output is confirmed when `Programmed` appears in the `Status` column.
+    The desired output is confirmed when the value in the `PROGRAMMED` column is `True`.
+
+    **Example output**
+
+    ```shell
+    NAME                     CLASS   ADDRESS                                                         PROGRAMMED   AGE
+    httpbin-egress-gateway   istio   httpbin-egress-gateway-istio.egress-gateway.svc.cluster.local   True         22h
+    ```
 
 ## Verification
 
