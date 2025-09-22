@@ -1,0 +1,189 @@
+---
+weight: 20
+---
+
+# Routing egress traffic via a gateway with the Kubernetes Gateway API
+
+This section describes how to use the Kubernetes Gateway API to route outbound HTTP traffic through an egress gateway.
+
+## Prerequisites
+
+- Alauda Service Mesh v2 Operator is installed.
+- An Istio control plane is deployed.
+
+## Procedure
+
+1.  Create a namespace named `egress-gateway` with the following command:
+
+    ```shell
+    kubectl create namespace egress-gateway
+    ```
+
+2.  Create a YAML file named `egress-gateway-cr.yaml` that defines the egress gateway.
+
+    **Example egress gateway CR file**
+
+    ```yaml
+    # ServiceEntry to allow traffic to httpbin.org
+    apiVersion: networking.istio.io/v1
+    kind: ServiceEntry
+    metadata:
+      name: httpbin-ext
+    spec:
+      hosts:
+        - httpbin.org
+      ports:
+        - number: 80
+          name: http
+          protocol: HTTP
+      location: MESH_EXTERNAL
+      resolution: DNS
+    ---
+    # Gateway API Gateway for egress
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: Gateway
+    metadata:
+      name: httpbin-egress-gateway
+      annotations:
+        networking.istio.io/service-type: ClusterIP
+    spec:
+      gatewayClassName: istio
+      listeners:
+        - name: http
+          hostname: httpbin.org
+          port: 80
+          protocol: HTTP
+          allowedRoutes:
+            namespaces:
+              from: All
+    ---
+    # HTTPRoute to direct traffic from sidecars to the egress gateway
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    metadata:
+      name: direct-httpbin-to-egress-gateway
+    spec:
+      parentRefs:
+        - kind: ServiceEntry
+          group: networking.istio.io
+          name: httpbin-ext
+      rules:
+        - backendRefs:
+            - name: httpbin-egress-gateway-istio
+              port: 80
+    ---
+    # HTTPRoute to forward traffic from the egress gateway to httpbin.org
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    metadata:
+      name: forward-httpbin-from-egress-gateway
+    spec:
+      parentRefs:
+        - name: httpbin-egress-gateway
+      hostnames:
+        - httpbin.org
+      rules:
+        - backendRefs:
+            - kind: Hostname
+              group: networking.istio.io
+              name: httpbin.org
+              port: 80
+    ```
+
+    Apply this YAML file by executing the following command:
+
+    ```shell
+    kubectl -n egress-gateway apply -f egress-gateway-cr.yaml
+    ```
+
+3.  Check the status of the gateway configuration by running this command:
+
+    ```shell
+    kubectl -n egress-gateway get gtw httpbin-egress-gateway
+    ```
+
+    The desired output is confirmed when the value in the `PROGRAMMED` column is `True`.
+
+    **Example output**
+
+    ```shell
+    NAME                     CLASS   ADDRESS                                                         PROGRAMMED   AGE
+    httpbin-egress-gateway   istio   httpbin-egress-gateway-istio.egress-gateway.svc.cluster.local   True         22h
+    ```
+
+## Verification
+
+1.  Create a namespace named `curl` by executing the following command:
+
+    ```shell
+    kubectl create namespace curl
+    ```
+
+2.  Enable sidecar injection for the namespace. If your setup uses the `InPlace` upgrade strategy, run this command:
+
+    ```shell
+    kubectl label namespace curl istio-injection=enabled
+    ```
+
+    <Directive type="note">
+
+    If you are using the `RevisionBased` upgrade strategy, execute these commands:
+
+    1.  To discover your `<revision-name>`, run the following:
+
+        ```shell
+        kubectl get istiorevisions.sailoperator.io
+        ```
+
+        **Sample output:**
+
+        ```shell
+        NAME      TYPE    READY   STATUS    IN USE   VERSION   AGE
+        default   Local   True    Healthy   True     v1.26.3   3m33s
+        ```
+
+    2.  Label the namespace using the revision name to enable sidecar injection:
+
+        ```shell
+        kubectl label namespace curl istio.io/rev=default
+        ```
+    
+    </Directive>
+
+3.  Deploy the `curl` application by running this command:
+
+    ```shell
+    kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/curl/curl.yaml
+    ```
+
+4.  Initialize and export a `CURL_POD` environment variable containing the name of the curl pod:
+
+    ```shell
+    export CURL_POD=$(kubectl get pod -n curl -l app=curl -o jsonpath='{.items[0].metadata.name}')
+    ```
+
+5.  Using the `curl` client, confirm that you can reach `httpbin.org` via the egress gateway by entering this command:
+
+    ```shell
+    kubectl exec "$CURL_POD" -n curl -c curl -- curl -s -v http://httpbin.org/get
+    ```
+
+    The desired output will show a response from `httpbin.org`, which indicates that the egress traffic is being routed through the configured gateway.
+
+     **Example output**
+
+    ```shell
+    ...
+    {
+      "headers": {
+        "Host": "httpbin.org",
+        "User-Agent": "curl/8.15.0",
+        "X-Envoy-Peer-Metadata-Id": "router~10.3.0.58~httpbin-egress-gateway-istio-7db8cbfc64-72g85.egress-gateway~egress-gateway.svc.cluster.local"
+        ...
+      },
+      "url": "http://httpbin.org/get"
+    }
+    < HTTP/1.1 200 OK
+    < server: envoy
+    ...
+    ```

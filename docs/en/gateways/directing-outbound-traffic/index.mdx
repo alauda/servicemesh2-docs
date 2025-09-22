@@ -1,0 +1,20 @@
+---
+weight: 30
+---
+
+# Directing outbound traffic through a gateway
+
+Istio APIs enable you to configure gateway proxies, installed via gateway injection, to route traffic destined for an external service.
+
+A gateway installed through gateway injection can be set up as an exit point for traffic departing the service mesh. In such a setup, the gateway functions as a forward proxy for requests aimed at services outside the mesh.
+
+Setting up a gateway for egress traffic can assist in meeting security requirements. For instance, an egress gateway is useful in environments where traffic policies mandate that all traffic leaving a mesh must pass through a specific set of nodes. Likewise, a gateway can be employed when network policies block application nodes from accessing external services directly. In these situations, gateway proxies are placed on dedicated egress nodes that are permitted to access external services. These nodes can then be monitored more closely or be subject to stricter network policies to improve security.
+
+To set up a [gateway installed with gateway injection](../gateway-installation/installing-a-gateway-via-injection.mdx) for directing egress traffic, you should use a combination of Istio's `ServiceEntry`, `Gateway`, `VirtualService`, and `DestinationRule` resources. The `ServiceEntry` resource is used to specify the properties of an external service, which is then added to the mesh's Istio service registry. This allows you to apply Istio features, like monitoring and routing rules, to traffic leaving the mesh for that external service. The `Gateway`, `VirtualService`, and `DestinationRule` resources are used to configure rules that direct traffic from within the mesh to the external service through the gateway proxy.
+
+## Reference
+
+- [Egress gateways](https://istio.io/latest/docs/tasks/traffic-management/egress/egress-gateway/) (Istio documentation)
+- [Introduction](https://gateway-api.sigs.k8s.io/) (Gateway API documentation)
+
+<Overview overviewHeaders={[]} />

@@ -1,0 +1,21 @@
+---
+weight: 20
+---
+
+# Directing Traffic into the Mesh
+
+By using Istio APIs, you can set up gateway proxies installed through gateway injection. This allows them to receive traffic originating from outside the mesh and route it to internal services.
+
+:::note
+For the purpose of this document, which shows how to use a gateway to control ingress traffic into your “Kubernetes cluster”, you can start the internal service with or without sidecar injection enabled (i.e., the internal service can be either inside or outside of the Istio mesh).
+:::
+
+You can make gateway proxies accessible to traffic from outside a cluster by utilizing a `Service` of type `LoadBalancer`.
+
+## Reference
+
+- [Istio Gateway resource API reference](https://istio.io/latest/docs/reference/config/networking/gateway/#Gateway) (Istio documentation)
+- [VirtualService API reference](https://istio.io/latest/docs/reference/config/networking/virtual-service/#VirtualService) (Istio documentation)
+- [Kubernetes Gateway API concept](https://kubernetes.io/docs/concepts/services-networking/gateway/) (Kubernetes documentation)
+
+<Overview overviewHeaders={[]} />
