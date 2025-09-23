@@ -1,0 +1,187 @@
+---
+weight: 10
+---
+
+# Uninstalling Alauda Service Mesh
+
+You can uninstall the Alauda Service Mesh Operator and its resources from your Alauda Container Platform instance. This can be done through the Alauda Container Platform web console or the command line interface (CLI). Additionally, you have the option to delete the Istio custom resource definitions (CRDs).
+
+## Uninstalling the Alauda Service Mesh v2 Operator and Istio control plane 
+
+### Uninstalling via the web console
+
+Uninstalling the Alauda Service Mesh v2 Operator and the Istio control plane from an Alauda Container Platform instance involves deleting the following components:
+
+  - `Istio` resource
+  - `IstioCNI` resource
+  - Alauda Service Mesh v2 Operator
+  - `istio-system` namespace
+  - `istio-cni` namespace
+
+You can also optionally remove the Istio custom resource definitions (CRDs).
+
+The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Container Platform web console.
+
+#### Procedure
+
+1.  Delete the `Istio` resource:
+    1.  In the Alauda Container Platform web console, navigate to **Administrator**.
+    2.  Select **Marketplace** > **OperatorHub**.
+    3.  Search for the `Alauda Service Mesh v2`.
+    4.  Locate the Alauda Service Mesh v2, and click to select it.
+    5.  Click **All Instances** tab.
+    6.  From the **Filter by instance type** dropdown, select `Istio`.
+    7.  Click the "**⋮**" button for the `Istio` resource, then click **Delete** in the menu.
+    8.  When prompted, confirm the action by clicking **Delete**.
+
+2.  Delete the `IstioCNI` resource:
+
+    In the **Alauda Service Mesh v2** view of **OperatorHub**:
+
+    1.  Click **All Instances** tab.
+    2.  From the **Filter by instance type** dropdown, select `IstioCNI`.
+    3.  Click the "**⋮**" button for the `IstioCNI` resource, then click **Delete** in the menu.
+    4.  When prompted, confirm the action by clicking **Delete**.
+
+3.  Uninstall the Alauda Service Mesh v2 Operator:
+
+    In the **Alauda Service Mesh v2** view of **OperatorHub**:
+
+    1.  Click the **Uninstall** button in the top-right corner.
+    2.  Open the **Options** menu and select **Uninstall Operator**.
+    3.  In the confirmation prompt, read the uninstall notice: `Removing the operator will not remove any of its custom resource definitions or managed resources. If you have created a resource instance, you need to delete it manually`.
+    4.  Click **Uninstall**.
+
+4.  Delete the `istio-system` namespace:
+
+    ```shell
+    kubectl delete ns istio-system
+    ```
+
+5.  Delete the `istio-cni` namespace:
+
+    ```shell
+    kubectl delete ns istio-cni
+    ```
+
+### Uninstalling via the CLI
+
+To uninstall the Alauda Service Mesh v2 Operator and the Istio control plane from an Alauda Container Platform instance, you must delete the following:
+
+  - `Istio` resource
+  - `IstioCNI` resource
+  - Alauda Service Mesh v2 Operator
+  - `istio-system` project
+  - `istio-cni` project
+
+Optionally, you can also delete the Istio custom resource definitions (CRDs).
+
+The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Container Platform command line interface (CLI).
+
+#### Procedure
+
+1.  Delete the `Istio` resource:
+
+    1.  Get the `Istio` resource name by executing this command:
+
+        ```shell
+        kubectl get istio -n istio-system
+        ```
+
+        **Example output**
+
+        ```shell
+        AME                         NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
+        <name_of_custom_resource>   istio-system             1           1       1        default           Healthy   v1.26.3   1d
+        ```
+
+    2.  Use the name from the previous command's output to replace `<name_of_custom_resource>`, and then run the following to remove it:
+
+        ```shell
+        kubectl delete istio/<name_of_custom_resource>
+        ```
+
+        **Example output**
+
+        ```shell
+        istio.sailoperator.io "<name_of_custom_resource>" deleted
+        ```
+
+2.  Delete the `IstioCNI` resource:
+
+    1.  Get the name of the `IstioCNI` resource by executing this command:
+
+        ```shell
+        kubectl get istioCNI -n istio-system
+        ```
+
+        **Example output**
+
+        ```shell
+        NAME                        NAMESPACE   PROFILE   READY   STATUS    VERSION   AGE
+        <name_of_custom_resource>   istio-cni             True    Healthy   v1.26.3   1d
+        ```
+
+    2.  Use the name from the previous command's output to replace `<name_of_custom_resource>`, and then run the following to remove it:
+
+        ```shell
+        kubectl delete istioCNI/<name_of_custom_resource>
+        ```
+
+        **Example output**
+
+        ```shell
+        istiocni.sailoperator.io "<name_of_custom_resource>" deleted
+        ```
+
+3.  Delete the `istio-system` and `istio-cni` namespaces:
+
+    1.  Delete the `istio-system` namespace with the following command:
+
+        ```shell
+        kubectl delete ns istio-system
+        ```
+
+        **Example output**
+
+        ```shell
+        namespace "istio-system" deleted
+        ```
+
+    2.  Delete the `istio-cni` namespace with the following command:
+
+        ```shell
+        kubectl delete ns istio-cni
+        ```
+
+        **Example output**
+
+        ```shell
+        namespace "istio-cni" deleted
+        ```
+
+4.  Uninstall the Alauda Service Mesh v2 Operator:
+
+    1.  Delete the `servicemesh-operator2` subscription:
+
+        ```shell
+        kubectl delete subscription servicemesh-operator2 -n sail-operator
+        ```
+
+        **Example output**
+
+        ```shell
+        subscription.operators.coreos.com "servicemesh-operator2" deleted
+        ```
+
+## Deleting Istio custom resource definitions
+
+The deletion of Istio custom resource definitions (CRDs) is an optional step.
+
+### Procedure
+
+1.  To delete the Istio CRDs, execute the command below:
+
+    ```shell
+    kubectl get crds -oname | grep -e istio.io -e sailoperator.io | xargs kubectl delete
+    ```
