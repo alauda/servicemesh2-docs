@@ -1,0 +1,74 @@
+---
+weight: 30
+---
+
+# Using `DiscoverySelectors`
+
+A workload is included in the Service Mesh if it satisfies these two conditions:
+
+  - It has been discovered by the control plane.
+  - An Envoy proxy sidecar has been injected into it.
+
+By default, the control plane scans for workloads in every namespace within the cluster. This default behavior leads to two outcomes:
+
+  - Every proxy instance is configured for all namespaces, even for workloads not part of the mesh.
+  - A proxy sidecar is injected into any workload that has the correct injection label on its pod or namespace.
+
+## Understanding discovery selectors
+
+Discovery selectors allow a mesh administrator to manage which namespaces the control plane can monitor. The administrator uses a Kubernetes label selector to define the criteria for namespaces that should be visible to the control plane, effectively hiding any namespaces that don't meet these criteria.
+
+:::warning
+Istiod will always open a watch to Kubernetes for all namespaces. However, discovery selectors will ignore objects that are not selected very early in its processing, minimizing costs.
+:::
+
+The `discoverySelectors` field takes an array of Kubernetes selectors that are applied to namespace labels. Each selector can be configured for various scenarios:
+
+  - **Custom label names and values.** For example, configuring all relevant namespaces with the `istio-discovery=enabled` label.
+  - **A list of namespace labels.** This can be done with set-based selectors that use OR logic. For instance, configuring namespaces that have either `istio-discovery=enabled` OR `region=us-east1`.
+  - **Inclusion and exclusion of namespaces.** For example, configuring namespaces that possess both `istio-discovery=enabled` AND the `app=helloworld` label.
+
+:::warning
+It is important to note that discovery selectors do not function as a security boundary. Even with the `discoverySelector` field configured, Istiod retains access to all namespaces.
+:::
+
+## How to Scoping the Service Mesh with Discovery Selectors
+
+When you have identified the namespaces to be included in the Service Mesh, you can configure `discoverySelectors` either during or after the installation. This is done by adding the necessary selectors to the `meshConfig.discoverySelectors` field within the `Istio` resource. For instance, you could configure Istio to only discover namespaces that have the label `istio-discovery=enabled`.
+
+**Prerequisites**
+
+  - Alauda Service Mesh v2 Operator is installed.
+  - An Istio CNI is deployed.
+  - An Istio control plane is deployed.
+
+**Procedure**
+
+1.  Apply a label to the namespace where the Istio control plane is running, such as the `istio-system` namespace.
+
+    ```shell
+    kubectl label namespace istio-system istio-discovery=enabled
+    ```
+
+2.  Update the `Istio` control plane resource by adding a `discoverySelectors` section that uses the same label.
+
+    ```yaml
+    kind: Istio
+    apiVersion: sailoperator.io/v1
+    spec:
+      namespace: istio-system
+      # Applying the following contents to your Istio Custom Resource:
+      values:
+        meshConfig:
+          discoverySelectors:
+            - matchLabels:
+                istio-discovery: enabled
+    ```
+
+3.  Verify that every namespace intended to host workloads for the Service Mesh is tagged with both the `discoverySelector` label and, if required, the relevant Istio injection label.
+
+## Reference
+
+- [Use discovery selectors to configure namespaces for your Istio service mesh](https://istio.io/latest/blog/2021/discovery-selectors/) (Istio documentation)
+- [Label selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors) (Kubernetes documentation)
+- [Resources that support set-based requirements](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#resources-that-support-set-based-requirements) (Kubernetes documentation)
