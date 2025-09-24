@@ -1,0 +1,33 @@
+---
+weight: 20
+---
+
+# Scoping the Service Mesh
+
+In order to program the service mesh, the Istio control plane (Istiod) reads a variety of configurations, including core Kubernetes types like `Service` and `Node`, and Istio's own types like `Gateway`. These are then sent to the data plane (see [Architecture](https://istio.io/latest/docs/ops/deployment/architecture/) for more information).
+
+By default, the control plane will read all configuration in all namespaces. Each proxy instance will receive configuration for all namespaces as well. This includes information about workloads that are not enrolled in the mesh.
+
+This default ensures correct behavior out of the box, but comes with a scalability cost. Each configuration has a cost (in CPU and memory, primarily) to maintain and keep up to date. At large scales, it is critical to limit the configuration scope to avoid excessive resource consumption.
+
+## Scoping mechanisms
+
+Istio offers a few tools to help control the scope of a configuration to meet different use cases. Depending on your requirements, these can be used alone or together.
+
+- `Sidecar` provides a mechanism for specific workloads to _import_ a set of configurations
+- `exportTo` provides a mechanism to _export_ a configuration to a set of workloads
+- `discoverySelectors` provides a mechanism to let Istio completely ignore a set of configurations
+
+<Overview overviewHeaders={[]} />
+
+## Frequently asked questions
+
+### What happens if I connect to a service outside of my scope?
+
+When connecting to a service that has been excluded through one of the scoping mechanisms, the data plane will not know anything about the destination, so it will be treated as [Unmatched traffic](https://istio.io/latest/docs/ops/configuration/traffic-management/traffic-routing/#unmatched-traffic).
+
+### What about Gateways?
+
+While [Gateways](https://istio.io/latest/docs/setup/additional-setup/gateway/) will respect `exportTo` and `DiscoverySelectors`, `Sidecar` objects do not impact Gateways. However, unlike sidecars, gateways do not have configuration for the entire cluster by default. Instead, each configuration is explicitly attached to the gateway, which mostly avoids this problem.
+
+However, [currently](https://github.com/istio/istio/issues/29131) part of the data plane configuration (a “cluster”, in Envoy terms), is always sent for the entire cluster, even if it is not referenced explicitly.

@@ -1,0 +1,26 @@
+---
+weight: 10
+---
+
+# Using `Sidecar` import
+
+The [`egress.hosts`](https://istio.io/latest/docs/reference/config/networking/sidecar/#IstioEgressListener) field in `Sidecar` allows specifying a list of configurations to import. Only configurations matching the specified criteria will be seen by sidecars impacted by the `Sidecar` resource.
+
+For example:
+
+```yaml
+apiVersion: networking.istio.io/v1
+kind: Sidecar
+metadata:
+  name: default
+spec:
+  egress:
+  - hosts:
+    - "./*" # Import all configuration from our own namespace
+    - "bookinfo/*" # Import all configuration from the bookinfo namespace
+    - "external-services/example.com" # Import only 'example.com' from the external-services namespace
+```
+
+## Reference
+
+- [Istio Sidecar resource API reference](https://istio.io/latest/docs/reference/config/networking/sidecar/) (Istio documentation)

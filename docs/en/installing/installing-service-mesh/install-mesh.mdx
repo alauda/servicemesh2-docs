@@ -9,7 +9,6 @@ Installing Alauda Service Mesh consists four major parts:
 - Installing the Alauda Service Mesh v2 Operator
 - Deploying the Istio CNI plugin
 - Deploying the Istio control plane
-- Customizing Istio configuration
 
 :::warning
 Do not install Alauda Service Mesh and Alauda Service Mesh v2 in the same Kubernetes cluster, as this may result in functional conflicts.
@@ -148,21 +147,3 @@ The Alauda Service Mesh v2 Operator leverages this resource's configuration to d
 **Verification**
 
 Wait until the `.status.state` field of the `Istio` resource to be `Healthy`.
-
-## Customizing Istio configuration
-
-The `values` field of the `Istio` custom resource definition, which was created when the control plane was deployed,
-can be used to customize Istio configuration using Istio's `Helm` configuration values.
-
-**Procedure**
-
-1. In the Alauda Container Platform web console, navigate to **Administrator**.
-2. Select **Marketplace** > **OperatorHub**.
-3. Search for the Alauda Service Mesh v2.
-4. Locate the Alauda Service Mesh v2, and click to select it.
-5. Click **All Instances** tab.
-6. Click the `Istio` instance, named `default`.
-7. Click **YAML** to view the `Istio` configuration.
-8. Click **Actions** > **Update** to make modifications to the `Istio` configuration.
-
-For a complete list of available configuration for the values field, refer to [sail-operator's documentation](https://github.com/alauda-mesh/sail-operator/blob/main/docs/api-reference/sailoperator.io.md).

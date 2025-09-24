@@ -1,0 +1,25 @@
+---
+weight: 20
+---
+
+# Using `exportTo`
+
+Istio's `VirtualService`, `DestinationRule`, and `ServiceEntry` provide a `spec.exportTo` field. Similarly, `Service` can be configured with the `networking.istio.io/exportTo` annotation.
+
+Unlike `Sidecar` which allows a workload owner to control what dependencies it has, `exportTo` works in the opposite way, and allows the service owners to control their own service's visibility.
+
+For example, this configuration makes the `details` `Service` only visible to its own namespace, and the `client` namespace:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: details
+  annotations:
+    networking.istio.io/exportTo: ".,client"
+spec: ...
+```
+
+## Reference
+
+- [Istio Traffic Management API reference](https://istio.io/latest/docs/reference/config/networking/) (Istio documentation)
