@@ -1,0 +1,50 @@
+---
+weight: 10
+---
+
+# Application Requirements
+
+Many Kubernetes applications can be deployed in an Istio-enabled cluster without any changes at all. However, there are some implications of Istio's sidecar model that may need special consideration when deploying an Istio-enabled application. This document describes these application considerations and specific requirements of Istio enablement.
+
+## Pod requirements
+
+To be part of a mesh, Kubernetes pods must satisfy the following requirements:
+
+- **Application UIDs**: Ensure your pods do **not** run applications as a user with the user ID (UID) value of `1337` because `1337` is reserved for the sidecar proxy.
+
+- **Pod labels**: We recommend explicitly declaring pods with an application identifier and version by using a pod label. These labels add contextual information to the metrics and telemetry that Istio collects. Each of these values are read from multiple labels ordered from highest to lowest precedence:
+
+    - Application name: `service.istio.io/canonical-name`, `app.kubernetes.io/name`, or `app`.
+    - Application version: `service.istio.io/canonical-revision`, `app.kubernetes.io/version`, or `version`.
+
+    :::warning
+    **Kiali** relies on correctness of these labels for several features (particularly the **Application name** label).
+    
+    In Istio, it is possible to use a different set of labels, like `app.kubernetes.io/name` and `app.kubernetes.io/version`, however you must configure Kiali to the labels you are using. By default, Kiali uses Istio's recommended `app` and `version` labels.
+    :::
+
+- **Named service ports**: Service ports may optionally be named to explicitly specify a protocol. See [Protocol Selection](https://istio.io/latest/docs/ops/configuration/traffic-management/protocol-selection/) for more details. If a pod belongs to multiple [Kubernetes services](https://kubernetes.io/docs/concepts/services-networking/service/), the services cannot use the same port number for different protocols, for instance HTTP and TCP.
+
+## Ports used by Istio
+
+The following ports and protocols are used by the Istio sidecar proxy (Envoy).
+
+To avoid port conflicts with sidecars, applications should not use any of the ports used by Envoy.
+
+| Port | Protocol | Description | Pod-internal only |
+| --- | --- | --- | --- |
+| 15000 | TCP | Envoy admin port (commands/diagnostics) | Yes |
+| 15001 | TCP | Envoy outbound | No |
+| 15002 | TCP | Listen port for failure detection | Yes |
+| 15004 | HTTP | Debug port | Yes |
+| 15006 | TCP | Envoy inbound | No |
+| 15008 | HTTP2 | HBONE mTLS tunnel port | No |
+| 15020 | HTTP | Merged Prometheus telemetry from <br />Istio agent, Envoy, and application | No |
+| 15021 | HTTP | Health checks | No |
+| 15053 | DNS | DNS port, if capture is enabled | Yes |
+| 15090 | HTTP | Envoy Prometheus telemetry | No |
+
+## Reference
+
+- [Application Requirements](https://istio.io/latest/docs/ops/deployment/application-requirements/) (Istio documentation)
+- [Labels and resource names](https://kiali.io/docs/configuration/istio/#labels-and-resource-names) (Kiali documentation)
