@@ -37,8 +37,8 @@ This section explains how to use Istio APIs to route outbound HTTP traffic via a
         **Sample output:**
 
         ```shell
-        NAME      TYPE    READY   STATUS    IN USE   VERSION   AGE
-        default   Local   True    Healthy   True     v1.26.3   3m33s
+        NAME      NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
+        default   istio-system             True    Healthy   True     v1.26.3   47h
         ```
 
     2.  Label the namespace using the revision name to enable sidecar injection:
