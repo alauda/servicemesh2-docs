@@ -67,9 +67,9 @@ Additional details can be found in the upstream Istio documentation for the [Boo
     </Directive>
 
 
-3.  *Optional* : Use the following command to apply the Istio discovery selector to the `bookinfo` namespace:
+3.  *Optional* : If you have already configured `discoverySelectors`, use the following command to apply the Istio `discovery selector` to the `bookinfo` namespace:
 
-    **Example discovery selector label**: `istio-discovery=enabled`
+    **Example `discovery selector` label**: `istio-discovery=enabled`
     
     ```shell
     kubectl label namespace bookinfo istio-discovery=enabled
@@ -119,7 +119,7 @@ Additional details can be found in the upstream Istio documentation for the [Boo
 
     A successful proxy sidecar injection is indicated when the `Ready` column shows `2/2`. Ensure the `Status` column for each pod shows `Running`.
 
-3.  Confirm the `bookinfo` application is running by sending a request to its product page. Execute this command:
+3.  Confirm the `bookinfo` application is running by sending a request to its `product page`. Execute this command:
 
     ```shell
     kubectl exec "$(kubectl get pod -l app=ratings -n bookinfo -o jsonpath='{.items[0].metadata.name}')" -c ratings -n bookinfo -- curl -sS productpage:9080/productpage | grep -o "<title>.*</title>"
