@@ -200,7 +200,7 @@ NAME              ENDPOINTS                             AGE
 <gateway_name>    10.131.0.181:8080,10.131.0.181:8443   1m
 ```
 
-10. *Optional*: Create a YAML file named `gateway-hpa.yaml` that defines a horizontal pod autoscaler for the gateway.
+10. *Optional* : Create a YAML file named `gateway-hpa.yaml` that defines a horizontal pod autoscaler for the gateway.
     The following example sets the minimum replicas to `2` and the maximum replicas to `5` and scales the replicas up when average CPU utilization exceeds 80% of the CPU resource limit.
     This limit is specified in the pod template of the deployment for the gateway.
 
@@ -230,12 +230,13 @@ NAME              ENDPOINTS                             AGE
       1. Set `spec.scaleTargetRef.name` to the name of the gateway deployment previously created.
     </Callouts>
 
-11. *Optional*: Apply the YAML file by running the following command:
+11. *Optional* : Apply the YAML file by running the following command:
+    
     ```bash
     kubectl apply -f gateway-hpa.yaml
     ```
 
-12. *Optional*: Create a YAML file named `gateway-pdb.yaml` that defines a pod disruption budget for the gateway.
+12. *Optional* : Create a YAML file named `gateway-pdb.yaml` that defines a pod disruption budget for the gateway.
     The following example allows gateway pods to be evicted only when at least `1` healthy gateway pod will remain on the cluster after the eviction.
 
     ```yaml title="gateway-pdb.yaml"
@@ -255,7 +256,8 @@ NAME              ENDPOINTS                             AGE
       1. Set the `spec.selector.matchLabels` to the unique label or set of labels specified in the pod template of the gateway deployment previously created.
     </Callouts>
 
-13. *Optional*: Apply the YAML file by running the following command:
+13. *Optional* : Apply the YAML file by running the following command:
+
     ```bash
     kubectl apply -f gateway-pdb.yaml
     ```
