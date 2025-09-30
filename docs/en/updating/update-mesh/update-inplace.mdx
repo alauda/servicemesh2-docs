@@ -2,7 +2,7 @@
 weight: 50
 ---
 
-# About InPlace strategy
+# Updating with InPlace strategy
 
 The `InPlace` update strategy runs only one revision of the control plane at a time. During an update, all the workloads immediately connect to the new control plane version. To maintain compatibility between the sidecars and the control plane, you can upgrade only one minor version at a time.
 
@@ -33,23 +33,24 @@ You can install the Istio control plane, Istio CNI, and the Bookinfo demo applic
 You can use the following section to understand the update process. You can skip this installation if the cluster already includes an Istio deployment.
 :::
 
-**Procedure**
+### Procedure
 
-1. Create the `istio-system` namespace by running the following command:
+1. Create the `istio-cni` and `istio-system` namespace by running the following command:
 
    ```bash
+   kubectl create ns istio-cni
    kubectl create ns istio-system
    ```
 
 2. Attach the workloads to a control plane deployed using the `InPlace` strategy:
 
-   1. Label the namespace to automatically include all workloads by entering the following command:
+   - Label the namespace to automatically include all workloads by entering the following command:
 
       ```bash
       kubectl label namespace <namespace_name> istio.io/rev=<revision_name>
       ```
 
-   2. Apply the revision label to individual workloads by modifying the pod template in the `Deployment` resource. For example:
+   - Apply the revision label to individual workloads by modifying the pod template in the `Deployment` resource. For example:
 
       ```yaml
       apiVersion: apps/v1
@@ -67,7 +68,25 @@ You can use the following section to understand the update process. You can skip
    kubectl label namespace <namespace_name> istio-injection=enabled
    ```
 
-4. Deploy the Istio control plane using the `InPlace` update strategy. The following example configuration creates an `Istio` resource named `default` in the `istio-system` namespace:
+4. Install the Istio CNI plugin with the desired version. The following example configuration creates an `IstioCNI` resource named default in the `istio-cni` namespace:
+
+   ```yaml
+   apiVersion: sailoperator.io/v1
+   kind: IstioCNI
+   metadata:
+     name: default
+   spec:
+     version: v1.24.6
+     namespace: istio-cni
+     values:
+       cni:
+         cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
+         excludeNamespaces:
+           - istio-cni
+           - kube-system
+   ```
+
+5. Deploy the Istio control plane using the `InPlace` update strategy. The following example configuration creates an `Istio` resource named `default` in the `istio-system` namespace:
 
    **Example configuration**
 
@@ -78,34 +97,51 @@ You can use the following section to understand the update process. You can skip
      name: default
    spec:
      namespace: istio-system
-     version: v1.26.3
+     version: v1.24.6
      updateStrategy:
        type: InPlace
    ```
 
-5. Install the Istio CNI plugin with the desired version. The following example configuration creates an `IstioCNI` resource named default in the `istio-cni` namespace:
+6. Set up the application workloads to execute in the cluster. For instance, you can deploy the `bookinfo` sample application into the `bookinfo` namespace.
+    
+    1. Generate the `bookinfo` namespace with the command below:
+        
+        ```shell
+        kubectl create ns bookinfo
+        ```
 
-   ```yaml
-   apiVersion: sailoperator.io/v1
-   kind: IstioCNI
-   metadata:
-     name: default
-   spec:
-     version: v1.26.3
-     namespace: istio-cni
-     values:
-       cni:
-         cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
-         excludeNamespaces:
-           - istio-cni
-           - kube-system
-   ```
+    2. Apply a label to the `bookinfo` namespace to activate automatic sidecar injection. Use the following command:
+        
+        ```shell
+        kubectl label namespace bookinfo istio-injection=enabled
+        ```
+
+    3. Deploy the `bookinfo` application pods into the `bookinfo` namespace by executing this command:
+        
+        ```shell
+        kubectl -n bookinfo apply -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
+        ```
+
+7. Inspect the `Istio` resource using the following command:
+    
+    ```shell
+    kubectl get istio -n istio-system
+    ```
+    
+    **Example output**
+    
+    ```shell
+    NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
+    default   istio-system             1           1       1        default           Healthy   v1.24.6   6m3s
+    ```
+    
+    A value of `1` in the `IN USE` column signifies that the `IstioRevision` resource is referenced by both the label on the namespace and the injected sidecar proxies.
 
 ## Updating Istio control plane with InPlace strategy
 
 When updating Istio using the `InPlace` strategy, you can increment the version by only one minor release at a time. To update by more than one minor version, you must increment the version and restart the workloads after each update. Restarting workloads ensures compatibility between the sidecar and control plane versions. The update process is complete after restarting all workloads.
 
-**Prerequisites**
+### Prerequisites
 
 - You are logged in to the Alauda Container Platform web console as **cluster-admin**.
 - You have installed the Alauda Container Platform Networking for Multus plugin, and kube-ovn must be v4.1.5 or later.
@@ -116,7 +152,7 @@ When updating Istio using the `InPlace` strategy, you can increment the version 
 - You have labeled the `bookinfo` namespace to enable sidecar injection.
 - You have application workloads running in the cluster. In this example, the bookinfo application is deployed in the `bookinfo` namespace.
 
-**Procedure**
+### Procedure
 
 1. Change the version in the `Istio` resource. For example, to update to Istio `1.26.3`, set the spec.version field to `v1.26.3` by running the following command:
 
@@ -145,8 +181,8 @@ When updating Istio using the `InPlace` strategy, you can increment the version 
    **Example output**
 
    ```
-   NAME      REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
-   default   1           1       1        default           Healthy   v1.26.3   8m10s
+   NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
+   default   istio-system             1           1       1        default           Healthy   v1.26.3   18m5s
    ```
 
 3. Restart the application workloads so that the new version of the sidecar gets injected by running the following command:
@@ -155,7 +191,7 @@ When updating Istio using the `InPlace` strategy, you can increment the version 
    kubectl rollout restart deployment -n bookinfo
    ```
 
-**Verification**
+### Verification
 
 Verify that the new version of the sidecar is running by entering the following command:
 
@@ -166,13 +202,13 @@ istioctl proxy-status
 **Example output**
 
 ```
-NAME                                                    CLUSTER        CDS                LDS                EDS                RDS                ECDS        ISTIOD                                     VERSION
-details-v1-7d775cb4f6-5t9zm.bookinfo                    Kubernetes     SYNCED (2m25s)     SYNCED (2m25s)     SYNCED (2m17s)     SYNCED (2m25s)     IGNORED     istiod-default-v1-26-3-c98fd9675-r7bfw     1.26.3
-productpage-v1-7c4b6b857-mxrw6.bookinfo                 Kubernetes     SYNCED (2m35s)     SYNCED (2m35s)     SYNCED (2m17s)     SYNCED (2m35s)     IGNORED     istiod-default-v1-26-3-c98fd9675-r7bfw     1.26.3
-ratings-v1-5b896f8544-r552l.bookinfo                    Kubernetes     SYNCED (2m21s)     SYNCED (2m21s)     SYNCED (2m17s)     SYNCED (2m21s)     IGNORED     istiod-default-v1-26-3-c98fd9675-r7bfw     1.26.3
-reviews-v1-746f96c9d4-9pw8k.bookinfo                    Kubernetes     SYNCED (2m17s)     SYNCED (2m17s)     SYNCED (2m17s)     SYNCED (2m17s)     IGNORED     istiod-default-v1-26-3-c98fd9675-r7bfw     1.26.3
-reviews-v2-97bdf5876-4mzx5.bookinfo                     Kubernetes     SYNCED (2m35s)     SYNCED (2m35s)     SYNCED (2m17s)     SYNCED (2m35s)     IGNORED     istiod-default-v1-26-3-c98fd9675-r7bfw     1.26.3
-reviews-v3-77d9db6844-djgjk.bookinfo                    Kubernetes     SYNCED (2m19s)     SYNCED (2m19s)     SYNCED (2m17s)  SYNCED (2m19s)     IGNORED     istiod-default-v1-26-3-c98fd9675-r7bfw     1.26.3
+NAME                                        CLUSTER        CDS              LDS              EDS              RDS              ECDS        ISTIOD                      VERSION
+details-v1-5c89dbb599-4t927.bookinfo        Kubernetes     SYNCED (92s)     SYNCED (92s)     SYNCED (85s)     SYNCED (92s)     IGNORED     istiod-57559f96c4-v2h9g     1.26.3-asm-r0
+productpage-v1-f8fdd5649-xmxkt.bookinfo     Kubernetes     SYNCED (92s)     SYNCED (92s)     SYNCED (85s)     SYNCED (92s)     IGNORED     istiod-57559f96c4-v2h9g     1.26.3-asm-r0
+ratings-v1-ccf8bc48c-766tl.bookinfo         Kubernetes     SYNCED (93s)     SYNCED (93s)     SYNCED (85s)     SYNCED (93s)     IGNORED     istiod-57559f96c4-v2h9g     1.26.3-asm-r0
+reviews-v1-85dc746bfc-gsf6l.bookinfo        Kubernetes     SYNCED (92s)     SYNCED (92s)     SYNCED (85s)     SYNCED (92s)     IGNORED     istiod-57559f96c4-v2h9g     1.26.3-asm-r0
+reviews-v2-5bd759b4c5-nkb62.bookinfo        Kubernetes     SYNCED (93s)     SYNCED (93s)     SYNCED (85s)     SYNCED (93s)     IGNORED     istiod-57559f96c4-v2h9g     1.26.3-asm-r0
+reviews-v3-55d5b84fb9-wq9ds.bookinfo        Kubernetes     SYNCED (94s)     SYNCED (94s)     SYNCED (85s)     SYNCED (94s)     IGNORED     istiod-57559f96c4-v2h9g     1.26.3-asm-r0
 ```
 
 The column `VERSION` should match with the new control plane version.

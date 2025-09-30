@@ -1,0 +1,26 @@
+---
+weight: 300
+---
+
+# Sidecar injection
+
+In order to take advantage of all of Istio's features, pods in the service mesh must be running an Istio sidecar proxy.
+
+## About sidecar injection
+
+Sidecar proxy injection is primarily controlled through labels applied at either the namespace or pod level.
+
+When enabled in namespace, automatic injection injects the proxy configuration at pod creation time using an admission controller,
+ensures any new pods in that namespace include a sidecar.
+
+The revision label is also used to dictates which Istio control plane instance the sidecar will associate with.
+
+Note that unlike manual injection, automatic injection occurs at the pod-level. You won't see any change to the deployment itself.
+Instead, you'll want to check individual pods (via `kubectl describe`) to see the injected proxy.
+
+<Overview overviewHeaders={[]} />
+
+## Reference
+
+- [About admission controllers](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/) (Kubernetes documentation)
+- [Istio sidecar injection problems](https://istio.io/latest/docs/ops/common-problems/injection/) (Istio documentation)
