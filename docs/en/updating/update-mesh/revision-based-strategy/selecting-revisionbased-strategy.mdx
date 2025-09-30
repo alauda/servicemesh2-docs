@@ -1,0 +1,19 @@
+---
+weight: 10
+---
+
+# Selecting RevisionBased strategy
+
+To deploy Istio with the `RevisionBased` strategy, create the `Istio` resource with the following `spec.updateStrategy` value:
+
+**Example specification to select `RevisionBased` strategy**
+
+```yaml
+kind: Istio
+spec:
+  version: v1.26.3
+  updateStrategy:
+    type: RevisionBased
+```
+
+After you select the strategy for the Istio resource, the Operator creates a new `IstioRevision` resource with the name `<istio_resource_name>-<version>`.

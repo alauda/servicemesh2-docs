@@ -1,24 +1,8 @@
 ---
-weight: 300
+weight: 10
 ---
 
-# Sidecar injection
-
-In order to take advantage of all of Istio's features, pods in the service mesh must be running an Istio sidecar proxy.
-
-## About sidecar injection
-
-Sidecar proxy injection is primarily controlled through labels applied at either the namespace or pod level.
-
-When enabled in namespace, automatic injection injects the proxy configuration at pod creation time using an admission controller,
-ensures any new pods in that namespace include a sidecar.
-
-The revision label is also used to dictates which Istio control plane instance the sidecar will associate with.
-
-Note that unlike manual injection, automatic injection occurs at the pod-level. You won't see any change to the deployment itself.
-Instead, you'll want to check individual pods (via `kubectl describe`) to see the injected proxy.
-
-## Identifying the revision name
+# Identifying the revision name
 
 The label required to enable sidecar injection is determined by the specific control plane instance, known as a revision.
 Each revision is managed by corresponding `IstioRevision` resource, which is automatically managed by the `Istio` resource.
@@ -44,7 +28,7 @@ NAME              NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   
 default-v1-26-3   istio-system             True    Healthy   False    v1.26.3   40s
 ```
 
-### Enabling sidecar injection with default revision
+## Enabling sidecar injection with default revision
 
 When the name of `IstioRevision` is `default`, you can use the following labels on a namespace or a pod to enable sidecar injection:
 
@@ -57,7 +41,7 @@ When the name of `IstioRevision` is `default`, you can use the following labels 
 You can also enable injection by applying the `istio.io/rev: default` label to the namespace or pod.
 :::
 
-### Enabling sidecar injection with other revisions
+## Enabling sidecar injection with other revisions
 
 When then name of `IstioRevision` is not `default`, you'll need to use the specific `IstioRevision` name with the `istio.io/rev` label.
 This links the pod to the desired control plane and enables sidecar injection.

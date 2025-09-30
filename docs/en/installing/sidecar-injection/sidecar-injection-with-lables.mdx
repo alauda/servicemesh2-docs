@@ -1,0 +1,256 @@
+---
+weight: 20
+---
+
+# Enabling Sidecar Injection
+
+The following procedures utilize the Bookinfo application to illustrate various methods for configuring sidecar injection.
+
+## Prerequisites
+
+- The Alauda Service Mesh v2 Operator is installed, an `Istio` resource has been created, and the Operator has successfully deployed Istio.
+- The `IstioCNI` resource has been created, and the Operator has deployed the required `IstioCNI` pods.
+- The namespaces intended for the mesh have been created and are discoverable by the Istio control plane.
+- Optional: The workloads to be included in the mesh are already deployed. For the subsequent examples, the Bookinfo application is deployed in the `bookinfo` namespace, but sidecar injection (as described in step 2) is not yet configured. See "[Deploying the Bookinfo application](../installing-service-mesh/application-deployment/deploying-the-bookinfo-application.mdx)" for more details.
+
+## Enabling Sidecar Injection Using Namespace Labels
+
+This method injects a sidecar proxy into all workloads within a given namespace. It is the ideal approach when most workloads in that namespace need to be part of the mesh.
+
+### Procedure
+
+1.  Check the revision name of the Istio control plane with the following command:
+
+    ```shell
+    kubectl get istiorevisions
+    ```
+
+    You should see output similar to the following example:
+
+    **Example output**
+
+    ```shell
+    NAME      NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
+    default   istio-system             True    Healthy   False    v1.26.3   2m
+    ```
+
+    Because the revision name is `default`, you can use the standard injection labels without specifying the exact revision.
+
+2.  Confirm that existing workloads in the target namespace show `1/1` ready containers by running the command below. This verifies the pods are currently running without sidecars.
+
+    ```shell
+    kubectl get pods -n bookinfo
+    ```
+
+    You should see output similar to the following example:
+
+    **Example output**
+
+    ```shell
+    NAME                              READY   STATUS    RESTARTS   AGE
+    details-v1-c66556f6d-6zldd        1/1     Running   0          3m42s
+    productpage-v1-5f568ff46d-kx7nn   1/1     Running   0          3m42s
+    ratings-v1-74bcfcb96d-jp4xk       1/1     Running   0          3m42s
+    reviews-v1-549bfb5f44-sv2n9       1/1     Running   0          3m42s
+    reviews-v2-6486bc9868-56h7n       1/1     Running   0          3m42s
+    reviews-v3-6c66dc6cdd-vmczd       1/1     Running   0          3m42s
+    ```
+
+3.  Apply the injection label to the `bookinfo` namespace by executing the following command:
+
+    ```shell
+    kubectl label namespace bookinfo istio-injection=enabled
+    ```
+
+    **Example output**
+
+    ```shell
+    namespace/bookinfo labeled
+    ```
+
+4.  To apply the sidecar injection, redeploy the workloads in the `bookinfo` namespace. Initiate a rolling update for all deployments with this command:
+
+    ```shell
+    kubectl -n bookinfo rollout restart deployments
+    ```
+
+### Verification
+
+1.  To verify the rollout, check that the new pods show `2/2` containers in the `READY` state, which confirms a successful sidecar injection. Use the following command:
+
+    ```shell
+    kubectl get pods -n bookinfo
+    ```
+
+    You should see output similar to the following example:
+
+    **Example output**
+
+    ```shell
+    NAME                              READY   STATUS    RESTARTS   AGE
+    details-v1-85c7fcfd5b-hftlt       2/2     Running   0          31s
+    productpage-v1-775ffc67d8-482s6   2/2     Running   0          31s
+    ratings-v1-6c79fdf684-d7jmn       2/2     Running   0          31s
+    reviews-v1-685fb87cb6-rch6v       2/2     Running   0          31s
+    reviews-v2-76c4659bc6-vjcd8       2/2     Running   0          31s
+    reviews-v3-f7b4c8678-zdnm7        2/2     Running   0          31s
+    ```
+
+## Excluding a Workload from the Mesh
+
+It is possible to prevent sidecar injection for a specific workload even when injection is enabled for its entire namespace.
+
+:::note
+This example serves only as a demonstration. For the Bookinfo application to function correctly, all of its workloads must be part of the mesh.
+:::
+
+### Procedure
+
+1.  Edit the `Deployment` resource for the application. In this example, we will exclude the `ratings-v1` service.
+
+    ```shell
+    kubectl -n bookinfo edit deployments ratings-v1
+    ```
+
+2.  In the `spec.template.metadata.labels` section of the `Deployment`, add the label `sidecar.istio.io/inject: "false"` to disable sidecar injection.
+
+    ```yaml
+    kind: Deployment
+    apiVersion: apps/v1
+    metadata:
+    name: ratings-v1
+    namespace: bookinfo
+    labels:
+      app: ratings
+      version: v1
+    spec:
+      template:
+        metadata:
+          labels:
+            sidecar.istio.io/inject: "false"
+    ```
+
+    :::note
+    The sidecar injection process is not affected if this label is added to the top-level `labels` section of the `Deployment`.
+    :::
+
+    When the deployment is updated, a rollout is triggered, which creates a new ReplicaSet containing the modified pod(s).
+
+### Verification
+
+1.  Confirm that the updated pod(s) lack a sidecar container and display `1/1` running containers by executing this command:
+
+    ```shell
+    kubectl get pods -n bookinfo
+    ```
+
+    You should see output similar to the following example:
+
+    **Example output**
+
+    ```shell
+    NAME                              READY   STATUS    RESTARTS   AGE
+    details-v1-85c7fcfd5b-hftlt       2/2     Running   0          4m7s
+    productpage-v1-775ffc67d8-482s6   2/2     Running   0          4m7s
+    ratings-v1-7988b9b7f4-7hdwm       1/1     Running   0          16s
+    reviews-v1-685fb87cb6-rch6v       2/2     Running   0          4m7s
+    reviews-v2-76c4659bc6-vjcd8       2/2     Running   0          4m7s
+    reviews-v3-f7b4c8678-zdnm7        2/2     Running   0          4m7s
+    ```
+
+## Enabling Sidecar Injection Using Pod Labels
+
+With this method, you can select individual workloads for sidecar injection rather than enabling it for an entire namespace. This is best suited for cases where only a small number of workloads require inclusion in the service mesh. The example also shows how to use a revision label for sidecar injection, where the `Istio` resource is named `my-mesh`. Using a distinct `Istio` resource name is necessary when multiple Istio control planes exist in one cluster or during a control plane upgrade that is based on revisions.
+
+### Procedure
+
+1.  Check the Istio control plane's revision name by running this command:
+
+    ```shell
+    kubectl get istiorevisions
+    ```
+
+    You should see output similar to the following example:
+
+    **Example output**
+
+    ```shell
+    NAME      NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
+    my-mesh   istio-system             True    Healthy   False    v1.26.3   22s
+    ```
+
+    Because the revision name is `my-mesh`, the revision label `istio.io/rev=my-mesh` must be used to activate sidecar injection.
+
+2.  Confirm that existing pods are running without sidecars by checking that they show `1/1` containers in the `READY` state. Use this command:
+
+    ```shell
+    kubectl get pods -n bookinfo
+    ```
+
+    You should see output similar to the following example:
+
+    **Example output**
+
+    ```shell
+    NAME                              READY   STATUS    RESTARTS   AGE
+    details-v1-85c7fcfd5b-8kzrc       1/1     Running   0          74s
+    productpage-v1-775ffc67d8-rtbxj   1/1     Running   0          74s
+    ratings-v1-6c79fdf684-ntzdr       1/1     Running   0          74s
+    reviews-v1-685fb87cb6-l9fvr       1/1     Running   0          74s
+    reviews-v2-76c4659bc6-7gt2l       1/1     Running   0          74s
+    reviews-v3-f7b4c8678-lw59c        1/1     Running   0          74s
+    ```
+
+3.  Edit the `Deployment` resource of the application. For this example, modify the `ratings-v1` service.
+
+    ```shell
+    kubectl -n bookinfo edit deployments ratings-v1
+    ```
+
+4.  Modify the `spec.template.metadata.labels` section of the `Deployment` to add the required pod injection or revision label. Here, it is `istio.io/rev: my-mesh`:
+
+    ```yaml
+    kind: Deployment
+    apiVersion: apps/v1
+    metadata:
+    name: ratings-v1
+    namespace: bookinfo
+    labels:
+      app: ratings
+      version: v1
+    spec:
+      template:
+        metadata:
+          labels:
+            istio.io/rev: my-mesh
+    ```
+
+    :::note
+    Placing the label in the top-level `labels` section of the `Deployment` resource will not affect sidecar injection.
+    :::
+
+    This update to the deployment initiates a rollout, which results in a new ReplicaSet with the changed pod(s).
+
+### Verification
+
+1.  Confirm that the sidecar was injected successfully by verifying that only the `ratings-v1` pod displays `2/2` ready containers. Run the following command:
+
+    ```shell
+    kubectl get pods -n bookinfo
+    ```
+
+    You should see output similar to the following example:
+
+    **Example output**
+
+    ```shell
+    NAME                              READY   STATUS    RESTARTS   AGE
+    details-v1-85c7fcfd5b-8kzrc       1/1     Running   0          2m29s
+    productpage-v1-775ffc67d8-rtbxj   1/1     Running   0          2m29s
+    ratings-v1-86d864565d-g8sqw       2/2     Running   0          17s
+    reviews-v1-685fb87cb6-l9fvr       1/1     Running   0          2m29s
+    reviews-v2-76c4659bc6-7gt2l       1/1     Running   0          2m29s
+    reviews-v3-f7b4c8678-lw59c        1/1     Running   0          2m29s
+    ```
+
+2.  Follow the same process for any other workloads you want to add to the mesh.

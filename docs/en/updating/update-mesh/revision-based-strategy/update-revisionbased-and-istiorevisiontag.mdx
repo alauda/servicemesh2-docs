@@ -1,0 +1,286 @@
+---
+weight: 30
+---
+
+# Istio with RevisionBased strategy and IstioRevisionTag 
+
+## Installing Istio with RevisionBased strategy and IstioRevisionTag 
+
+You can install the Istio control plane, `IstioRevisionTag` resource, Istio CNI, and the Bookinfo demo application using the `RevisionBased` update strategy.
+
+:::note
+You can use the following section to understand the update process. You can skip this installation if the cluster already includes an Istio deployment.
+:::
+
+### Procedure
+
+1. Create the `istio-cni` and `istio-system` namespace by running the following command:
+
+   ```bash
+   kubectl create ns istio-cni
+   kubectl create ns istio-system
+   ```
+
+2. Install the Istio CNI plugin with the desired version. The following example configuration creates an `IstioCNI` resource named default in the `istio-cni` namespace:
+
+   ```yaml
+   apiVersion: sailoperator.io/v1
+   kind: IstioCNI
+   metadata:
+     name: default
+   spec:
+     version: v1.24.6
+     namespace: istio-cni
+     values:
+       cni:
+         cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
+         excludeNamespaces:
+           - istio-cni
+           - kube-system
+   ```
+
+3. Deploy the Istio control plane using the `RevisionBased` update strategy. The following example configuration creates an `Istio` resource named `default` in the `istio-system` namespace:
+
+   **Example configuration**
+
+   ```yaml
+   apiVersion: sailoperator.io/v1
+   kind: Istio
+   metadata:
+     name: default
+   spec:
+     namespace: istio-system
+     version: v1.24.6
+     updateStrategy:
+       type: RevisionBased
+   ```
+
+4.  Create a resource for `IstioRevisionTag`. The example YAML below shows how to create one named `default`:
+
+    **Example configuration**
+
+    ```yaml
+    apiVersion: sailoperator.io/v1
+    kind: IstioRevisionTag
+    metadata:
+      name: default
+    spec:
+      targetRef:
+        kind: Istio
+        name: default
+    ```
+
+    Ensure that the `targetRef` field is pointing to the correct `Istio` resource. In the provided example, the `IstioRevisionTag` is configured to reference the `Istio` resource that has the name `default`.
+
+5. Get the `IstioRevision` name by running the following command:
+
+   ```bash
+   kubectl get istiorevision -n istio-system
+   ```
+
+   **Example output**
+
+   ```
+   NAME              NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
+   default-v1-24-6   istio-system             True    Healthy   False    v1.24.6   4m18s
+   ```
+
+   The `IstioRevision` name is in the format `<istio_resource_name>-<version>`.
+
+6. Set up the application workloads to execute in the cluster. For instance, you can deploy the `bookinfo` sample application into the `bookinfo` namespace.
+    
+    1. Generate the `bookinfo` namespace with the command below:
+        
+        ```shell
+        kubectl create ns bookinfo
+        ```
+
+    2. Apply a label to the `bookinfo` namespace to activate automatic sidecar injection. Use the following command:
+        
+        ```shell
+        kubectl label namespace bookinfo istio-injection=enabled
+        ```
+
+    3. Deploy the `bookinfo` application pods into the `bookinfo` namespace by executing this command:
+        
+        ```shell
+        kubectl -n bookinfo apply -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
+        ```
+
+7. Inspect the `IstioRevisionTag` resource using the following command:
+    
+    ```shell
+    kubectl get istiorevisiontag
+    ```
+    
+    **Example output**
+    
+    ```shell
+    NAME      STATUS    IN USE   REVISION          AGE
+    default   Healthy   True     default-v1-24-6   3m36s
+    ```
+    
+    The `IN USE` field shows `True` because both active workloads and the `bookinfo` namespace now reference the tag.
+
+8. Confirm that the proxy version matches the control plane version by running the following command:
+
+   ```bash
+   istioctl proxy-status
+   ```
+
+   The `VERSION` column should match the control plane version.
+   
+   **Example output**
+
+   ```
+   NAME                                         CLUSTER        CDS                LDS                EDS                RDS                ECDS        ISTIOD                                      VERSION
+   details-v1-6d47555dc6-zb7q9.bookinfo         Kubernetes     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
+   productpage-v1-6bc7fbf668-mrhx5.bookinfo     Kubernetes     SYNCED (2m15s)     SYNCED (2m15s)     SYNCED (2m14s)     SYNCED (2m15s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
+   ratings-v1-58c5668d5b-dkbst.bookinfo         Kubernetes     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
+   reviews-v1-658c4dc7fd-7cwct.bookinfo         Kubernetes     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
+   reviews-v2-7f5ccbcdc6-8gzf2.bookinfo         Kubernetes     SYNCED (2m17s)     SYNCED (2m17s)     SYNCED (2m14s)     SYNCED (2m17s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
+   reviews-v3-646657847d-79nns.bookinfo         Kubernetes     SYNCED (2m18s)     SYNCED (2m18s)     SYNCED (2m14s)     SYNCED (2m18s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
+   ```
+
+## Updating Istio control plane with RevisionBased strategy  and IstioRevisionTag 
+
+With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resource can be used to tag a specific `IstioRevision`. This allows you to attach workloads to that revision without needing to modify the `istio.io/rev` label on namespaces or pods.
+
+### Prerequisites
+
+- You are logged in to the Alauda Container Platform web console as **cluster-admin**.
+- You have installed the Alauda Service Mesh v2 Operator, and deployed Istio.
+- You have installed the Alauda Container Platform Networking for Multus plugin, and kube-ovn must be v4.1.5 or later.
+- You have installed `istioctl` on your local machine.
+- You have configured the Istio control plane to use the `RevisionBased` update strategy. In this example, the `Istio` resource named `default` is deployed in the `istio-system` namespace.
+- You have created an `IstioRevisionTag` resource where the `targetRef` field correctly points to the desired `Istio` resource.
+- You have installed the Istio CNI plugin with the desired version. In this example, the `IstioCNI` resource named `default` is deployed in the `istio-cni` namespace.
+- You have labeled the `bookinfo` namespace to enable sidecar injection.
+- You have application workloads running in the cluster. In this example, the bookinfo application is deployed in the `bookinfo` namespace.
+- You have verified the `InUse` field of the `IstioRevisionTag` resource is `true`.
+
+### Procedure
+
+1. Change the version in the `Istio` resource. For example, to update to Istio `1.26.3`, set the spec.version field to `v1.26.3` by running the following command:
+
+   ```bash
+   kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.26.3"}}'
+   ```
+
+   **Version update in Istio CR**
+
+   ```yaml
+   kind: Istio
+   spec:
+     version: v1.26.3
+     updateStrategy:
+       type: RevisionBased
+   ```
+
+   The Service Mesh v2 Operator deploys a new version of the control plane alongside the old version of the control plane. The sidecars remain connected to the old control plane.
+
+2. Confirm that both `Istio` and `IstioRevision` resources are ready with the new revision.
+
+   1. Confirm that `Istio` resource is ready by running the following command:
+
+      ```bash
+      kubectl get istio
+      ```
+
+      **Example output**
+
+      ```
+      NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
+      default   istio-system             2           2       2        default-v1-26-3   Healthy   v1.26.3   12m
+      ```
+
+   2. Confirm that `IstioRevision` resource is ready by running the following command:
+
+      ```bash
+      kubectl get istiorevision
+      ```
+
+      **Example output**
+
+      ```
+      NAME              NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
+      default-v1-24-6   istio-system             True    Healthy   True     v1.24.6   13m
+      default-v1-26-3   istio-system             True    Healthy   True     v1.26.3   52s
+
+   3. Confirm that `IstioRevisionTag` resource is ready by running the following command:
+
+      ```bash
+      kubectl get istiorevisiontag
+      ```
+
+      **Example output**
+
+      ```
+      NAME      STATUS    IN USE   REVISION          AGE
+      default   Healthy   True     default-v1-26-3   9m53s
+      ```
+
+3. Confirm that there are two control plane pods running, one for each revision by running the following command:
+
+   ```bash
+   kubectl get pods -n istio-system
+   ```
+
+   **Example output**
+
+   ```
+   NAME                                      READY   STATUS    RESTARTS   AGE
+   istiod-default-v1-24-6-79c8fddcf7-qnfmb   1/1     Running   0          14m
+   istiod-default-v1-26-3-79b66bfb5f-2nq6q   1/1     Running   0          108s
+   ```
+
+4. Confirm that the workload sidecars are still connected to the previous control plane by running the following command:
+
+   ```bash
+   istioctl proxy-status
+   ```
+
+   **Example output**
+
+   ```
+   NAME                                         CLUSTER        CDS               LDS               EDS               RDS               ECDS        ISTIOD                                      VERSION
+   details-v1-6d47555dc6-zb7q9.bookinfo         Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
+   productpage-v1-6bc7fbf668-mrhx5.bookinfo     Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
+   ratings-v1-58c5668d5b-dkbst.bookinfo         Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
+   reviews-v1-658c4dc7fd-7cwct.bookinfo         Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
+   reviews-v2-7f5ccbcdc6-8gzf2.bookinfo         Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
+   reviews-v3-646657847d-79nns.bookinfo         Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
+   ```
+
+   The `VERSION` column should match the old control plane version.
+
+5. Restart the application workloads so that the new version of the sidecar gets injected by running the following command:
+
+   ```bash
+   kubectl rollout restart deployment -n bookinfo
+   ```
+
+### Verification
+
+1. Verify that the new version of the sidecar is running by entering the following command:
+
+   ```bash
+   istioctl proxy-status
+   ```
+
+   The `VERSION` column should match the new control plane version.
+
+2. Verify that the old control plane, `Istio`, and `IstioRevision` resources has been deleted.
+   1. Verify that the old control plane has beend deleted by running the following command:
+   2. Verify that the `Istio` resource has been deleted by running the following command:
+      ```bash
+      kubectl get istio
+      ```
+   3. Verify that the `IstioRevision` resource has been deleted by running the following command:
+      ```bash
+      kubectl get istiorevision
+      ```
+
+The Alauda Service Mesh v2 Operator deletes the old `IstioRevision` resource and the associated control plane after the grace period defined in the `spec.updateStrategy.inactiveRevisionDeletionGracePeriodSeconds` field expires. The default grace period is `30` seconds.
+
+You can increase the grace period to allow sufficient time to test the new control plane before removing the previous revision. Set a higher value during canary upgrades to ensure workload stability before fully transitioning.
