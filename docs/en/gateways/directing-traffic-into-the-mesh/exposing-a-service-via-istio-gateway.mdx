@@ -190,7 +190,7 @@ This guide demonstrates using Istio `Gateway` and `VirtualService` resources to 
 
 8. Confirm that the `httpbin` service is accessible from outside the cluster using the gateway `Service`'s external hostname or IP address. Make sure to set the `INGRESS_HOST` variable correctly for your cluster's environment.
 
-    1.  Set the `INGRESS_HOST` variable with this command:
+    a.  Set the `INGRESS_HOST` variable with this command:
 
         ```shell
         INGRESS_HOST=$(kubectl get service <gateway_name> -n <gateway_namespace> -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
@@ -206,7 +206,7 @@ This guide demonstrates using Istio `Gateway` and `VirtualService` resources to 
 
         </Directive>
 
-    2.  Send a `curl` request to the `httpbin` service using the gateway's host by running this command:
+    b.  Send a `curl` request to the `httpbin` service using the gateway's host by running this command:
 
         ```shell
         curl -s -I -H Host:httpbin.example.com http://$INGRESS_HOST/headers

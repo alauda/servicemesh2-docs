@@ -104,19 +104,19 @@ You can use the following section to understand the update process. You can skip
 
 6. Set up the application workloads to execute in the cluster. For instance, you can deploy the `bookinfo` sample application into the `bookinfo` namespace.
     
-    1. Generate the `bookinfo` namespace with the command below:
+    a. Generate the `bookinfo` namespace with the command below:
         
         ```shell
         kubectl create ns bookinfo
         ```
 
-    2. Apply a label to the `bookinfo` namespace to activate automatic sidecar injection. Use the following command:
+    b. Apply a label to the `bookinfo` namespace to activate automatic sidecar injection. Use the following command:
         
         ```shell
         kubectl label namespace bookinfo istio-injection=enabled
         ```
 
-    3. Deploy the `bookinfo` application pods into the `bookinfo` namespace by executing this command:
+    c. Deploy the `bookinfo` application pods into the `bookinfo` namespace by executing this command:
         
         ```shell
         kubectl -n bookinfo apply -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
