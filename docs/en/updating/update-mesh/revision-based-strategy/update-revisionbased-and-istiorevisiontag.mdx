@@ -89,19 +89,19 @@ You can use the following section to understand the update process. You can skip
 
 6. Set up the application workloads to execute in the cluster. For instance, you can deploy the `bookinfo` sample application into the `bookinfo` namespace.
     
-    1. Generate the `bookinfo` namespace with the command below:
+    a. Generate the `bookinfo` namespace with the command below:
         
         ```shell
         kubectl create ns bookinfo
         ```
 
-    2. Apply a label to the `bookinfo` namespace to activate automatic sidecar injection. Use the following command:
+    b. Apply a label to the `bookinfo` namespace to activate automatic sidecar injection. Use the following command:
         
         ```shell
         kubectl label namespace bookinfo istio-injection=enabled
         ```
 
-    3. Deploy the `bookinfo` application pods into the `bookinfo` namespace by executing this command:
+    c. Deploy the `bookinfo` application pods into the `bookinfo` namespace by executing this command:
         
         ```shell
         kubectl -n bookinfo apply -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
@@ -181,7 +181,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
 
 2. Confirm that both `Istio` and `IstioRevision` resources are ready with the new revision.
 
-   1. Confirm that `Istio` resource is ready by running the following command:
+   a. Confirm that `Istio` resource is ready by running the following command:
 
       ```bash
       kubectl get istio
@@ -194,7 +194,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
       default   istio-system             2           2       2        default-v1-26-3   Healthy   v1.26.3   12m
       ```
 
-   2. Confirm that `IstioRevision` resource is ready by running the following command:
+   b. Confirm that `IstioRevision` resource is ready by running the following command:
 
       ```bash
       kubectl get istiorevision
@@ -207,7 +207,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
       default-v1-24-6   istio-system             True    Healthy   True     v1.24.6   13m
       default-v1-26-3   istio-system             True    Healthy   True     v1.26.3   52s
 
-   3. Confirm that `IstioRevisionTag` resource is ready by running the following command:
+   c. Confirm that `IstioRevisionTag` resource is ready by running the following command:
 
       ```bash
       kubectl get istiorevisiontag
@@ -271,12 +271,17 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
    The `VERSION` column should match the new control plane version.
 
 2. Verify that the old control plane, `Istio`, and `IstioRevision` resources has been deleted.
-   1. Verify that the old control plane has beend deleted by running the following command:
-   2. Verify that the `Istio` resource has been deleted by running the following command:
+   
+   a. Verify that the old control plane has beend deleted by running the following command:
+   
+   b. Verify that the `Istio` resource has been deleted by running the following command:
+   
       ```bash
       kubectl get istio
       ```
-   3. Verify that the `IstioRevision` resource has been deleted by running the following command:
+   
+   c. Verify that the `IstioRevision` resource has been deleted by running the following command:
+   
       ```bash
       kubectl get istiorevision
       ```

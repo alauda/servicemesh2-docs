@@ -176,19 +176,19 @@ You can use the Kubernetes Gateway API to create `Gateway` and `HTTPRoute` resou
 
 7.  Verify that the `httpbin` service is accessible from outside the cluster by using the external hostname or IP address of the gateway `Service`. Ensure the `INGRESS_HOST` variable is set appropriately for your cluster's environment.
 
-    1.  Set the `INGRESS_HOST` variable by running this command:
+    a.  Set the `INGRESS_HOST` variable by running this command:
 
         ```shell
         export INGRESS_HOST=$(kubectl get gtw httpbin-gateway -n httpbin -o jsonpath='{.status.addresses[0].value}')
         ```
 
-    2.  Set the `INGRESS_PORT` variable by running this command:
+    b.  Set the `INGRESS_PORT` variable by running this command:
 
         ```shell
         INGRESS_PORT=$(kubectl get gtw httpbin-gateway -n httpbin -o jsonpath='{.spec.listeners[?(@.name=="http")].port}')
         ```
 
-    3.  Using the gateway host, send a `curl` request to the `httpbin` service with this command:
+    c.  Using the gateway host, send a `curl` request to the `httpbin` service with this command:
 
         ```shell
         curl -s -I -H Host:httpbin.example.com http://$INGRESS_HOST:$INGRESS_PORT/headers
