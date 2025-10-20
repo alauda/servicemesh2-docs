@@ -6,9 +6,7 @@ weight: 10
 
 You can uninstall the Alauda Service Mesh Operator and its resources from your Alauda Container Platform. This can be done through the Alauda Container Platform web console or the command line interface (CLI). Additionally, you have the option to delete the Istio custom resource definitions (CRDs).
 
-## Uninstalling the Alauda Service Mesh v2 Operator and Istio control plane 
-
-### Uninstalling via the web console
+## Uninstalling via the web console
 
 Uninstalling the Alauda Service Mesh v2 Operator and the Istio control plane from an Alauda Container Platform involves deleting the following components:
 
@@ -22,9 +20,12 @@ You can also optionally remove the Istio custom resource definitions (CRDs).
 
 The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Container Platform web console.
 
-#### Procedure
+**Procedure**
 
-1.  Delete the `Istio` resource:
+<Steps>
+
+### Delete the `Istio` resource
+
     1.  In the Alauda Container Platform web console, navigate to **Administrator**.
     2.  Select **Marketplace** > **OperatorHub**.
     3.  Search for the `Alauda Service Mesh v2`.
@@ -34,7 +35,7 @@ The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Containe
     7.  Click the "**⋮**" button for the `Istio` resource, then click **Delete** in the menu.
     8.  When prompted, confirm the action by clicking **Delete**.
 
-2.  Delete the `IstioCNI` resource:
+### Delete the `IstioCNI` resource
 
     In the **Alauda Service Mesh v2** view of **OperatorHub**:
 
@@ -43,7 +44,7 @@ The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Containe
     3.  Click the "**⋮**" button for the `IstioCNI` resource, then click **Delete** in the menu.
     4.  When prompted, confirm the action by clicking **Delete**.
 
-3.  Uninstall the Alauda Service Mesh v2 Operator:
+### Uninstall the Alauda Service Mesh v2 Operator
 
     In the **Alauda Service Mesh v2** view of **OperatorHub**:
 
@@ -52,19 +53,21 @@ The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Containe
     3.  In the confirmation prompt, read the uninstall notice: *Removing the operator will not remove any of its custom resource definitions or managed resources. If you have created a resource instance, you need to delete it manually.*
     4.  Click **Uninstall**.
 
-4.  Delete the `istio-system` namespace:
+### Delete the `istio-system` namespace
 
     ```shell
     kubectl delete ns istio-system
     ```
 
-5.  Delete the `istio-cni` namespace:
+### Delete the `istio-cni` namespace
 
     ```shell
     kubectl delete ns istio-cni
     ```
 
-### Uninstalling via the CLI
+</Steps>
+
+## Uninstalling via the CLI
 
 To uninstall the Alauda Service Mesh v2 Operator and the Istio control plane from an Alauda Container Platform, you must delete the following:
 
@@ -78,9 +81,11 @@ Optionally, you can also delete the Istio custom resource definitions (CRDs).
 
 The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Container Platform command line interface (CLI).
 
-#### Procedure
+**Procedure**
 
-1.  Delete the `Istio` resource:
+<Steps>
+
+### Delete the `Istio` resource
 
     1.  Get the `Istio` resource name by executing this command:
 
@@ -107,7 +112,7 @@ The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Containe
         istio.sailoperator.io "<name_of_custom_resource>" deleted
         ```
 
-2.  Delete the `IstioCNI` resource:
+### Delete the `IstioCNI` resource
 
     1.  Get the name of the `IstioCNI` resource by executing this command:
 
@@ -134,7 +139,7 @@ The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Containe
         istiocni.sailoperator.io "<name_of_custom_resource>" deleted
         ```
 
-3.  Delete the `istio-system` and `istio-cni` namespaces:
+### Delete the `istio-system` and `istio-cni` namespaces
 
     1.  Delete the `istio-system` namespace with the following command:
 
@@ -160,7 +165,7 @@ The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Containe
         namespace "istio-cni" deleted
         ```
 
-4.  Uninstall the Alauda Service Mesh v2 Operator:
+### Uninstall the Alauda Service Mesh v2 Operator
 
     1.  Delete the `servicemesh-operator2` subscription:
 
@@ -174,11 +179,13 @@ The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Containe
         subscription.operators.coreos.com "servicemesh-operator2" deleted
         ```
 
+</Steps>
+
 ## Deleting Istio custom resource definitions
 
 The deletion of Istio custom resource definitions (CRDs) is an optional step.
 
-### Procedure
+**Procedure**
 
 1.  To delete the Istio CRDs, execute the command below:
 

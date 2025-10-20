@@ -21,7 +21,8 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
 
 2.  Create a YAML file named `egress-gateway-cr.yaml` that defines the egress gateway.
 
-    **Example egress gateway CR file**
+    <details>
+    <summary>**Example egress gateway CR file**</summary>
 
     ```yaml
     # ServiceEntry to allow traffic to httpbin.org
@@ -89,6 +90,7 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
               name: httpbin.org
               port: 80
     ```
+    </details>
 
     Apply this YAML file by executing the following command:
 
