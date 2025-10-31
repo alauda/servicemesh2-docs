@@ -31,29 +31,21 @@ Install the `istioctl` command-line utility to debug and diagnose Istio service 
 
 4. Extract the `istioctl` binary file.
 
-   a. If you are using a Linux operating system, run the following command:
+   a. If you are using a Linux or Apple Mac operating system, run the following command:
 
       ```bash
-      tar xzf istioctl-<VERSION>-<OS>-<ARCH>.tar.gz
+      tar xvf istioctl-<VERSION>-<OS>-<ARCH>.tar.gz
       ```
 
-   b. If you are using an Apple Mac operating system, unpack and extract the archive.
+   b. If you are using a Microsoft Windows operating system, use the zip software to extract the archive.
 
-   c. If you are using a Microsoft Windows operating system, use the zip software to extract the archive.
-
-5. Move to the uncompressed directory by running the following command:
-
-   ```bash
-   cd istioctl-<VERSION>-<OS>-<ARCH>
-   ```
-
-6. Add the `istioctl` client to the path by running the following command:
+5. Add the `istioctl` client to the path by running the following command:
 
    ```bash
    export PATH=$PWD:$PATH
    ```
 
-7. Confirm that the `istioctl` client version and the Istio control plane version match or are within one version by running the following command:
+6. Confirm that the `istioctl` client version and the Istio control plane version match or are within one version by running the following command:
 
    ```bash
    istioctl version
@@ -62,7 +54,7 @@ Install the `istioctl` command-line utility to debug and diagnose Istio service 
    **Example output**
 
    ```
-   client version: 1.20.0
-   control plane version: 1.26.3-asm.r0
-   data plane version: none
+   client version: 1.26.3
+   control plane version: 1.26.3-asm-r0
+   data plane version: 1.26.3-asm-r0
    ```
