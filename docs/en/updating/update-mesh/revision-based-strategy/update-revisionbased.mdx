@@ -143,10 +143,10 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 
 ### Procedure
 
-1. Change the version in the `Istio` resource. For example, to update to Istio `1.28.0`, set the spec.version field to `v1.28.0` by running the following command:
+1. Change the version in the `Istio` resource. For example, to update to Istio `1.28.1`, set the spec.version field to `v1.28.1` by running the following command:
 
    ```bash
-   kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.28.0"}}'
+   kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.28.1"}}'
    ```
 
    **Version update in Istio CR**
@@ -154,7 +154,7 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
    ```yaml
    kind: Istio
    spec:
-     version: v1.28.0
+     version: v1.28.1
      updateStrategy:
        type: RevisionBased
    ```
@@ -173,7 +173,7 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 
       ```
       NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
-      default   istio-system             2           2       1        default-v1-28-0   Healthy   v1.28.0   14m
+      default   istio-system             2           2       1        default-v1-28-1   Healthy   v1.28.1   14m
       ```
 
    b. Confirm that `IstioRevision` resource is ready by running the following command:
@@ -187,7 +187,7 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
       ```
       NAME              NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
       default-v1-26-3   istio-system             True    Healthy   True     v1.26.3   15m
-      default-v1-28-0   istio-system             True    Healthy   False    v1.28.0   61s
+      default-v1-28-1   istio-system             True    Healthy   False    v1.28.1   61s
       ```
 
 3. Confirm that there are two control plane pods running, one for each revision by running the following command:
@@ -201,7 +201,7 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
    ```
    NAME                                      READY   STATUS    RESTARTS   AGE
    istiod-default-v1-26-3-79c8fddcf7-4lgqh   1/1     Running   0          16m
-   istiod-default-v1-28-0-79b66bfb5f-fhvk9   1/1     Running   0          81s
+   istiod-default-v1-28-1-79b66bfb5f-fhvk9   1/1     Running   0          81s
    ```
 
 4. Confirm that the workload sidecars are still connected to the previous control plane by running the following command:
@@ -227,7 +227,7 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 5. Move the workloads to the new control plane by updating the `istio.io/rev` label on the application namespace or pods to the revision name. For example, update the label for the entire namespace by running the following command:
 
    ```bash
-   # <new_revision_name> example: default-v1-28-0
+   # <new_revision_name> example: default-v1-28-1
    kubectl label namespace bookinfo istio.io/rev=<new_revision_name> --overwrite
    ```
 

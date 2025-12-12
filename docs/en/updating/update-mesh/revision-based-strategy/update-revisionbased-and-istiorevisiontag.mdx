@@ -161,10 +161,10 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
 
 ### Procedure
 
-1. Change the version in the `Istio` resource. For example, to update to Istio `1.28.0`, set the spec.version field to `v1.28.0` by running the following command:
+1. Change the version in the `Istio` resource. For example, to update to Istio `1.28.1`, set the spec.version field to `v1.28.1` by running the following command:
 
    ```bash
-   kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.28.0"}}'
+   kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.28.1"}}'
    ```
 
    **Version update in Istio CR**
@@ -172,7 +172,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
    ```yaml
    kind: Istio
    spec:
-     version: v1.28.0
+     version: v1.28.1
      updateStrategy:
        type: RevisionBased
    ```
@@ -191,7 +191,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
 
       ```
       NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
-      default   istio-system             2           2       2        default-v1-28-0   Healthy   v1.28.0   12m
+      default   istio-system             2           2       2        default-v1-28-1   Healthy   v1.28.1   12m
       ```
 
    b. Confirm that `IstioRevision` resource is ready by running the following command:
@@ -205,7 +205,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
       ```
       NAME              NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
       default-v1-26-3   istio-system             True    Healthy   True     v1.26.3   13m
-      default-v1-28-0   istio-system             True    Healthy   True     v1.28.0   52s
+      default-v1-28-1   istio-system             True    Healthy   True     v1.28.1   52s
 
    c. Confirm that `IstioRevisionTag` resource is ready by running the following command:
 
@@ -217,7 +217,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
 
       ```
       NAME      STATUS    IN USE   REVISION          AGE
-      default   Healthy   True     default-v1-28-0   9m53s
+      default   Healthy   True     default-v1-28-1   9m53s
       ```
 
 3. Confirm that there are two control plane pods running, one for each revision by running the following command:
@@ -231,7 +231,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
    ```
    NAME                                      READY   STATUS    RESTARTS   AGE
    istiod-default-v1-26-3-79c8fddcf7-qnfmb   1/1     Running   0          14m
-   istiod-default-v1-28-0-79b66bfb5f-2nq6q   1/1     Running   0          108s
+   istiod-default-v1-28-1-79b66bfb5f-2nq6q   1/1     Running   0          108s
    ```
 
 4. Confirm that the workload sidecars are still connected to the previous control plane by running the following command:

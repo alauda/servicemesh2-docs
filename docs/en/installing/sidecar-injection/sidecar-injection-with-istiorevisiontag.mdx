@@ -29,10 +29,10 @@ If your revision name is not `default`, you can still use the `istio-injection=e
 
     ```shell
     NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
-    default   istio-system             1           1       0        default-v1-28-0   Healthy   v1.28.0   37s
+    default   istio-system             1           1       0        default-v1-28-1   Healthy   v1.28.1   37s
     ```
 
-    In this case, the `Istio` resource is named `default`, but its underlying revision is `default-v1-28-0`.
+    In this case, the `Istio` resource is named `default`, but its underlying revision is `default-v1-28-1`.
 
 2.  Define the `IstioRevisionTag` resource in a YAML file:
 
@@ -65,10 +65,10 @@ If your revision name is not `default`, you can still use the `istio-injection=e
 
     ```shell
     NAME      STATUS    IN USE   REVISION          AGE
-    default   Healthy   True     default-v1-28-0   15s
+    default   Healthy   True     default-v1-28-1   15s
     ```
 
-    As shown in the example, the new tag now references your active revision, `default-v1-28-0`. Now you can use the `istio-injection=enabled` label as if your revision was called `default`.
+    As shown in the example, the new tag now references your active revision, `default-v1-28-1`. Now you can use the `istio-injection=enabled` label as if your revision was called `default`.
 
 5.  Check that the pods are running without sidecars by executing the command below. All existing workloads in the target namespace should display `1/1` in the `READY` containers column.
 
