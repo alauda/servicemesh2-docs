@@ -160,10 +160,10 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
           username: secret:kiali-monitoring-basic-auth:username  # [!code callout]
           password: secret:kiali-monitoring-basic-auth:password  # [!code callout]
           insecure_skip_verify: true
-        # thanos_proxy only required when using VictoriaMetrics, remove this field when using Prometheus
+        # Prometheus is recommended to use thanos_proxy, and it is required when using VictoriaMetrics.
         thanos_proxy:  # [!code callout]
           enabled: true
-          retention_period: 30d
+          retention_period: 7d
           scrape_interval: 60s
         url: ${MONITORING_URL}  # [!code callout]
     kiali_feature_flags:
@@ -185,7 +185,7 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
     9. Required in multi cluster mesh. `<mesh_id>` should be the same as the `.spec.values.global.meshId` in `Istio` resource.
     10. `username` references the monitoring basic‑auth username stored in the `kiali-monitoring-basic-auth` Secret.
     11. `password` references the monitoring basic‑auth password stored in the `kiali-monitoring-basic-auth` Secret.
-    12. `thanos_proxy` is only required when using VictoriaMetrics, remove this field when using Prometheus.
+    12. Define `thanos_proxy` if Prometheus is to be queried through a Thanos proxy (it is required when using VictoriaMetrics).
     13. `url` is the monitoring endpoint for Prometheus or VictoriaMetrics.
     14. `i18n` specifies the default language and whether to show the language selector.
   </Callouts>
