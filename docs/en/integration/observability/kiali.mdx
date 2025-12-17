@@ -125,7 +125,7 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
     namespace: istio-system
   spec:
     server:
-      web_port: 443  # [!code callout]
+      web_port: "443"  # [!code callout]
       web_root: /clusters/${CLUSTER_NAME}/kiali  # [!code callout]
     auth:
       openid:
@@ -152,7 +152,7 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
       grafana:
         enabled: false  # Since Grafana is not bundled in ACP anymore, it is disabled by default
       prometheus:
-        # Only required in multi cluster
+        # query_scope only required in multi cluster
         query_scope:  # [!code callout]
            mesh_id: <mesh_id>
         auth:
@@ -160,10 +160,10 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
           username: secret:kiali-monitoring-basic-auth:username  # [!code callout]
           password: secret:kiali-monitoring-basic-auth:password  # [!code callout]
           insecure_skip_verify: true
-        # only required when using VictoriaMetrics, remove this field when using Prometheus
+        # Prometheus is recommended to use thanos_proxy, and it is required when using VictoriaMetrics.
         thanos_proxy:  # [!code callout]
           enabled: true
-          retention_period: 30d
+          retention_period: 7d
           scrape_interval: 60s
         url: ${MONITORING_URL}  # [!code callout]
     kiali_feature_flags:
@@ -174,7 +174,7 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
   ```
 
   <Callouts>
-    1. `web_port` is the port for accessing the Kiali dashboard.
+    1. `web_port` (string) is the port for accessing the Kiali dashboard.
     2. `web_root` is the path under platform url for accessing the Kiali dashboard.
     3. `api_proxy` points to **erebus** to map ACP user tokens to Kubernetes tokens.
     4. `api_proxy_ca_data` is the base64‑encoded CA certificate used by **erebus**.
@@ -185,7 +185,7 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
     9. Required in multi cluster mesh. `<mesh_id>` should be the same as the `.spec.values.global.meshId` in `Istio` resource.
     10. `username` references the monitoring basic‑auth username stored in the `kiali-monitoring-basic-auth` Secret.
     11. `password` references the monitoring basic‑auth password stored in the `kiali-monitoring-basic-auth` Secret.
-    12. `thanos_proxy` is only required when using VictoriaMetrics, remove this field when using Prometheus.
+    12. Define `thanos_proxy` if Prometheus is to be queried through a Thanos proxy (it is required when using VictoriaMetrics).
     13. `url` is the monitoring endpoint for Prometheus or VictoriaMetrics.
     14. `i18n` specifies the default language and whether to show the language selector.
   </Callouts>
@@ -229,7 +229,7 @@ This capability supports the analysis of request flow behavior, aiding in root c
    spec:
      external_services:
        tracing:
-         # Only required in multi cluster
+         # query_scope only required in multi cluster
          query_scope:
            istio.mesh_id: <mesh_id>  # [!code callout]
          enabled: true  # [!code callout]
@@ -246,7 +246,7 @@ This capability supports the analysis of request flow behavior, aiding in root c
      1. Required in multi cluster mesh. `<mesh_id>` should be the same as the `.spec.values.global.meshId` in `Istio` resource.
      2. Specifies whether tracing is enabled.
      3. Specifies the tracing provider (`jaeger` or `tempo`).
-     4. Specifies the internal URL for the Jaeger API.
+     4. Specifies the internal URL for the Jaeger or Tempo API.
    </Callouts>
 
 2. Save the updated spec in `kiali_cr.yaml`.

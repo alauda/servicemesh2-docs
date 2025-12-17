@@ -16,7 +16,7 @@ Alauda Service Mesh follows Semantic Versioning for all product releases. Semant
 
 ## Understanding Service Mesh and Istio versions
 
-The Alauda Service Mesh Operator includes additional Istio releases for upgrades but supports only the latest Istio version available for each Operator version.
+The Alauda Service Mesh Operator includes additional Istio releases for upgrades but supports only the latest Istio version available for each Operator version. See the "[Release Notes](../../about/release-notes/index.mdx)" to identify the supported Istio version for each Operator release.
 
 ## Understanding Operator updates and channels
 
@@ -46,7 +46,7 @@ The `Istio` resource configuration includes the following fields that are releva
 - `spec.version`
 
   specifies the version of Istio to install. Use the format `vX.Y.Z`, where `X.Y.Z` is the desired Istio release.
-  For example, set the field to `v1.26.3` to install Istio `1.26.3`.
+  For example, set the field to `v1.28.1` to install Istio `1.28.1`.
   Alternatively, set the value to an alias such as `vX.Y-latest` to automatically install the latest supported patch version for the specified minor release.
 
 - `spec.updateStrategy`

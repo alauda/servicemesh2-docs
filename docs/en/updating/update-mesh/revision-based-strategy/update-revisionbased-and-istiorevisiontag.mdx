@@ -29,7 +29,7 @@ You can use the following section to understand the update process. You can skip
    metadata:
      name: default
    spec:
-     version: v1.24.6
+     version: v1.26.3
      namespace: istio-cni
      values:
        cni:
@@ -50,7 +50,7 @@ You can use the following section to understand the update process. You can skip
      name: default
    spec:
      namespace: istio-system
-     version: v1.24.6
+     version: v1.26.3
      updateStrategy:
        type: RevisionBased
    ```
@@ -82,7 +82,7 @@ You can use the following section to understand the update process. You can skip
 
    ```
    NAME              NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
-   default-v1-24-6   istio-system             True    Healthy   False    v1.24.6   4m18s
+   default-v1-26-3   istio-system             True    Healthy   False    v1.26.3   4m18s
    ```
 
    The `IstioRevision` name is in the format `<istio_resource_name>-<version>`.
@@ -117,7 +117,7 @@ You can use the following section to understand the update process. You can skip
     
     ```shell
     NAME      STATUS    IN USE   REVISION          AGE
-    default   Healthy   True     default-v1-24-6   3m36s
+    default   Healthy   True     default-v1-26-3   3m36s
     ```
     
     The `IN USE` field shows `True` because both active workloads and the `bookinfo` namespace now reference the tag.
@@ -134,12 +134,12 @@ You can use the following section to understand the update process. You can skip
 
    ```
    NAME                                         CLUSTER        CDS                LDS                EDS                RDS                ECDS        ISTIOD                                      VERSION
-   details-v1-6d47555dc6-zb7q9.bookinfo         Kubernetes     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
-   productpage-v1-6bc7fbf668-mrhx5.bookinfo     Kubernetes     SYNCED (2m15s)     SYNCED (2m15s)     SYNCED (2m14s)     SYNCED (2m15s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
-   ratings-v1-58c5668d5b-dkbst.bookinfo         Kubernetes     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
-   reviews-v1-658c4dc7fd-7cwct.bookinfo         Kubernetes     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
-   reviews-v2-7f5ccbcdc6-8gzf2.bookinfo         Kubernetes     SYNCED (2m17s)     SYNCED (2m17s)     SYNCED (2m14s)     SYNCED (2m17s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
-   reviews-v3-646657847d-79nns.bookinfo         Kubernetes     SYNCED (2m18s)     SYNCED (2m18s)     SYNCED (2m14s)     SYNCED (2m18s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
+   details-v1-6d47555dc6-zb7q9.bookinfo         Kubernetes     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     IGNORED     istiod-default-v1-26-3-79c8fddcf7-qnfmb     1.26.3-asm-r0
+   productpage-v1-6bc7fbf668-mrhx5.bookinfo     Kubernetes     SYNCED (2m15s)     SYNCED (2m15s)     SYNCED (2m14s)     SYNCED (2m15s)     IGNORED     istiod-default-v1-26-3-79c8fddcf7-qnfmb     1.26.3-asm-r0
+   ratings-v1-58c5668d5b-dkbst.bookinfo         Kubernetes     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     IGNORED     istiod-default-v1-26-3-79c8fddcf7-qnfmb     1.26.3-asm-r0
+   reviews-v1-658c4dc7fd-7cwct.bookinfo         Kubernetes     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     SYNCED (2m14s)     IGNORED     istiod-default-v1-26-3-79c8fddcf7-qnfmb     1.26.3-asm-r0
+   reviews-v2-7f5ccbcdc6-8gzf2.bookinfo         Kubernetes     SYNCED (2m17s)     SYNCED (2m17s)     SYNCED (2m14s)     SYNCED (2m17s)     IGNORED     istiod-default-v1-26-3-79c8fddcf7-qnfmb     1.26.3-asm-r0
+   reviews-v3-646657847d-79nns.bookinfo         Kubernetes     SYNCED (2m18s)     SYNCED (2m18s)     SYNCED (2m14s)     SYNCED (2m18s)     IGNORED     istiod-default-v1-26-3-79c8fddcf7-qnfmb     1.26.3-asm-r0
    ```
 
 ## Updating Istio control plane with RevisionBased strategy  and IstioRevisionTag 
@@ -161,10 +161,10 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
 
 ### Procedure
 
-1. Change the version in the `Istio` resource. For example, to update to Istio `1.26.3`, set the spec.version field to `v1.26.3` by running the following command:
+1. Change the version in the `Istio` resource. For example, to update to Istio `1.28.1`, set the spec.version field to `v1.28.1` by running the following command:
 
    ```bash
-   kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.26.3"}}'
+   kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.28.1"}}'
    ```
 
    **Version update in Istio CR**
@@ -172,7 +172,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
    ```yaml
    kind: Istio
    spec:
-     version: v1.26.3
+     version: v1.28.1
      updateStrategy:
        type: RevisionBased
    ```
@@ -191,7 +191,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
 
       ```
       NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
-      default   istio-system             2           2       2        default-v1-26-3   Healthy   v1.26.3   12m
+      default   istio-system             2           2       2        default-v1-28-1   Healthy   v1.28.1   12m
       ```
 
    b. Confirm that `IstioRevision` resource is ready by running the following command:
@@ -204,8 +204,8 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
 
       ```
       NAME              NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
-      default-v1-24-6   istio-system             True    Healthy   True     v1.24.6   13m
-      default-v1-26-3   istio-system             True    Healthy   True     v1.26.3   52s
+      default-v1-26-3   istio-system             True    Healthy   True     v1.26.3   13m
+      default-v1-28-1   istio-system             True    Healthy   True     v1.28.1   52s
 
    c. Confirm that `IstioRevisionTag` resource is ready by running the following command:
 
@@ -217,7 +217,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
 
       ```
       NAME      STATUS    IN USE   REVISION          AGE
-      default   Healthy   True     default-v1-26-3   9m53s
+      default   Healthy   True     default-v1-28-1   9m53s
       ```
 
 3. Confirm that there are two control plane pods running, one for each revision by running the following command:
@@ -230,8 +230,8 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
 
    ```
    NAME                                      READY   STATUS    RESTARTS   AGE
-   istiod-default-v1-24-6-79c8fddcf7-qnfmb   1/1     Running   0          14m
-   istiod-default-v1-26-3-79b66bfb5f-2nq6q   1/1     Running   0          108s
+   istiod-default-v1-26-3-79c8fddcf7-qnfmb   1/1     Running   0          14m
+   istiod-default-v1-28-1-79b66bfb5f-2nq6q   1/1     Running   0          108s
    ```
 
 4. Confirm that the workload sidecars are still connected to the previous control plane by running the following command:
@@ -244,12 +244,12 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
 
    ```
    NAME                                         CLUSTER        CDS               LDS               EDS               RDS               ECDS        ISTIOD                                      VERSION
-   details-v1-6d47555dc6-zb7q9.bookinfo         Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
-   productpage-v1-6bc7fbf668-mrhx5.bookinfo     Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
-   ratings-v1-58c5668d5b-dkbst.bookinfo         Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
-   reviews-v1-658c4dc7fd-7cwct.bookinfo         Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
-   reviews-v2-7f5ccbcdc6-8gzf2.bookinfo         Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
-   reviews-v3-646657847d-79nns.bookinfo         Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-24-6-79c8fddcf7-qnfmb     1.24.6-asm-r0
+   details-v1-6d47555dc6-zb7q9.bookinfo         Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-26-3-79c8fddcf7-qnfmb     1.26.3-asm-r0
+   productpage-v1-6bc7fbf668-mrhx5.bookinfo     Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-26-3-79c8fddcf7-qnfmb     1.26.3-asm-r0
+   ratings-v1-58c5668d5b-dkbst.bookinfo         Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-26-3-79c8fddcf7-qnfmb     1.26.3-asm-r0
+   reviews-v1-658c4dc7fd-7cwct.bookinfo         Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-26-3-79c8fddcf7-qnfmb     1.26.3-asm-r0
+   reviews-v2-7f5ccbcdc6-8gzf2.bookinfo         Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-26-3-79c8fddcf7-qnfmb     1.26.3-asm-r0
+   reviews-v3-646657847d-79nns.bookinfo         Kubernetes     SYNCED (2m4s)     SYNCED (2m4s)     SYNCED (2m3s)     SYNCED (2m4s)     IGNORED     istiod-default-v1-26-3-79c8fddcf7-qnfmb     1.26.3-asm-r0
    ```
 
    The `VERSION` column should match the old control plane version.
