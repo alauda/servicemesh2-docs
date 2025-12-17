@@ -1,0 +1,17 @@
+---
+weight: 10
+---
+
+# Namespace Requirements
+
+## Creating a namespace with kubectl
+
+There are no special requirements for namespaces created with kubectl at this time. You can create a namespace using the following command:
+
+```bash
+kubectl create namespace <namespace-name>
+```
+
+## Creating a namespace via the Alauda Container Platform web console
+
+When creating a namespace from the Alauda Container Platform **Projects → Namespace** page, you must update the **Pod Security Admission** setting. The `Enforce` security mode must **not** be set to `Restricted`; it is recommended to change it to `Baseline`.

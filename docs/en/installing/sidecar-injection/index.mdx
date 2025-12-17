@@ -10,6 +10,10 @@ In order to take advantage of all of Istio's features, pods in the service mesh 
 
 Sidecar proxy injection is primarily controlled through labels applied at either the namespace or pod level.
 
+:::note
+[Namespace requirements](../installing-service-mesh/application-deployment/namespace-requirements.mdx) and [Application Requirements](../installing-service-mesh/application-deployment/application-requirements.mdx).
+:::
+
 When enabled in namespace, automatic injection injects the proxy configuration at pod creation time using an admission controller,
 ensures any new pods in that namespace include a sidecar.
 
