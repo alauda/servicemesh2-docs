@@ -31,6 +31,9 @@ You can integrate Alauda Service Mesh with user-workload monitoring to enable ob
   metadata:
     name: istiod-monitor
     namespace: istio-system
+    labels:
+      # prometheus=kube-prometheus is required in ACP prometheus.
+      prometheus: kube-prometheus
   spec:
     targetLabels:
     - app
@@ -59,8 +62,7 @@ You can integrate Alauda Service Mesh with user-workload monitoring to enable ob
     name: istio-proxies-monitor
     namespace: istio-system  # [!code callout]
     labels:
-      # monitoring=pods & prometheus=kube-prometheus is required in ACP prometheus.
-      monitoring: pods
+      # prometheus=kube-prometheus is required in ACP prometheus.
       prometheus: kube-prometheus
   spec:
     selector:
@@ -99,9 +101,6 @@ You can integrate Alauda Service Mesh with user-workload monitoring to enable ob
       - sourceLabels: [__meta_kubernetes_namespace]
         action: replace
         targetLabel: namespace
-      - action: drop
-        regex: "true"
-        sourceLabels: [__meta_kubernetes_pod_container_init]
   ```
 
   <Callouts>
