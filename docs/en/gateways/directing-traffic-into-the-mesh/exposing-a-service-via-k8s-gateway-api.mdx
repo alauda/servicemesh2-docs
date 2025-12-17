@@ -39,6 +39,8 @@ You can use the Kubernetes Gateway API to create `Gateway` and `HTTPRoute` resou
     metadata:
       annotations:
         networking.istio.io/service-type: ClusterIP  # [!code callout]
+      labels:
+        istio.io/rev: default # [!code callout]
       name: httpbin-gateway  # [!code callout]
       namespace: httpbin  # [!code callout]
     spec:
@@ -55,9 +57,10 @@ You can use the Kubernetes Gateway API to create `Gateway` and `HTTPRoute` resou
 
     <Callouts>
         1.  Specifies the gateway's `Service` type; defaults to `LoadBalancer`.
-        2.  Specifies the gateway's name.
-        3.  Specifies the gateway's namespace.
-        4.  Specifies the virtual hostname for clients to use when accessing a mesh service on this port.
+        2.  Specifies the Istio revision name; defaults to `default`.
+        3.  Specifies the gateway's name.
+        4.  Specifies the gateway's namespace.
+        5.  Specifies the virtual hostname for clients to use when accessing a mesh service on this port.
     </Callouts>
 
 4.  Apply the YAML file with this command:

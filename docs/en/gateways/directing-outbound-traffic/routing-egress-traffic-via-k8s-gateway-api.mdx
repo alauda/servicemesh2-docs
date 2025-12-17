@@ -47,6 +47,9 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
       name: httpbin-egress-gateway
       annotations:
         networking.istio.io/service-type: ClusterIP
+      labels:
+        # Specify the Istio revision name; defaults to 'default'
+        istio.io/rev: default
     spec:
       gatewayClassName: istio
       listeners:
