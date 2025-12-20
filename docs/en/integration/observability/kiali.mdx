@@ -69,6 +69,8 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
 
   The output is a base64-encoded certificate. Store this value for use in later steps.
 
+  **Note**: If the command returns an empty output, contact your administrator to obtain the ACP CA certificate.
+
   ### Retrieve platform configuration from the business cluster:
 
   ```bash
@@ -155,13 +157,13 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
       prometheus:
         # query_scope only required in multi cluster
         query_scope:  # [!code callout]
-           mesh_id: <mesh_id>
+          mesh_id: <mesh_id>
         auth:
           type: basic
           username: secret:kiali-monitoring-basic-auth:username  # [!code callout]
           password: secret:kiali-monitoring-basic-auth:password  # [!code callout]
           insecure_skip_verify: true
-        # Prometheus is recommended to use thanos_proxy, and it is required when using VictoriaMetrics.
+        # Prometheus is recommended to be used together with thanos_proxy. When using VictoriaMetrics, thanos_proxy must be enabled.
         thanos_proxy:  # [!code callout]
           enabled: true
           retention_period: 7d
