@@ -162,7 +162,7 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
           username: secret:kiali-monitoring-basic-auth:username  # [!code callout]
           password: secret:kiali-monitoring-basic-auth:password  # [!code callout]
           insecure_skip_verify: true
-        # Prometheus is recommended to be used together with thanos_proxy. When using VictoriaMetrics, thanos_proxy must be enabled.
+        # Define thanos_proxy if Prometheus is to be queried through a Thanos proxy (it is required when using VictoriaMetrics)
         thanos_proxy:  # [!code callout]
           enabled: true
           retention_period: 7d
