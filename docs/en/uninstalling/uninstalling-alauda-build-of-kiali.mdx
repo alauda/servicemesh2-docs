@@ -1,0 +1,113 @@
+---
+weight: 20
+---
+
+# Uninstalling Alauda Build of Kiali
+
+You can uninstall the Alauda Build of Kiali Operator and its resources from your Alauda Container Platform. This can be done through the Alauda Container Platform web console or the command line interface (CLI). Additionally, you have the option to delete the Kiali custom resource definitions (CRDs).
+
+## Uninstalling via the web console
+
+Uninstalling the Alauda Build of Kiali Operator and the Kiali resources from an Alauda Container Platform involves deleting the following components:
+
+  - `Kiali` resource
+  - Alauda Build of Kiali Operator
+
+You can also optionally remove the Kiali custom resource definitions (CRDs).
+
+The Alauda Build of Kiali Operator can be uninstalled using the Alauda Container Platform web console.
+
+**Procedure**
+
+<Steps>
+
+### Delete the `Kiali` resource
+
+    1.  In the Alauda Container Platform web console, navigate to **Administrator**.
+    2.  Select **Marketplace** > **OperatorHub**.
+    3.  Search for the `Alauda Build of Kiali`.
+    4.  Locate the Alauda Build of Kiali, and click to select it.
+    5.  Click **All Instances** tab.
+    6.  From the **Filter by instance type** dropdown, select `Kiali`.
+    7.  Click the "**⋮**" button for the `Kiali` resource, then click **Delete** in the menu.
+    8.  When prompted, confirm the action by clicking **Delete**.
+
+### Uninstall the Alauda Build of Kiali Operator
+
+    In the **Alauda Build of Kiali** view of **OperatorHub**:
+
+    1.  Click the **Uninstall** button in the top-right corner.
+    2.  In the confirmation prompt, read the uninstall notice: *Removing the operator will not remove any of its custom resource definitions or managed resources. If you have created a resource instance, you need to delete it manually.*
+    3.  Click **Uninstall**.
+
+</Steps>
+
+## Uninstalling via the CLI
+
+To uninstall the Alauda Build of Kiali Operator and the Kiali resources from an Alauda Container Platform, you must delete the following:
+
+  - `Kiali` resource
+  - Alauda Build of Kiali Operator
+
+Optionally, you can also delete the Kiali custom resource definitions (CRDs).
+
+The Alauda Build of Kiali Operator can be uninstalled using the Alauda Container Platform command line interface (CLI).
+
+**Procedure**
+
+<Steps>
+
+### Delete the `Kiali` resource
+
+    1.  Get the `Kiali` resource name by executing this command:
+
+        ```shell
+        kubectl get kiali -A
+        ```
+
+        **Example output**
+
+        ```shell
+        NAMESPACE      NAME    AGE
+        istio-system   kiali   22h
+        ```
+
+    2.  Use the name and namespace from the previous command's output to replace `<name_of_custom_resource>` and `<namespace>`, and then run the following to remove it:
+
+        ```shell
+        kubectl delete kiali/<name_of_custom_resource> -n <namespace>
+        ```
+
+        **Example output**
+
+        ```shell
+        kiali.kiali.io "<name_of_custom_resource>" deleted
+        ```
+
+### Uninstall the Alauda Build of Kiali Operator
+
+    1.  Delete the `kiali-operator` subscription:
+
+        ```shell
+        kubectl delete subscription kiali-operator -n kiali-operator
+        ```
+
+        **Example output**
+
+        ```shell
+        subscription.operators.coreos.com "kiali-operator" deleted
+        ```
+
+</Steps>
+
+## Deleting Kiali custom resource definitions
+
+The deletion of Kiali custom resource definitions (CRDs) is an optional step.
+
+**Procedure**
+
+1.  To delete the Kiali CRDs, execute the command below:
+
+    ```shell
+    kubectl get crds -oname | grep -e kiali.io | xargs kubectl delete
+    ```

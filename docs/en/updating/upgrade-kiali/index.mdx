@@ -1,0 +1,63 @@
+---
+weight: 20
+---
+
+# Upgrading Alauda Build of Kiali
+
+When you install the Kiali Operator, it will be configured to install a Kiali Server that is the same version as the operator itself. For example, if you have Kiali Operator v2.17.1 installed, that operator will install Kiali Server v2.17.1. If you upgrade the Kiali Operator, the operator will in turn upgrade the Kiali Server.
+
+## Upgrade Path
+
+The table below contains the complete upgrade path. When upgrading, you need to upgrade the Operator versions in sequence.
+
+| No. | Alauda Build of Kiali |
+| --- | ---------------- |
+| 1   | 2.11.z          |
+| 2   | 2.17.z          |
+
+:::info
+In the version numbers above, the `.z` indicates the latest available patch version for that minor release.
+When performing an upgrade, you should always use the most recent patch version to ensure you benefit from the latest security updates and bug fixes.
+The latest patch versions for each release can be found in the [Release Notes](../../about/release-notes/).
+:::
+
+## Upgrade Steps
+
+When upgrading, you need to upgrade the <ExternalSiteLink name="acp" href="/extend/operator.html#upgrading-operators" children="Operator" /> version in sequence according to the upgrade path. Upgrading the Operator will automatically upgrade the `Kiali` instance (Kiali Server) version.
+
+## Post-Upgrade Verification
+
+After upgrading the Operator, you should verify that the new version of Kiali Server is running correctly and that the Kiali UI is accessible.
+
+**Procedure**
+
+1.  Check the Kiali Server pod status to ensure it is running:
+
+    ```shell
+    kubectl get pods -A -l app.kubernetes.io/name=kiali
+    ```
+
+    Verify that the pod status is `Running` and ready.
+
+    **Example output**
+
+    ```shell
+    NAMESPACE      NAME                    READY   STATUS    RESTARTS   AGE
+    istio-system   kiali-d764748f9-xzmwk   1/1     Running   0          2m36s
+    ```
+
+    Verify the upgraded version by checking the logs:
+
+    ```shell
+    kubectl -n <namespace> logs <kiali-pod-name> | grep "Version:"
+    ```
+
+    **Example output**
+
+    ```shell
+    INF Kiali: Version: <real-version>, Commit: <real-commit>
+    ```
+
+2.  Access the Kiali UI to verify that the web interface is accessible and functioning correctly.
+
+    Click the "?" icon in the upper right corner of the Kiali UI, and select **About** from the menu to view the Kiali version.
