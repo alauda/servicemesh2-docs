@@ -266,15 +266,25 @@ With the Kubernetes Gateway API, a gateway is deployed through the creation of a
 
     ```shell
     export INGRESS_HOST=$(kubectl get gtw bookinfo-gateway -n bookinfo -o jsonpath='{.status.addresses[0].value}')
+    echo "INGRESS_HOST=$INGRESS_HOST"
     ```
 
 5.  Retrieve the port with this command:
 
     ```shell
     export INGRESS_PORT=$(kubectl get gtw bookinfo-gateway -n bookinfo -o jsonpath='{.spec.listeners[?(@.name=="http")].port}')
+    echo "INGRESS_PORT=$INGRESS_PORT"
     ```
 
 6.  Retrieve the gateway URL with this command:
+
+    :::info
+    If `$INGRESS_HOST` is an IPv6 address, enclose it in square brackets when constructing the URL. For example:
+
+    ```shell
+    export GATEWAY_URL=[$INGRESS_HOST]:$INGRESS_PORT
+    ```
+    :::
 
     ```shell
     export GATEWAY_URL=$INGRESS_HOST:$INGRESS_PORT
@@ -291,7 +301,7 @@ With the Kubernetes Gateway API, a gateway is deployed through the creation of a
   - Confirm that the **productpage** is accessible with the `curl` command:
     
     ```shell
-    curl -s "http://${GATEWAY_URL}/productpage" | grep -o "<title>.*</title>"
+    curl -sS -g "http://${GATEWAY_URL}/productpage" | grep -o "<title>.*</title>"
     ```
 
     **Example output**

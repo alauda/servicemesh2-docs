@@ -158,6 +158,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
      export DISCOVERY_ADDRESS=$(kubectl --context="${CTX_CLUSTER1}" \
         -n istio-system get svc istio-eastwestgateway \
         -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+     echo "DISCOVERY_ADDRESS=${DISCOVERY_ADDRESS}"
      ```
 
   2. Create an `Istio` resource on the West cluster by running the following command:

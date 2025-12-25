@@ -171,7 +171,7 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
 5.  Using the `curl` client, confirm that you can reach `httpbin.org` via the egress gateway by entering this command:
 
     ```shell
-    kubectl exec "$CURL_POD" -n curl -c curl -- curl -s -v http://httpbin.org/get
+    kubectl exec "$CURL_POD" -n curl -c curl -- curl -sS -v http://httpbin.org/get
     ```
 
     The desired output will show a response from `httpbin.org`, which indicates that the egress traffic is being routed through the configured gateway.
