@@ -148,7 +148,7 @@ This guide demonstrates using Istio `Gateway` and `VirtualService` resources to 
 
     ```shell
     kubectl exec $CURL_POD -n curl -- \
-      curl -s -I \
+      curl -sS -I \
         -H Host:httpbin.example.com \
         <gateway_name>.<gateway_namespace>.svc.cluster.local/headers
     ```
@@ -167,7 +167,7 @@ This guide demonstrates using Istio `Gateway` and `VirtualService` resources to 
 
     ```shell
     kubectl exec $CURL_POD -n curl -- \
-      curl -s -I \
+      curl -sS -I \
         -H Host:httpbin.example.com \
         <gateway_name>.<gateway_namespace>.svc.cluster.local/get
     ```
@@ -194,6 +194,7 @@ This guide demonstrates using Istio `Gateway` and `VirtualService` resources to 
 
         ```shell
         INGRESS_HOST=$(kubectl get service <gateway_name> -n <gateway_namespace> -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        echo "INGRESS_HOST=$INGRESS_HOST"
         ```
 
         <Directive type="danger" title=" ">
@@ -202,14 +203,23 @@ This guide demonstrates using Istio `Gateway` and `VirtualService` resources to 
 
         ```shell
         INGRESS_HOST=$(kubectl get service <gateway_name> -n <gateway_namespace> -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        echo "INGRESS_HOST=$INGRESS_HOST"
         ```
 
         </Directive>
 
     b.  Send a `curl` request to the `httpbin` service using the gateway's host by running this command:
 
+        :::info
+        If `$INGRESS_HOST` is an IPv6 address, enclose it in square brackets when constructing the URL. For example:
+
         ```shell
-        curl -s -I -H Host:httpbin.example.com http://$INGRESS_HOST/headers
+        curl -sS -g -I -H Host:httpbin.example.com http://[$INGRESS_HOST]/headers
+        ```
+        :::
+
+        ```shell
+        curl -sS -g -I -H Host:httpbin.example.com http://$INGRESS_HOST/headers
         ```
 
 9. Check that the response includes the `HTTP/1.1 200 OK` status, which confirms the request succeeded.

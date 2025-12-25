@@ -138,7 +138,7 @@ You can use the Kubernetes Gateway API to create `Gateway` and `HTTPRoute` resou
 
     ```shell
     kubectl exec $CURL_POD -n curl -- \
-      curl -s -I \
+      curl -sS -I \
         -H Host:httpbin.example.com \
         httpbin-gateway-istio.httpbin.svc.cluster.local/headers
     ```
@@ -157,7 +157,7 @@ You can use the Kubernetes Gateway API to create `Gateway` and `HTTPRoute` resou
 
     ```shell
     kubectl exec $CURL_POD -n curl -- \
-      curl -s -I \
+      curl -sS -I \
         -H Host:httpbin.example.com \
         httpbin-gateway-istio.httpbin.svc.cluster.local/get
     ```
@@ -184,18 +184,28 @@ You can use the Kubernetes Gateway API to create `Gateway` and `HTTPRoute` resou
 
         ```shell
         export INGRESS_HOST=$(kubectl get gtw httpbin-gateway -n httpbin -o jsonpath='{.status.addresses[0].value}')
+        echo "INGRESS_HOST=$INGRESS_HOST"
         ```
 
     b.  Set the `INGRESS_PORT` variable by running this command:
 
         ```shell
-        INGRESS_PORT=$(kubectl get gtw httpbin-gateway -n httpbin -o jsonpath='{.spec.listeners[?(@.name=="http")].port}')
+        export INGRESS_PORT=$(kubectl get gtw httpbin-gateway -n httpbin -o jsonpath='{.spec.listeners[?(@.name=="http")].port}')
+        echo "INGRESS_PORT=$INGRESS_PORT"
         ```
 
     c.  Using the gateway host, send a `curl` request to the `httpbin` service with this command:
 
+        :::info
+        If `$INGRESS_HOST` is an IPv6 address, enclose it in square brackets when constructing the URL. For example:
+
         ```shell
-        curl -s -I -H Host:httpbin.example.com http://$INGRESS_HOST:$INGRESS_PORT/headers
+        curl -sS -g -I -H Host:httpbin.example.com http://[$INGRESS_HOST]:$INGRESS_PORT/headers
+        ```
+        :::
+
+        ```shell
+        curl -sS -g -I -H Host:httpbin.example.com http://$INGRESS_HOST:$INGRESS_PORT/headers
         ```
 
 8.  Verify that the response shows the `HTTP/1.1 200 OK` status, which confirms the request was successful.
