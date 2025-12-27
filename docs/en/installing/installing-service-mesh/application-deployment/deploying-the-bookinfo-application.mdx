@@ -230,7 +230,8 @@ kubectl -n bookinfo port-forward svc/istio-ingressgateway 9080:80
 ```
 
 - If you run the command locally on your workstation, open `http://localhost:9080/productpage` in your browser.  
-- If you ran the command on a remote host and used `--address 0.0.0.0`, replace `localhost` with the remote host's IP or hostname (for example `http://<REMOTE_HOST_IP>:9080/productpage`)
+- If you ran the command on a remote **IPv4** host and used `--address "0.0.0.0"`, replace `localhost` with the remote host's IP or hostname (for example `http://<REMOTE_HOST_IP>:9080/productpage`)
+- If you ran the command on a remote **IPv6** host and used `--address "::"`, replace `localhost` with the remote host's IP or hostname (for example `http://[<REMOTE_HOST_IP>]:9080/productpage`)
 
 When you refresh the page several times, you should see different versions of reviews shown in `productpage`, presented in a round robin style (red stars, black stars, no stars), since we haven't yet used Istio to control the version routing.
 
