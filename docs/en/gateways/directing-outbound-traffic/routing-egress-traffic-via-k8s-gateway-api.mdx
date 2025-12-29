@@ -166,6 +166,7 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
 
     ```shell
     export CURL_POD=$(kubectl get pod -n curl -l app=curl -o jsonpath='{.items[0].metadata.name}')
+    echo "CURL_POD=$CURL_POD"
     ```
 
 5.  Using the `curl` client, confirm that you can reach `httpbin.org` via the egress gateway by entering this command:

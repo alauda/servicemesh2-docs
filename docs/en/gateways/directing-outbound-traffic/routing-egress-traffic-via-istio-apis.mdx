@@ -59,6 +59,7 @@ This section explains how to use Istio APIs to route outbound HTTP traffic via a
 
     ```shell
     export CURL_POD=$(kubectl get pod -n curl -l app=curl -o jsonpath='{.items[0].metadata.name}')
+    echo "CURL_POD=$CURL_POD"
     ```
 
 5.  Create a YAML file with the name `http-se.yaml` to direct traffic from the mesh toward an external service. The example below defines a `ServiceEntry` for a specific URL.
@@ -192,7 +193,8 @@ This section explains how to use Istio APIs to route outbound HTTP traffic via a
 
     ```shell
     ...
-    HTTP/1.1 302 Moved Permanently
+    HTTP/1.1 302 Found
+    server: envoy
     ...
     location: <example_url>
     ...
