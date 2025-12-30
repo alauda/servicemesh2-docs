@@ -26,6 +26,10 @@ Skip this section if your kernel version is 4.11 or later.
 
 #### Procedure
 
+:::info
+On some operating systems (e.g., CentOS 7) with older Linux kernels, gateways may not be able to listen on ports below 1024. It is recommended to configure your gateway to use ports above 1024 to avoid privilege requirements. If you must use privileged ports (below 1024), configure the `gateway-injection-template.txt` to either add the `NET_BIND_SERVICE` capability to the gateway's istio-proxy container or run the gateway as the root user by updating the container security context settings.
+:::
+
 1. Create a YAML file named `gateway-injection-template.txt` that contains the default injection template for gateways.
 
    <details>
@@ -334,7 +338,7 @@ Skip this section if your kernel version is 4.11 or later.
 #### Procedure
 
 :::info
-On some operating systems (e.g., CentOS 7) with older Linux kernels, gateways may not be able to listen on ports below 1024. It is recommended to configure your gateway to use ports above 1024 to avoid privilege requirements. If you must use privileged ports (below 1024), configure the gateway to either add the `NET_BIND_SERVICE` capability to the gateway container or run the gateway as the root user by creating a ConfigMap with custom container security context settings.
+On some operating systems (e.g., CentOS 7) with older Linux kernels, gateways may not be able to listen on ports below 1024. It is recommended to configure your gateway to use ports above 1024 to avoid privilege requirements. If you must use privileged ports (below 1024), configure the gateway to either add the `NET_BIND_SERVICE` capability to the gateway's istio-proxy container or run the gateway as the root user by creating a ConfigMap with custom container security context settings.
 :::
 
 1. Create a ConfigMap named `asm-kube-gateway-options` in the same namespace where you plan to deploy your Gateway:
