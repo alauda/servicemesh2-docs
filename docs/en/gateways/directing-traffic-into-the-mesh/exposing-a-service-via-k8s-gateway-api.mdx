@@ -114,6 +114,68 @@ You can use the Kubernetes Gateway API to create `Gateway` and `HTTPRoute` resou
     kubectl wait --for=condition=programmed gtw httpbin-gateway -n httpbin
     ```
 
+8.  *Optional* : Deploy the gateway to <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />:
+
+    <details>
+      <summary>Click to expand</summary>
+
+      <Directive type="info" title="Prerequisites">
+      Alauda Container Platform 4.2.0 or later, or upgrade Gateway API CRDs to the latest version.
+      </Directive>
+      
+      a. Create a ConfigMap named `asm-kube-gateway-options` in the same namespace where you plan to deploy your Gateway:
+
+        ```yaml
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: asm-kube-gateway-options  # [!code callout]
+          namespace: httpbin  # [!code callout]
+        data:  # [!code callout]
+          deployment: |
+            spec:
+              template:
+                spec:
+                  nodeSelector:
+                    node-role.kubernetes.io/infra: ""
+                  tolerations:
+                    - effect: NoSchedule
+                      key: node-role.kubernetes.io/infra
+                      value: reserved
+                      operator: Equal
+        ```
+
+        <Callouts>
+          1.  Specifies the configmap's name.
+          2.  Specifies the configmap's namespace same as the gateway.
+          3.  Sets node selectors and tolerations to schedule the gateway pods on Infra Nodes.
+        </Callouts>
+
+      b. Reference the ConfigMap in your Gateway resource by adding the `infrastructure.parametersRef` field:
+
+        ```yaml
+        apiVersion: gateway.networking.k8s.io/v1
+        kind: Gateway
+        metadata:
+          name: httpbin-gateway  # [!code callout]
+          namespace: httpbin  # [!code callout]
+        spec:
+          # Add the following infrastructure configuration to your Gateway CR
+          infrastructure:
+            parametersRef:
+              group: ""
+              kind: ConfigMap
+              name: asm-kube-gateway-options
+          # ... rest of your Gateway configuration
+        ```
+
+        <Callouts>
+          1.  Specifies the gateway's name.
+          2.  Specifies the gateway's namespace.
+        </Callouts>
+
+    </details>
+
 ## Verification
 
 1.  Create a namespace for a `curl` client by executing this command:
