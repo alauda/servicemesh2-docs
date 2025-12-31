@@ -102,6 +102,38 @@ The gateway in each cluster must be reachable from the other cluster.
      kubectl --context "${CTX_CLUSTER1}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net1.yaml
      ```
 
+     <details>
+
+       <summary>*Optional* : Deploy the East-West gateway to <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" /> (click to expand)</summary>
+
+       Run the following command to patch the gateway deployment:
+       
+       ```bash
+       kubectl --context "${CTX_CLUSTER1}" patch deployment istio-eastwestgateway -n istio-system \
+         --type='merge' \
+         --patch '{
+           "spec": {
+             "template": {
+               "spec": {
+                 "nodeSelector": {
+                   "node-role.kubernetes.io/infra": ""
+                 },
+                 "tolerations": [
+                   {
+                     "effect": "NoSchedule",
+                     "key": "node-role.kubernetes.io/infra",
+                     "value": "reserved",
+                     "operator": "Equal"
+                   }
+                 ]
+               }
+             }
+           }
+         }'
+       ```
+
+     </details>
+
   4. Expose the services through the gateway by running the following command:
 
      ```bash
@@ -168,6 +200,38 @@ The gateway in each cluster must be reachable from the other cluster.
      ```bash
      kubectl --context "${CTX_CLUSTER2}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net2.yaml
      ```
+
+     <details>
+
+       <summary>*Optional* : Deploy the East-West gateway to <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" /> (click to expand)</summary>
+
+       Run the following command to patch the gateway deployment:
+       
+       ```bash
+       kubectl --context "${CTX_CLUSTER2}" patch deployment istio-eastwestgateway -n istio-system \
+         --type='merge' \
+         --patch '{
+           "spec": {
+             "template": {
+               "spec": {
+                 "nodeSelector": {
+                   "node-role.kubernetes.io/infra": ""
+                 },
+                 "tolerations": [
+                   {
+                     "effect": "NoSchedule",
+                     "key": "node-role.kubernetes.io/infra",
+                     "value": "reserved",
+                     "operator": "Equal"
+                   }
+                 ]
+               }
+             }
+           }
+         }'
+       ```
+
+     </details>
 
   4. Expose the services through the gateway by running the following command:
 

@@ -115,6 +115,38 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
      kubectl --context "${CTX_CLUSTER1}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net1.yaml
      ```
 
+     <details>
+
+       <summary>*Optional* : Deploy the East-West gateway to <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" /> (click to expand)</summary>
+
+       Run the following command to patch the gateway deployment:
+       
+       ```bash
+       kubectl --context "${CTX_CLUSTER1}" patch deployment istio-eastwestgateway -n istio-system \
+         --type='merge' \
+         --patch '{
+           "spec": {
+             "template": {
+               "spec": {
+                 "nodeSelector": {
+                   "node-role.kubernetes.io/infra": ""
+                 },
+                 "tolerations": [
+                   {
+                     "effect": "NoSchedule",
+                     "key": "node-role.kubernetes.io/infra",
+                     "value": "reserved",
+                     "operator": "Equal"
+                   }
+                 ]
+               }
+             }
+           }
+         }'
+       ```
+
+     </details>
+
   4. Expose the control plane through the gateway so that services in the **West** cluster can access the control plane by running the following command:
 
      ```bash
@@ -211,6 +243,38 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
      ```bash
      kubectl --context "${CTX_CLUSTER2}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net2.yaml
      ```
+
+     <details>
+
+       <summary>*Optional* : Deploy the East-West gateway to <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" /> (click to expand)</summary>
+
+       Run the following command to patch the gateway deployment:
+       
+       ```bash
+       kubectl --context "${CTX_CLUSTER2}" patch deployment istio-eastwestgateway -n istio-system \
+         --type='merge' \
+         --patch '{
+           "spec": {
+             "template": {
+               "spec": {
+                 "nodeSelector": {
+                   "node-role.kubernetes.io/infra": ""
+                 },
+                 "tolerations": [
+                   {
+                     "effect": "NoSchedule",
+                     "key": "node-role.kubernetes.io/infra",
+                     "value": "reserved",
+                     "operator": "Equal"
+                   }
+                 ]
+               }
+             }
+           }
+         }'
+       ```
+
+     </details>
 
      :::note
      Since the **West** cluster is installed with a remote profile, exposing the application services on the **East** cluster exposes them on the East-West gateways of both clusters.
