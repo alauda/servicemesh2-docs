@@ -29,6 +29,10 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
 ## Prerequisites
 
 - You have installed the Alauda Container Platform Networking for Multus plugin all of the clusters that comprise the mesh, and kube-ovn must be v4.1.5 or later.
+- You have access to two clusters with external load balancer support.
+  :::warning
+   In primary-remote mode, if the external load balancer address is an IP and it is IPv6, primary-remote deployment is currently not supported.
+  :::
 - You have installed the Alauda Service Mesh v2 Operator on all of the clusters that comprise the mesh.
 - You have completed [Creating certificates for a multi-cluster mesh](./configuration-overview.mdx#creating-certificates-for-a-multi-cluster-mesh).
 - You have completed [Applying certificates to a multi-cluster topology](./configuration-overview.mdx#applying-certificates-to-a-multi-network-multi-cluster-mesh).
