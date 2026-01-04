@@ -6,22 +6,52 @@ weight: 9000
 
 Alauda Service Mesh v2.1 is built on the [Istio](https://istio.io/) project and is installed using a new Istio Operator derived from the [Sail Operator](https://github.com/istio-ecosystem/sail-operator) (hosted in the **istio-ecosystem** GitHub organization). The Operator provides an expanded set of custom resource definitions (CRDs) to manage Istio components.
 
-## Supported component versions
+## Alauda Service Mesh v2.1.0
+
+### Supported component versions
 
 - `Istio` version: v1.26.3 and v1.28.1
     - Istio 1.28 [supports Kubernetes](https://istio.io/latest/docs/releases/supported-releases/#support-status-of-istio-releases) 1.30, 1.31, 1.32, 1.33, 1.34
     - Istio 1.26 [supports Kubernetes](https://istio.io/latest/docs/releases/supported-releases/#support-status-of-istio-releases) 1.29, 1.30, 1.31, 1.32, 1.33
 - `Kiali operator` version: v2.17.1
 
-## Features
+### Istio Features
+
 
 - Updated Istio to version 1.28.
-    - See the [Istio 1.27 Release Announcement](https://istio.io/latest/news/releases/1.27.x/announcing-1.27/) for more details.
-    - See the [Istio 1.28 Release Announcement](https://istio.io/latest/news/releases/1.28.x/announcing-1.28/) for more details.
+    - **Inference extension**: Gateway inference support and InferencePool for managing AI inference endpoints.
+    - **Ambient multicluster**: Ambient mode support for multicluster and Waypoint cross-network routing.
+    - **nftables support**: Native nftables support extended across deployment modes.
+    - **Dual-stack networking**: IPv4/IPv6 dual-stack support reached Beta.
+    - **Security enhancements**: CRL support, stronger JWT options, istiod NetworkPolicy, container seccomp settings, etc.
+    - **Gateway API & traffic**: ListenerSets, BackendTLSPolicy support, and selective wildcard host scenarios.
+    - **Install & ops**: Persona-based installs (resourceScope) and improved deployment/rollback controls.
+    - **Observability improvements**: Dual B3/W3C header propagation, improved consistent-hash cookie options, better tracing interop.
+    - **istioctl & debugging**: Automatic revision detection and enhanced debugging tools for troubleshooting.
+- References
+    - [Istio 1.27 Release Announcement](https://istio.io/latest/news/releases/1.27.x/announcing-1.27/)
+    - [Istio 1.28 Release Announcement](https://istio.io/latest/news/releases/1.28.x/announcing-1.28/)
+
+### Kiali Features
+
 - Updated Kiali to version 2.17.
-    - See the [Kiali 2.12.0 Release Notes](https://kiali.io/news/release-notes/#2120) for more details.
-    - See the [Kiali 2.13.0 Release Notes](https://kiali.io/news/release-notes/#2130) for more details.
-    - See the [Kiali 2.14.0 Release Notes](https://kiali.io/news/release-notes/#2140) for more details.
-    - See the [Kiali 2.15.0 Release Notes](https://kiali.io/news/release-notes/#2150) for more details.
-    - See the [Kiali 2.16.0 Release Notes](https://kiali.io/news/release-notes/#2160) for more details.
-    - See the [Kiali 2.17.0 Release Notes](https://kiali.io/news/release-notes/#2170) for more details.
+    - **Inference extension**: Support for Gateway API Inference Extension (for AI inference integrations).
+    - **Auth enhancements**: Support multiple audiences in OIDC configuration.
+    - **Ambient capabilities**: Improved Ambient workload validation, namespace UI actions, and Waypoint / cross-network scenarios.
+    - **Gateway API support**: Upgraded/compatible Gateway API and support for clusters that only have Gateway API gateways (no Istio gateways).
+    - **Multiple control planes**: Support for multiple Istio control planes in different namespaces on the same cluster, with discovery/CRD adjustments.
+    - **Mesh / UI improvements**: Show Kiali in Local mode, unified config formats and consistent Istio metrics presentation.
+    - **Performance**: Graph “Show Virtual Services” option controls extra detail appenders; optimizations for istio_detail appender.
+    - **Deployment / CRD**: Introduced Kiali CRD schema, autodetect RootNamespace, and more deployment modes (local/external).
+    - **Operator improvements**: Ways to verify operator permissions and greater Helm/operator flexibility (e.g., skip creating some resources).
+    - **Visualization & panels**: Perses Dashboard support and OpenShift-specific tracing URL format.
+    - **Networking & security**: Configurable NetworkPolicy to restrict Kiali ingress.
+    - **Tracing & diagnostics**: Tracing tool improvements (changeable trace limits, x-request-id forwarding) and easier diagnostics export/configuration.
+- References
+    - [Kiali 2.12.0 Release Notes](https://kiali.io/news/release-notes/#2120)
+    - [Kiali 2.13.0 Release Notes](https://kiali.io/news/release-notes/#2130)
+    - [Kiali 2.14.0 Release Notes](https://kiali.io/news/release-notes/#2140)
+    - [Kiali 2.15.0 Release Notes](https://kiali.io/news/release-notes/#2150)
+    - [Kiali 2.16.0 Release Notes](https://kiali.io/news/release-notes/#2160)
+    - [Kiali 2.17.0 Release Notes](https://kiali.io/news/release-notes/#2170)
+
