@@ -135,10 +135,10 @@ kubectl label namespace sleep istio-injection=enabled
 5. Wait for all deployments to become available:
 
    ```bash {name=dual-stack:wait-deployments-ready}
-   kubectl wait --for=condition=Ready pod -n dual-stack -l app=tcp-echo --timeout=60s
-   kubectl wait --for=condition=Ready pod -n ipv4 -l app=tcp-echo --timeout=60s
-   kubectl wait --for=condition=Ready pod -n ipv6 -l app=tcp-echo --timeout=60s
-   kubectl wait --for=condition=Ready pod -n sleep -l app=sleep --timeout=60s
+   kubectl wait --for=condition=Ready pod -n dual-stack -l app=tcp-echo --timeout=3m
+   kubectl wait --for=condition=Ready pod -n ipv4 -l app=tcp-echo --timeout=3m
+   kubectl wait --for=condition=Ready pod -n ipv6 -l app=tcp-echo --timeout=3m
+   kubectl wait --for=condition=Ready pod -n sleep -l app=sleep --timeout=3m
    ```
 
 ### Verify the dual-stack service configuration
@@ -151,7 +151,7 @@ kubectl get service tcp-echo -n dual-stack -o=jsonpath='{.spec.ipFamilyPolicy}'
 
 **Example output**
 
-```text
+```text {name=dual-stack:verify-config-output}
 RequireDualStack
 ```
 
@@ -165,7 +165,7 @@ kubectl exec -n sleep deploy/sleep -- sh -c "echo dualstack | nc tcp-echo.dual-s
 
 **Example output**
 
-```text
+```text {name=dual-stack:test-connectivity-output}
 tcp-echo-xxx: hello dualstack
 ```
 
@@ -179,7 +179,7 @@ tcp-echo-xxx: hello dualstack
 
    **Example output**
 
-   ```text
+   ```text {name=dual-stack:test-ipv4-connectivity-output}
    tcp-echo-xxx: hello ipv4
    ```
 
@@ -191,7 +191,7 @@ tcp-echo-xxx: hello dualstack
 
    **Example output**
 
-   ```text
+   ```text {name=dual-stack:test-ipv6-connectivity-output}
    tcp-echo-xxx: hello ipv6
    ```
 
