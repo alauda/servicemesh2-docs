@@ -19,7 +19,7 @@ Install Istio with dual-stack networking support to enable both IPv4 and IPv6 co
 
   Install the `IstioCNI` resource by running the following command:
 
-  ```bash
+  ```bash {name=dual-stack:create-istio-cni}
   kubectl create namespace istio-cni
   cat <<EOF | kubectl apply -f -
   apiVersion: sailoperator.io/v1
@@ -41,7 +41,7 @@ Install Istio with dual-stack networking support to enable both IPv4 and IPv6 co
 
   1. Create an `Istio` resource with dual-stack configuration by running the following command:
 
-     ```bash
+     ```bash {name=dual-stack:create-istio}
      kubectl create namespace istio-system
      kubectl label namespace istio-system cpaas.io/project=cpaas-system
      cat <<EOF | kubectl apply -f -
@@ -65,7 +65,7 @@ Install Istio with dual-stack networking support to enable both IPv4 and IPv6 co
 
   2. Wait for the control plane to return the `Ready` status condition by running the following command:
 
-     ```bash
+     ```bash {name=dual-stack:wait-istio-ready}
      kubectl wait --for condition=Ready istio/default --timeout=3m
      ```
 
@@ -88,7 +88,7 @@ Create the following namespaces, each hosting the `tcp-echo` service with a spec
 - `ipv6`: hosts a `tcp-echo` service listening only on IPv6 addresses.
 - `sleep`: hosts the client application for sending test requests.
 
-   ```bash
+   ```bash {name=dual-stack:create-namespaces}
    kubectl create namespace dual-stack
    kubectl create namespace ipv4
    kubectl create namespace ipv6
@@ -99,7 +99,7 @@ Create the following namespaces, each hosting the `tcp-echo` service with a spec
 
 Label the namespaces to enable automatic Istio sidecar injection by running the following command:
 
-```bash
+```bash {name=dual-stack:enable-sidecar-injection}
 kubectl label namespace dual-stack istio-injection=enabled
 kubectl label namespace ipv4 istio-injection=enabled
 kubectl label namespace ipv6 istio-injection=enabled
@@ -110,48 +110,48 @@ kubectl label namespace sleep istio-injection=enabled
 
 1. Deploy the `tcp-echo` application with dual-stack configuration:
 
-   ```bash
+   ```bash {name=dual-stack:deploy-tcp-echo-dual-stack}
    kubectl apply -n dual-stack -f https://raw.githubusercontent.com/alauda-mesh/istio/istio-1.28/samples/tcp-echo/tcp-echo-dual-stack.yaml
    ```
 
 2. Deploy the `tcp-echo` application with IPv4-only configuration:
 
-   ```bash
+   ```bash {name=dual-stack:deploy-tcp-echo-ipv4}
    kubectl apply -n ipv4 -f https://raw.githubusercontent.com/alauda-mesh/istio/istio-1.28/samples/tcp-echo/tcp-echo-ipv4.yaml
    ```
 
 3. Deploy the `tcp-echo` application with IPv6-only configuration:
 
-   ```bash
+   ```bash {name=dual-stack:deploy-tcp-echo-ipv6}
    kubectl apply -n ipv6 -f https://raw.githubusercontent.com/alauda-mesh/istio/istio-1.28/samples/tcp-echo/tcp-echo-ipv6.yaml
    ```
 
 4. Deploy the `sleep` application, which will act as a client for sending test requests:
 
-   ```bash
+   ```bash {name=dual-stack:deploy-sleep}
    kubectl apply -n sleep -f https://raw.githubusercontent.com/alauda-mesh/istio/istio-1.28/samples/sleep/sleep.yaml
    ```
 
 5. Wait for all deployments to become available:
 
-   ```bash
-   kubectl wait --for=condition=Ready pod -n dual-stack -l app=tcp-echo --timeout=60s
-   kubectl wait --for=condition=Ready pod -n ipv4 -l app=tcp-echo --timeout=60s
-   kubectl wait --for=condition=Ready pod -n ipv6 -l app=tcp-echo --timeout=60s
-   kubectl wait --for=condition=Ready pod -n sleep -l app=sleep --timeout=60s
+   ```bash {name=dual-stack:wait-deployments-ready}
+   kubectl wait --for=condition=Ready pod -n dual-stack -l app=tcp-echo --timeout=3m
+   kubectl wait --for=condition=Ready pod -n ipv4 -l app=tcp-echo --timeout=3m
+   kubectl wait --for=condition=Ready pod -n ipv6 -l app=tcp-echo --timeout=3m
+   kubectl wait --for=condition=Ready pod -n sleep -l app=sleep --timeout=3m
    ```
 
 ### Verify the dual-stack service configuration
 
 Confirm that the `tcp-echo` service in the `dual-stack` namespace is configured with `ipFamilyPolicy` of `RequireDualStack` by running the following command:
 
-```bash
+```bash {name=dual-stack:verify-config}
 kubectl get service tcp-echo -n dual-stack -o=jsonpath='{.spec.ipFamilyPolicy}'
 ```
 
 **Example output**
 
-```bash
+```text {name=dual-stack:verify-config-output}
 RequireDualStack
 ```
 
@@ -159,40 +159,40 @@ RequireDualStack
 
 Send a test request from the `sleep` pod to the dual-stack `tcp-echo` service by running the following command:
 
-```bash
+```bash {name=dual-stack:test-connectivity}
 kubectl exec -n sleep deploy/sleep -- sh -c "echo dualstack | nc tcp-echo.dual-stack 9000"
 ```
 
 **Example output**
 
-```bash
-tcp-echo-xxx: hello dualstack
+```text {name=dual-stack:test-connectivity-output}
+hello dualstack
 ```
 
 ### Verify connectivity to IPv4 and IPv6 services
 
 1. Send a test request to the IPv4-only `tcp-echo` service:
 
-   ```bash
+   ```bash {name=dual-stack:test-ipv4-connectivity}
    kubectl exec -n sleep deploy/sleep -- sh -c "echo ipv4 | nc tcp-echo.ipv4 9000"
    ```
 
    **Example output**
 
-   ```bash
-   tcp-echo-xxx: hello ipv4
+   ```text {name=dual-stack:test-ipv4-connectivity-output}
+   hello ipv4
    ```
 
 2. Send a test request to the IPv6-only `tcp-echo` service:
 
-   ```bash
+   ```bash {name=dual-stack:test-ipv6-connectivity}
    kubectl exec -n sleep deploy/sleep -- sh -c "echo ipv6 | nc tcp-echo.ipv6 9000"
    ```
 
    **Example output**
 
-   ```bash
-   tcp-echo-xxx: hello ipv6
+   ```text {name=dual-stack:test-ipv6-connectivity-output}
+   hello ipv6
    ```
 
 </Steps>
@@ -205,7 +205,7 @@ After completing your verification and experimentation, you should remove the du
 
 Execute the following commands to remove all Istio components and the sample applications:
 
-```bash
+```bash {name=dual-stack:cleanup}
 kubectl delete istio/default istiocni/default
 kubectl delete ns/dual-stack ns/ipv4 ns/ipv6 ns/sleep
 kubectl delete ns/istio-system ns/istio-cni
