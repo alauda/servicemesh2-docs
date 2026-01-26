@@ -26,6 +26,8 @@ If the update strategy of the `Istio` resource is set to `RevisionBased`, the Op
 
 ## Installing the Alauda Service Mesh v2 Operator
 
+### Installing via the web console
+
 **Prerequisites**
 
 - The Alauda Service Mesh v2 must be uploaded.
@@ -49,7 +51,168 @@ If the update strategy of the `Istio` resource is set to `RevisionBased`, the Op
 
 Verify that the Operator installation status is reported as `Succeeded` in the **Installation Info** section.
 
-### Custom Resource Definitions Installed by the Operator
+### Installing via the CLI
+
+**Prerequisites**
+
+- The Alauda Service Mesh v2 must be uploaded.
+- An active ACP CLI (`kubectl`) session by a cluster administrator with the `cluster-admin` role.
+- The Alauda Container Platform Networking for Multus plugin must be installed, and kube-ovn must be v4.1.5 or later.
+
+**Procedure**
+
+1. Check available versions
+
+    ```bash {name=install-mesh:check-packagemanifest-versions}
+    (
+      echo -e "CHANNEL\tNAME\tVERSION"
+      kubectl get packagemanifest servicemesh-operator2 -o json | jq -r '
+        .status.channels[] |
+        .name as $channel |
+        .entries[] |
+        [$channel, .name, .version] | @tsv
+      '
+    ) | column -t -s $'\t'
+    ```
+
+    **Example output**
+    
+    ```bash {name=install-mesh:check-packagemanifest-versions-output}
+    CHANNEL     NAME                          VERSION
+    stable      servicemesh-operator2.v2.1.0  2.1.0
+    stable-2.1  servicemesh-operator2.v2.1.0  2.1.0
+    ```
+
+    **Fields**:
+    
+    * **CHANNEL**: Operator channel name
+    * **NAME**: CSV resource name
+    * **VERSION**: Operator version
+
+2. Confirm catalogSource
+
+    ```bash {name=install-mesh:confirm-catalogsource}
+    kubectl get packagemanifests servicemesh-operator2 -ojsonpath='{.status.catalogSource}'
+    ```
+    
+    **Example output**
+    
+    ```bash {name=install-mesh:confirm-catalogsource-output}
+    platform
+    ```
+    
+    This indicates the `servicemesh-operator2` comes from the `platform` catalogSource.
+
+3. Create a namespace
+
+    ```bash {name=install-mesh:create-namespace-sail-operator}
+    kubectl get namespace sail-operator || kubectl create namespace sail-operator
+    ```
+
+4. Create a Subscription
+
+    ```bash {name=install-mesh:create-subscription-servicemesh-operator2}
+    kubectl apply -f - <<EOF
+    apiVersion: operators.coreos.com/v1alpha1
+    kind: Subscription
+    metadata:
+      annotations:
+        cpaas.io/target-namespaces: ""
+      labels:
+        catalog: platform
+      name: servicemesh-operator2
+      namespace: sail-operator
+    spec:
+      channel: stable
+      installPlanApproval: Manual
+      name: servicemesh-operator2
+      source: platform
+      sourceNamespace: cpaas-system
+      startingCSV: servicemesh-operator2.v2.1.0
+    EOF
+    ```
+    
+    **Field explanations**
+    
+    * **annotation `cpaas.io/target-namespaces`**: It is recommended to set this to empty; empty indicates cluster-wide installation.
+    * **.metadata.name**: Subscription name (DNS-compliant, max 253 characters).
+    * **.metadata.namespace**: Namespace where the Operator will be installed.
+    * **.spec.channel**: Subscribed Operator channel.
+    * **.spec.installPlanApproval**: Approval strategy (`Manual` or `Automatic`). Here, `Manual` requires manual approval for install/upgrade.
+    * **.spec.source**: Operator catalogSource.
+    * **.spec.sourceNamespace**: Must be set to cpaas-system because all catalogSources provided by the platform are located in this namespace.
+    * **.spec.startingCSV**: Specifies the version to install for Manual approval; defaults to the latest in the channel if empty. Not required for Automatic.
+
+5. Check Subscription status
+
+    ```bash {name=install-mesh:check-subscription-servicemesh-operator2}
+    kubectl -n sail-operator get subscriptions servicemesh-operator2 -o yaml
+    ```
+
+    **Key output**
+
+    * **.status.state**: `UpgradePending` indicates the Operator is awaiting installation or upgrade.
+    * **Condition InstallPlanPending = True**: Waiting for manual approval.
+    * **.status.currentCSV**: Latest subscribed CSV.
+    * **.status.installPlanRef**: Associated InstallPlan; must be approved before installation proceeds.
+
+    Wait for the `InstallPlanPending` condition to be `True`:
+
+    ```bash {name=install-mesh:wait-installplan-pending}
+    kubectl -n sail-operator wait --for=condition=InstallPlanPending subscription servicemesh-operator2 --timeout=2m
+    ```
+
+6. Approve InstallPlan
+
+    ```bash {name=install-mesh:get-installplan}
+    kubectl -n sail-operator get installplan \
+      "$(kubectl -n sail-operator get subscriptions servicemesh-operator2 -o jsonpath='{.status.installPlanRef.name}')"
+    ```
+    
+    **Example output**
+    
+    ```bash {name=install-mesh:get-installplan-output}
+    NAME            CSV                            APPROVAL   APPROVED
+    install-rlgnp   servicemesh-operator2.v2.1.0   Manual     false
+    ```
+    
+    **Approve manually**
+    
+    ```bash {name=install-mesh:approve-installplan-manual}
+    PLAN="$(kubectl -n sail-operator get subscription servicemesh-operator2 -o jsonpath='{.status.installPlanRef.name}')"
+    kubectl -n sail-operator patch installplan "$PLAN" --type=json -p='[{"op": "replace", "path": "/spec/approved", "value": true}]'
+    ```
+
+**Verification**
+
+Wait for CSV creation; Phase changes to `Succeeded`:
+
+```shell {name=install-mesh:wait-csv-succeeded}
+kubectl wait --for=jsonpath='{.status.phase}'=Succeeded csv --all -n sail-operator --timeout=3m
+```
+
+Check CSV status:
+
+```shell {name=install-mesh:check-csv-status}
+kubectl -n sail-operator get csv
+```
+
+**Example output**
+
+```bash {name=install-mesh:check-csv-status-output}
+NAME                           DISPLAY                  VERSION   REPLACES   PHASE
+servicemesh-operator2.v2.1.0   Alauda Service Mesh v2   2.1.0                Succeeded
+```
+
+**Fields**
+
+* **NAME**: Installed CSV name
+* **DISPLAY**: Operator display name
+* **VERSION**: Operator version
+* **REPLACES**: CSV replaced during upgrade
+* **PHASE**: Installation status (`Succeeded` indicates success)
+
+## Custom Resource Definitions Installed by the Operator
 
 The Operator installs the following categories of Custom Resource Definitions (CRDs):
 
@@ -69,11 +232,13 @@ It's required to create these `Istio` and `IstioCNI` resources in separate names
 
 ### Creating the namespace for IstioCNI
 
-```bash
+```bash {name=install-mesh:create-namespace-istio-cni}
 kubectl create namespace istio-cni
 ```
 
-### Creating the IstioCNI resource using web console
+### Creating the `IstioCNI` resource
+
+#### Creating via the web console
 
 Create an Istio Container Network Interface (CNI) resource, which contains the configuration file for the Istio CNI plugin.
 The Alauda Service Mesh v2 Operator uses this resource's configuration to deploy the CNI pod.
@@ -114,14 +279,51 @@ The Alauda Service Mesh v2 Operator uses this resource's configuration to deploy
 
 Wait until the `.status.state` field of the `IstioCNI` resource to be `Healthy`.
 
+#### Creating via the CLI
+
+**Prerequisites**
+
+- An active ACP CLI (`kubectl`) session by a cluster administrator with the `cluster-admin` role.
+- The Alauda Service Mesh v2 Operator must be installed.
+- The Alauda Container Platform Networking for Multus plugin must be installed, and kube-ovn must be v4.1.5 or later.
+
+**Procedure**
+
+1. Create the IstioCNI resource by running the following command:
+
+    ```bash {name=install-mesh:create-istiocni}
+    cat <<EOF | kubectl apply -f -
+    apiVersion: sailoperator.io/v1
+    kind: IstioCNI
+    metadata:
+      name: default
+    spec:
+      namespace: istio-cni
+      values:
+        cni:
+          cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
+          excludeNamespaces:
+            - istio-cni
+            - kube-system
+    EOF
+    ```
+
+2. Wait for the IstioCNI resource to return the `Ready` status condition by running the following command:
+
+    ```bash {name=install-mesh:wait-istiocni-ready}
+    kubectl wait --for condition=Ready istiocni/default --timeout=3m
+    ```
+
 ### Creating the namespace for Istio
 
-```bash
+```bash {name=install-mesh:create-namespace-istio-system}
 kubectl create namespace istio-system
 kubectl label namespace istio-system cpaas.io/project=cpaas-system
 ```
 
-### Creating the `Istio` Resource via Web Console
+### Creating the `Istio` Resource
+
+#### Creating via the web console
 
 Create the `Istio` resource that will contain the YAML configuration for your Istio deployment.
 The Alauda Service Mesh v2 Operator leverages this resource's configuration to deploy the Istio Control Plane.
@@ -147,6 +349,36 @@ The Alauda Service Mesh v2 Operator leverages this resource's configuration to d
 **Verification**
 
 Wait until the `.status.state` field of the `Istio` resource to be `Healthy`.
+
+#### Creating via the CLI
+
+**Prerequisites**
+
+- An active ACP CLI (`kubectl`) session by a cluster administrator with the `cluster-admin` role.
+- The Alauda Service Mesh v2 Operator must be installed.
+- The Alauda Container Platform Networking for Multus plugin must be installed, and kube-ovn must be v4.1.5 or later.
+
+**Procedure**
+
+1. Create the Istio resource by running the following command:
+
+    ```bash {name=install-mesh:create-istio}
+    cat <<EOF | kubectl apply -f -
+    apiVersion: sailoperator.io/v1
+    kind: Istio
+    metadata:
+      name: default
+    spec:
+      namespace: istio-system
+      version: v1.28.1
+    EOF
+    ```
+
+2. Wait for the Istio control plane to return the `Ready` status condition by running the following command:
+
+    ```bash {name=install-mesh:wait-istio-ready}
+    kubectl wait --for condition=Ready istio/default --timeout=3m
+    ```
 
 ## Additional resources
 
