@@ -30,14 +30,14 @@ Additional details can be found in the upstream Istio documentation for the [Boo
 
 1.  Use the following command to Create a new namespace named `bookinfo`:
 
-    ```shell
+    ```shell {name=bookinfo:create-namespace}
     kubectl create namespace bookinfo
     ```
 
 
 2.  Enable sidecar injection for the `bookinfo` namespace. If your setup uses the `InPlace` upgrade strategy, run this command:
 
-    ```shell
+    ```shell {name=bookinfo:enable-sidecar-injection-inplace}
     kubectl label namespace bookinfo istio-injection=enabled
     ```
 
@@ -47,20 +47,20 @@ Additional details can be found in the upstream Istio documentation for the [Boo
 
     1.  To discover your `<revision-name>`, run the following:
 
-        ```shell
+        ```shell {name=bookinfo:get-istio-revisions}
         kubectl get istiorevisions.sailoperator.io
         ```
 
         **Sample output:**
 
-        ```shell
+        ```shell {name=bookinfo:get-istio-revisions-output}
         NAME      NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
         default   istio-system             True    Healthy   True     v1.28.1   47h
         ```
 
     2.  Label the namespace using the revision name to enable sidecar injection:
 
-        ```shell
+        ```shell {name=bookinfo:enable-sidecar-injection-revision}
         kubectl label namespace bookinfo istio.io/rev=default
         ```
     
@@ -71,13 +71,13 @@ Additional details can be found in the upstream Istio documentation for the [Boo
 
     **Example `discovery selector` label**: `istio-discovery=enabled`
     
-    ```shell
+    ```shell {name=bookinfo:apply-discovery-selector}
     kubectl label namespace bookinfo istio-discovery=enabled
     ```
 
 4.  Deploy the `bookinfo` application by applying its YAML file with the following command:
 
-    ```shell
+    ```shell {name=bookinfo:deploy-application}
     kubectl -n bookinfo apply -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
     ```
 
@@ -85,13 +85,13 @@ Additional details can be found in the upstream Istio documentation for the [Boo
 
 1.  To confirm the `bookinfo` service is available, run this command:
 
-    ```shell
+    ```shell {name=bookinfo:verify-services}
     kubectl get services -n bookinfo
     ```
 
     **Example output**
 
-    ```shell
+    ```shell {name=bookinfo:verify-services-output}
     NAME          TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
     details       ClusterIP   10.4.153.200   <none>        9080/TCP   4m44s
     productpage   ClusterIP   10.4.132.101   <none>        9080/TCP   4m43s
@@ -101,13 +101,13 @@ Additional details can be found in the upstream Istio documentation for the [Boo
 
 2.  To check that the `bookinfo` pods are available, execute the following command:
 
-    ```shell
+    ```shell {name=bookinfo:verify-pods}
     kubectl get pods -n bookinfo
     ```
 
     **Example output**
 
-    ```shell
+    ```shell {name=bookinfo:verify-pods-output}
     NAME                              READY   STATUS    RESTARTS   AGE
     details-v1-c66556f6d-bbqjx        2/2     Running   0          5m56s
     productpage-v1-5f568ff46d-r886k   2/2     Running   0          5m56s
@@ -121,13 +121,13 @@ Additional details can be found in the upstream Istio documentation for the [Boo
 
 3.  Confirm the `bookinfo` application is running by sending a request to its `product page`. Execute this command:
 
-    ```shell
+    ```shell {name=bookinfo:verify-application}
     kubectl exec "$(kubectl get pod -l app=ratings -n bookinfo -o jsonpath='{.items[0].metadata.name}')" -c ratings -n bookinfo -- curl -sS productpage:9080/productpage | grep -o "<title>.*</title>"
     ```
 
     **Example output**
 
-    ```html
+    ```html {name=bookinfo:verify-application-output}
     <title>Simple Bookstore App</title>
     ```
 

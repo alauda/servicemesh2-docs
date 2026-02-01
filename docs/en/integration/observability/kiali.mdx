@@ -26,8 +26,11 @@ These capabilities enable users to diagnose service behavior, identify potential
 
 The following steps show how to install Alauda Build of Kiali.
 
+### Installing via the web console
+
 **Prerequisites**
 
+- The Alauda Build of Kiali must be uploaded.
 - You are logged in to the Alauda Container Platform web console as **cluster-admin**.
 
 **Procedure**
@@ -42,6 +45,165 @@ The following steps show how to install Alauda Build of Kiali.
 **Verification**
 
 Verify that the Operator installation status is reported as `Succeeded` in the **Installation Info** section.
+
+### Installing via the CLI
+
+**Prerequisites**
+
+- The Alauda Build of Kiali must be uploaded.
+- An active ACP CLI (`kubectl`) session by a cluster administrator with the `cluster-admin` role.
+
+**Procedure**
+
+1. Check available versions
+
+    ```bash {name=install-kiali:check-packagemanifest-versions}
+    (
+      echo -e "CHANNEL\tNAME\tVERSION"
+      kubectl get packagemanifest kiali-operator -o json | jq -r '
+        .status.channels[] |
+        .name as $channel |
+        .entries[] |
+        [$channel, .name, .version] | @tsv
+      '
+    ) | column -t -s $'\t'
+    ```
+
+    **Example output**
+
+    ```bash {name=install-kiali:check-packagemanifest-versions-output}
+    CHANNEL  NAME                       VERSION
+    stable   kiali-operator.v2.17.1-r1  2.17.1-r1
+    ```
+
+    **Fields**:
+
+    * **CHANNEL**: Operator channel name
+    * **NAME**: CSV resource name
+    * **VERSION**: Operator version
+
+2. Confirm catalogSource
+
+    ```bash {name=install-kiali:confirm-catalogsource}
+    kubectl get packagemanifests kiali-operator -ojsonpath='{.status.catalogSource}'
+    ```
+
+    **Example output**
+
+    ```bash {name=install-kiali:confirm-catalogsource-output}
+    platform
+    ```
+
+    This indicates the `kiali-operator` comes from the `platform` catalogSource.
+
+3. Create a namespace
+
+    ```bash {name=install-kiali:create-namespace-kiali-operator}
+    kubectl get namespace kiali-operator || kubectl create namespace kiali-operator
+    ```
+
+4. Create a Subscription
+
+    ```bash {name=install-kiali:create-subscription-kiali-operator}
+    kubectl apply -f - <<EOF
+    apiVersion: operators.coreos.com/v1alpha1
+    kind: Subscription
+    metadata:
+      annotations:
+        cpaas.io/target-namespaces: ""
+      labels:
+        catalog: platform
+      name: kiali-operator
+      namespace: kiali-operator
+    spec:
+      channel: stable
+      installPlanApproval: Manual
+      name: kiali-operator
+      source: platform
+      sourceNamespace: cpaas-system
+      startingCSV: kiali-operator.v2.17.1-r1
+    EOF
+    ```
+
+    **Field explanations**
+
+    * **annotation `cpaas.io/target-namespaces`**: It is recommended to set this to empty; empty indicates cluster-wide installation.
+    * **.metadata.name**: Subscription name (DNS-compliant, max 253 characters).
+    * **.metadata.namespace**: Namespace where the Operator will be installed.
+    * **.spec.channel**: Subscribed Operator channel.
+    * **.spec.installPlanApproval**: Approval strategy (`Manual` or `Automatic`). Here, `Manual` requires manual approval for install/upgrade.
+    * **.spec.source**: Operator catalogSource.
+    * **.spec.sourceNamespace**: Must be set to cpaas-system because all catalogSources provided by the platform are located in this namespace.
+    * **.spec.startingCSV**: Specifies the version to install for Manual approval; defaults to the latest in the channel if empty. Not required for Automatic.
+
+5. Check Subscription status
+
+    ```bash {name=install-kiali:check-subscription-kiali-operator}
+    kubectl -n kiali-operator get subscriptions kiali-operator -o yaml
+    ```
+
+    **Key output**
+
+    * **.status.state**: `UpgradePending` indicates the Operator is awaiting installation or upgrade.
+    * **Condition InstallPlanPending = True**: Waiting for manual approval.
+    * **.status.currentCSV**: Latest subscribed CSV.
+    * **.status.installPlanRef**: Associated InstallPlan; must be approved before installation proceeds.
+
+    Wait for the `InstallPlanPending` condition to be `True`:
+
+    ```bash {name=install-kiali:wait-installplan-pending}
+    kubectl -n kiali-operator wait --for=condition=InstallPlanPending subscription kiali-operator --timeout=2m
+    ```
+
+6. Approve InstallPlan
+
+    ```bash {name=install-kiali:get-installplan}
+    kubectl -n kiali-operator get installplan \
+      "$(kubectl -n kiali-operator get subscriptions kiali-operator -o jsonpath='{.status.installPlanRef.name}')"
+    ```
+
+    **Example output**
+
+    ```bash {name=install-kiali:get-installplan-output}
+    NAME            CSV                         APPROVAL   APPROVED
+    install-ddh84   kiali-operator.v2.17.1-r1   Manual     false
+    ```
+
+    **Approve manually**
+
+    ```bash {name=install-kiali:approve-installplan-manual}
+    PLAN="$(kubectl -n kiali-operator get subscription kiali-operator -o jsonpath='{.status.installPlanRef.name}')"
+    kubectl -n kiali-operator patch installplan "$PLAN" --type=json -p='[{"op": "replace", "path": "/spec/approved", "value": true}]'
+    ```
+
+**Verification**
+
+Wait for CSV creation; Phase changes to `Succeeded`:
+
+```shell {name=install-kiali:wait-csv-succeeded}
+kubectl wait --for=jsonpath='{.status.phase}'=Succeeded csv --all -n kiali-operator --timeout=3m
+```
+
+Check CSV status:
+
+```shell {name=install-kiali:check-csv-status}
+kubectl -n kiali-operator get csv
+```
+
+**Example output**
+
+```bash {name=install-kiali:check-csv-status-output}
+NAME                        DISPLAY                 VERSION     REPLACES   PHASE
+kiali-operator.v2.17.1-r1   Alauda Build of Kiali   2.17.1-r1              Succeeded
+```
+
+**Fields**
+
+* **NAME**: Installed CSV name
+* **DISPLAY**: Operator display name
+* **VERSION**: Operator version
+* **REPLACES**: CSV replaced during upgrade
+* **PHASE**: Installation status (`Succeeded` indicates success)
 
 ## Configuring Monitoring with Kiali
 
@@ -73,7 +235,7 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
 
   ### Retrieve platform configuration from the business cluster:
 
-  ```bash
+  ```bash {name=config-kiali:get-platform-config}
   export PLATFORM_URL=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.platformURL}')
   export CLUSTER_NAME=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.clusterName}')
   export ALB_CLASS_NAME=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.systemAlbIngressClassName}')
@@ -87,19 +249,19 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
 
   ### Create a `Secret` named `kiali` in the `istio-system` namespace for OpenID authentication:
 
-  ```bash
+  ```bash {name=config-kiali:create-secret-kiali}
   kubectl create secret generic kiali --from-literal="oidc-secret=$OIDC_CLIENT_SECRET" -nistio-system
   ```
 
   **Example output:**
 
-  ```
+  ```bash {name=config-kiali:create-secret-kiali-output}
   secret/kiali created
   ```
 
   ### Create a `Secret` for monitoring database credentials:
 
-  ```bash
+  ```bash {name=config-kiali:create-secret-monitoring-basic-auth}
   SECRET_NAME=$(kubectl get feature monitoring -o jsonpath='{.spec.accessInfo.database.basicAuth.secretName}')
 
   AUTH_USERNAME=$(kubectl -ncpaas-system get secret "$SECRET_NAME" -o jsonpath="{.data.username}" | base64 -d)
@@ -113,13 +275,13 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
 
   **Example output:**
 
-  ```
+  ```bash {name=config-kiali:create-secret-monitoring-basic-auth-output}
   secret/kiali-monitoring-basic-auth created
   ```
 
   ### Create a file named kiali.yaml with the following content. Replace placeholder values as needed:
 
-  ```yaml title="kiali.yaml"
+  ```yaml {name=config-kiali:kiali-yaml} title="kiali.yaml"
   apiVersion: kiali.io/v1alpha1
   kind: Kiali
   metadata:
@@ -156,8 +318,8 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
         enabled: false  # Since Grafana is not bundled in ACP anymore, it is disabled by default
       prometheus:
         # query_scope only required in multi cluster
-        query_scope:  # [!code callout]
-          mesh_id: <mesh_id>
+        # query_scope:  [!code callout]
+        #   mesh_id: <mesh_id>
         auth:
           type: basic
           username: secret:kiali-monitoring-basic-auth:username  # [!code callout]
@@ -198,13 +360,15 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
   ```bash
   # Replace <platform-ca> with the real base64-encoded CA certificate saved previously.
   export PLATFORM_CA=<platform-ca>  # [!code callout]
-
-  envsubst < kiali.yaml | kubectl apply -f -
   ```
 
   <Callouts>
     1. Replace `<platform-ca>` with the real base64-encoded CA certificate saved previously.
   </Callouts>
+
+  ```bash {name=config-kiali:apply-kiali}
+  envsubst < kiali.yaml | kubectl apply -f -
+  ```
 
   ### Access the Kiali console:
 
@@ -233,8 +397,8 @@ This capability supports the analysis of request flow behavior, aiding in root c
      external_services:
        tracing:
          # query_scope only required in multi cluster
-         query_scope:
-           istio.mesh_id: <mesh_id>  # [!code callout]
+         # query_scope: [!code callout]
+           # istio.mesh_id: <mesh_id>
          enabled: true  # [!code callout]
          provider: jaeger  # [!code callout]
          use_grpc: true
