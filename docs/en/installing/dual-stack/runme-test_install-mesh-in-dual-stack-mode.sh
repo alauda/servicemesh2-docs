@@ -55,28 +55,28 @@ test_dual_stack() {
     
     # 6. 部署 tcp-echo dual-stack
     log_info "步骤 6: 部署 tcp-echo (dual-stack)"
-    apply_with_mirror dual-stack:deploy-tcp-echo-dual-stack || {
+    kubectl_apply_with_mirror dual-stack:deploy-tcp-echo-dual-stack || {
         log_error "部署 tcp-echo (dual-stack) 失败"
         return 1
     }
     
     # 7. 部署 tcp-echo IPv4
     log_info "步骤 7: 部署 tcp-echo (IPv4)"
-    apply_with_mirror dual-stack:deploy-tcp-echo-ipv4 || {
+    kubectl_apply_with_mirror dual-stack:deploy-tcp-echo-ipv4 || {
         log_error "部署 tcp-echo (IPv4) 失败"
         return 1
     }
     
     # 8. 部署 tcp-echo IPv6
     log_info "步骤 8: 部署 tcp-echo (IPv6)"
-    apply_with_mirror dual-stack:deploy-tcp-echo-ipv6 || {
+    kubectl_apply_with_mirror dual-stack:deploy-tcp-echo-ipv6 || {
         log_error "部署 tcp-echo (IPv6) 失败"
         return 1
     }
     
     # 9. 部署 sleep 应用
     log_info "步骤 9: 部署 sleep 应用"
-    apply_with_mirror dual-stack:deploy-sleep || {
+    kubectl_apply_with_mirror dual-stack:deploy-sleep || {
         log_error "部署 sleep 应用失败"
         return 1
     }

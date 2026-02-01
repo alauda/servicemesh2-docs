@@ -59,44 +59,44 @@ The Alauda Build of Kiali Operator can be uninstalled using the Alauda Container
 
 ### Delete the `Kiali` resource
 
-    1.  Get the `Kiali` resource name by executing this command:
+1.  Get the `Kiali` resource name by executing this command:
 
-        ```shell
-        kubectl get kiali -A
-        ```
+    ```shell {name=uninstall-kiali:get-kiali}
+    kubectl get kiali -A
+    ```
 
-        **Example output**
+    **Example output**
 
-        ```shell
-        NAMESPACE      NAME    AGE
-        istio-system   kiali   22h
-        ```
+    ```shell {name=uninstall-kiali:get-kiali-output}
+    NAMESPACE      NAME    AGE
+    istio-system   kiali   22h
+    ```
 
-    2.  Use the name and namespace from the previous command's output to replace `<name_of_custom_resource>` and `<namespace>`, and then run the following to remove it:
+2.  Use the name and namespace from the previous command's output to replace `<name_of_custom_resource>` and `<namespace>`, and then run the following to remove it:
 
-        ```shell
-        kubectl delete kiali/<name_of_custom_resource> -n <namespace>
-        ```
+    ```shell {name=uninstall-kiali:delete-kiali}
+    kubectl delete kiali/<name_of_custom_resource> -n <namespace>
+    ```
 
-        **Example output**
+    **Example output**
 
-        ```shell
-        kiali.kiali.io "<name_of_custom_resource>" deleted
-        ```
+    ```shell {name=uninstall-kiali:delete-kiali-output}
+    kiali.kiali.io "<name_of_custom_resource>" deleted
+    ```
 
 ### Uninstall the Alauda Build of Kiali Operator
 
-    1.  Delete the `kiali-operator` subscription:
+1.  Delete the `kiali-operator` subscription:
 
-        ```shell
-        kubectl delete subscription kiali-operator -n kiali-operator
-        ```
+    ```shell {name=uninstall-kiali:delete-subscription}
+    kubectl delete subscription kiali-operator -n kiali-operator
+    ```
 
-        **Example output**
+    **Example output**
 
-        ```shell
-        subscription.operators.coreos.com "kiali-operator" deleted
-        ```
+    ```shell {name=uninstall-kiali:delete-subscription-output}
+    subscription.operators.coreos.com "kiali-operator" deleted
+    ```
 
 </Steps>
 
@@ -108,6 +108,6 @@ The deletion of Kiali custom resource definitions (CRDs) is an optional step.
 
 1.  To delete the Kiali CRDs, execute the command below:
 
-    ```shell
+    ```shell {name=uninstall-kiali:delete-crds}
     kubectl get crds -oname | grep -e kiali.io | xargs kubectl delete
     ```
