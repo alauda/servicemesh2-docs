@@ -6,7 +6,8 @@
 
 ```
 tests/
-├── run.sh                 # 测试执行入口脚本
+├── run.sh                 # 单个测试执行脚本
+├── run-all.sh             # 所有测试任务编排脚本
 ├── README.md              # 本文档
 ├── bin/                   # 工具存放目录 (runme, violet)
 ├── package/               # 插件包缓存目录
@@ -24,6 +25,8 @@ docs/en/installing/dual-stack/
 
 ### 1. 系统要求
 
+**注**：执行测试脚本的机器（不是 k8s 集群）必须能访问 Github。
+
 测试框架会自动检查并安装必要的工具，但以下工具需要预先安装：
 
 - `kubectl` - Kubernetes 命令行工具
@@ -31,6 +34,8 @@ docs/en/installing/dual-stack/
 - `jq` - JSON 处理工具
 
 ### 2. 设置 kubectl 环境
+
+TODO: 考虑使用 kubectl acp，登录 ACP 后自动添加集群的 kubectl 配置
 
 ```bash
 # 从 ACP 平台下载集群 kubeconfig 文件
@@ -42,7 +47,11 @@ kubectl --kubeconfig=/path/to/kubeconfig.yaml config rename-context proxy-connec
 export KUBECONFIG=/path/to/kubeconfig.yaml
 ```
 
-### 3. 设置环境变量
+### 3. 安装 `Multus` 集群插件
+
+TODO: 后续由脚本执行初始化时自动安装
+
+### 4. 设置环境变量
 
 在执行测试前，需要设置以下环境变量：
 
@@ -56,15 +65,20 @@ export WEST_CLUSTER_NAME=west-cluster      # 多集群网格的 West 集群名�
 export PLATFORM_ADDRESS=https://xxx
 export PLATFORM_USERNAME='your-username'
 export PLATFORM_PASSWORD='your-password'
+# TODO: 后续会自动从 Global 集群获取 CA 证书
+# 获取方式: kubectl -ncpaas-system get secret dex.tls -o jsonpath='{.data.ca\.crt}'
+export PLATFORM_CA='base64-encoded-ca-certificate'
 
-# 双栈环境标识（可选，默认为 false）
-export IS_DUAL_STACK=false  # 设置为 true 表示双栈环境
+# 双栈环境标识（可选，设置为 true 时才会执行双栈文档测试）
+export IS_DUAL_STACK=false
+# Bookinfo 流量生成（可选，设置为 true 时，Bookinfo 部署完成后会自动生成访问流量）
+export AUTO_GEN_BOOKINFO_TRAFFIC=true
 
 # 工具版本
 export RUNME_VERSION=3.16.4
 
 # 镜像加速地址（可选，用于替换默认镜像地址）
-export REGISTRY_MIRROR_ADDRESS=  # 留空表示不使用镜像加速
+export REGISTRY_MIRROR_ADDRESS=docker-mirrors.alauda.cn  # 留空表示不使用镜像加速
 
 # 插件包下载地址
 export PKG_SERVICEMESH_OPERATOR2_URL=xxx
@@ -88,7 +102,7 @@ cd tests
 ./run.sh --init-only
 
 # 测试所有文档（自动执行初始化，按预定义顺序执行）
-./run.sh --all
+./run-all.sh
 
 # 测试指定文档（默认不执行初始化）
 ./run.sh --file install-mesh-in-dual-stack-mode
@@ -110,32 +124,40 @@ cd tests
 ./run.sh --file install-mesh-in-dual-stack-mode --file another-doc
 ```
 
-### --all 参数说明
+### run-all.sh 说明
 
-`--all` 参数会按照预定义的顺序执行所有测试任务，而不是自动查找所有测试脚本。这样可以更好地控制测试执行顺序。
+`run-all.sh` 脚本按照预定义的顺序执行所有测试任务，适合 CI/CD 或全量回归测试。
 
 **执行流程**：
 
-1. **环境初始化**：自动执行环境初始化（无需手动指定 `--force-init`）
+1. **环境初始化**：自动执行 `./run.sh --init-only`
 2. **双栈测试**：如果 `IS_DUAL_STACK=true`，执行 `install-mesh-in-dual-stack-mode` 测试
-3. **网格安装测试**：如果 `IS_DUAL_STACK!=true`，执行 `install-mesh` 测试
+3. **单网格安装与应用测试**：
+   - 安装网格：`./run.sh --file install-mesh`
+   - 部署 Bookinfo：`./run.sh --file deploying-the-bookinfo-application --no-cleanup`
+   - 指标验证：`./run.sh --file metrics-and-mesh`
 4. **其他测试**：预留位置，后续可添加更多测试任务
 
 **添加新的测试任务**：
 
-编辑 `run.sh` 文件，在 `--all` 参数处理部分添加新的测试任务：
+编辑 `run-all.sh` 文件，在相应阶段添加新的测试命令：
 
 ```bash
-# 在 run.sh 的 test_files 数组中添加
-test_files+=(\"your-new-test-task\")
+# 在 run-all.sh 中添加
+./run.sh --file your-new-test-task
 ```
 
 ## 当前已有的测试文档
 
-| 文档名称     | 测试脚本                                                                                                                        | 执行命令                                          |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| 网格安装     | [runme-test_install-mesh.sh](../docs/en/installing/installing-service-mesh/runme-test_install-mesh.sh)                          | `./run.sh --file install-mesh`                    |
-| 双栈网格安装 | [runme-test_install-mesh-in-dual-stack-mode.sh](../docs/en/installing/dual-stack/runme-test_install-mesh-in-dual-stack-mode.sh) | `./run.sh --file install-mesh-in-dual-stack-mode` |
+| 文档名称           | 测试脚本                                                                                                                                                                  | 执行命令                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 双栈网格安装       | [runme-test_install-mesh-in-dual-stack-mode.sh](../docs/en/installing/dual-stack/runme-test_install-mesh-in-dual-stack-mode.sh)                                           | `./run.sh --file install-mesh-in-dual-stack-mode`    |
+| 网格安装           | [runme-test_install-mesh.sh](../docs/en/installing/installing-service-mesh/runme-test_install-mesh.sh)                                                                    | `./run.sh --file install-mesh`                       |
+| 指标与服务网格集成 | [runme-test_metrics-and-mesh.sh](../docs/en/integration/observability/runme-test_metrics-and-mesh.sh)                                                                     | `./run.sh --file metrics-and-mesh`                   |
+| Kiali 安装与配置   | [runme-test_kiali.sh](../docs/en/integration/observability/runme-test_kiali.sh)                                                                                           | `./run.sh --file kiali`                              |
+| Bookinfo 应用部署  | [runme-test_deploying-the-bookinfo-application.sh](../docs/en/installing/installing-service-mesh/application-deployment/runme-test_deploying-the-bookinfo-application.sh) | `./run.sh --file deploying-the-bookinfo-application` |
+| Kiali 卸载         | [runme-test_uninstalling-alauda-build-of-kiali.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-build-of-kiali.sh)                                              | `./run.sh --file uninstalling-alauda-build-of-kiali` |
+| 网格卸载           | [runme-test_uninstalling-alauda-service-mesh.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-service-mesh.sh)                                                  | `./run.sh --file uninstalling-alauda-service-mesh`   |
 
 > **注意**：后续会逐步添加更多文档的自动化测试。
 
@@ -162,7 +184,7 @@ test_files+=(\"your-new-test-task\")
 
 - `__cmp_same` - 精确匹配
 - `__cmp_contains` - 包含子串
-- `__cmp_like` - 模糊匹配（忽略动态值如 IP、时间等）
+- `__cmp_like` - 模糊匹配（忽略动态值如 IP、时间等，目前有问题，暂时不要使用）
 - `__cmp_regex` - 正则表达式匹配
 - 更多函数请查看 [verify.sh](./util/verify.sh)
 
@@ -285,13 +307,13 @@ chmod +x runme-test_<文档名>.sh
 ## 最佳实践
 
 1. **首次运行**：先执行 `--init-only` 初始化环境
-2. **测试所有文档**：使用 `--all` 参数（自动执行初始化并按顺序测试）
+2. **测试所有文档**：使用 `./run-all.sh` 脚本（自动执行初始化并按顺序测试）
 3. **测试单个文档**：
    - 如果环境已初始化，直接使用 `--file` 参数（默认不重新初始化）
    - 如果需要重新初始化，添加 `--force-init` 参数
 4. **开发调试**：使用 `--no-cleanup` 保留资源以便调试
 5. **CI/CD 集成**：
-   - 使用 `--all` 测试所有文档
+   - 使用 `./run-all.sh` 测试所有文档
    - 双栈环境设置 `IS_DUAL_STACK=true`
 
 ## 参考资料
@@ -306,3 +328,4 @@ chmod +x runme-test_<文档名>.sh
 - [ ] Multus 集群插件自动安装
 - [ ] MetalLB 集群插件自动安装
 - [ ] 逐步补充其他测试文档
+- [ ] 优化测试 case 结果统计
