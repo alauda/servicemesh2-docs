@@ -25,7 +25,7 @@ You can integrate Alauda Service Mesh with user-workload monitoring to enable ob
 
   **Example `ServiceMonitor` object**
 
-  ```yaml title="servicemonitor.yaml"
+  ```yaml {name=metrics-mesh:servicemonitor-yaml} title="servicemonitor.yaml"
   apiVersion: monitoring.coreos.com/v1
   kind: ServiceMonitor
   metadata:
@@ -47,7 +47,7 @@ You can integrate Alauda Service Mesh with user-workload monitoring to enable ob
 
   ### Apply the YAML file by running the following command:
 
-  ```bash
+  ```bash {name=metrics-mesh:apply-servicemonitor}
   kubectl apply -f servicemonitor.yaml
   ```
 
@@ -55,7 +55,7 @@ You can integrate Alauda Service Mesh with user-workload monitoring to enable ob
 
   **Example PodMonitor object**
 
-  ```yaml title="podmonitor.yaml"
+  ```yaml {name=metrics-mesh:podmonitor-yaml} title="podmonitor.yaml"
   apiVersion: monitoring.coreos.com/v1
   kind: PodMonitor
   metadata:
@@ -111,7 +111,7 @@ You can integrate Alauda Service Mesh with user-workload monitoring to enable ob
 
   ### Apply the YAML file by running the following command:
 
-  ```bash
+  ```bash {name=metrics-mesh:apply-podmonitor}
   kubectl apply -f podmonitor.yaml
   ```
 
@@ -119,7 +119,7 @@ You can integrate Alauda Service Mesh with user-workload monitoring to enable ob
 
   **Example Istio Telemetry resource**
 
-  ```yaml title="asm-telemetry.yaml"
+  ```yaml {name=metrics-mesh:telemetry-yaml} title="asm-telemetry.yaml"
   apiVersion: telemetry.istio.io/v1
   kind: Telemetry
   metadata:
@@ -143,7 +143,7 @@ You can integrate Alauda Service Mesh with user-workload monitoring to enable ob
 
   ### Apply the YAML file by running the following command:
 
-  ```bash
+  ```bash {name=metrics-mesh:apply-telemetry}
   kubectl apply -f asm-telemetry.yaml
   ```
 </Steps>

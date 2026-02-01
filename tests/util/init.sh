@@ -270,136 +270,6 @@ upload_all_packages() {
     log_success "所有插件包上传完成"
 }
 
-# 在指定集群安装 servicemesh-operator2
-install_servicemesh_operator() {
-    local cluster="$1"
-
-    log_info "=========================================="
-    log_info "在集群 $cluster 安装 servicemesh-operator2"
-    log_info "=========================================="
-
-    # 设置 kubectl context
-    kubectl config use-context "$cluster"
-
-    local csv_name=$(parse_csv_name_from_package "$PKG_SERVICEMESH_OPERATOR2_URL")
-
-    # 检查是否已经安装
-    if kubectl -n sail-operator get csv $csv_name 2>/dev/null; then
-        local csv_phase
-        csv_phase=$(kubectl -n sail-operator get csv "$csv_name" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
-        
-        if [ "$csv_phase" = "Succeeded" ]; then
-            log_success "servicemesh-operator2 已在集群 $cluster 安装"
-            return 0
-        else
-            log_error "servicemesh-operator2 存在但状态不是 Succeeded，当前状态: $csv_phase"
-            return 1
-        fi
-    fi
-    
-    # 0. 检查可用版本
-    log_info "步骤 0.1: 检查可用版本"
-    local versions_output
-    versions_output=$(runme run install-mesh:check-packagemanifest-versions 2>/dev/null || echo "")
-    if [ -z "$versions_output" ]; then
-        log_error "无法获取 PackageManifest 版本信息"
-        return 1
-    fi
-    
-    # 验证输出中包含 csv_name
-    if echo "$versions_output" | grep -q "$csv_name"; then
-        log_success "找到匹配的版本: $csv_name"
-        echo "$versions_output"
-    else
-        log_error "输出中未找到预期的 CSV 名称: $csv_name"
-        echo "$versions_output"
-        return 1
-    fi
-    
-    # 0.2 确认 catalogSource
-    log_info "步骤 0.2: 确认 catalogSource"
-    output=$(runme run install-mesh:confirm-catalogsource 2>/dev/null)
-    expected=$(runme print install-mesh:confirm-catalogsource-output 2>/dev/null)
-    if ! __cmp_contains "$output" "$expected"; then
-        log_error "CatalogSource 不匹配,期待: $expected, 实际: $output"
-        return 1
-    fi
-    log_success "CatalogSource 验证通过: $output"
-    
-    # 1. 创建命名空间
-    log_info "步骤 1: 创建 sail-operator 命名空间"
-    runme run install-mesh:create-namespace-sail-operator || {
-        log_error "创建命名空间失败"
-        return 1
-    }
-    log_success "命名空间创建成功"
-    
-    # 2. 创建 Subscription
-    log_info "步骤 2: 创建 Subscription"
-    # 使用 runme print 获取模板内容,然后替换 startingCSV 为实际的 csv_name
-    local subscription_yaml
-    subscription_yaml=$(runme print install-mesh:create-subscription-servicemesh-operator2 2>/dev/null | \
-        sed -E "s/startingCSV: servicemesh-operator2\.v.+/startingCSV: $csv_name/")
-    if [ -z "$subscription_yaml" ]; then
-        log_error "无法获取 Subscription 模板"
-        return 1
-    fi
-    echo "$subscription_yaml" | bash || {
-        log_error "创建 Subscription 失败"
-        return 1
-    }
-    log_success "Subscription 创建成功"
-    
-    # 3. 等待 InstallPlan 准备就绪
-    log_info "步骤 3: 等待 InstallPlan 准备就绪"
-    runme run install-mesh:wait-installplan-pending || {
-        log_error "等待 InstallPlan 超时"
-        return 1
-    }
-    log_success "InstallPlan 已准备就绪"
-    
-    # 4. 批准 InstallPlan
-    log_info "步骤 4: 批准 InstallPlan"
-    runme run install-mesh:approve-installplan-manual || {
-        log_error "批准 InstallPlan 失败"
-        return 1
-    }
-    log_success "InstallPlan 批准成功"
-
-    # 等待 CSV 资源被创建
-    log_info "等待 CSV 资源创建..."
-    _wait_for_resource "csv" "sail-operator" "$csv_name" || {
-        log_warn "等待 CSV 资源创建超时,继续执行..."
-    }
-    # 5. 等待 CSV 安装完成
-    log_info "步骤 5: 等待 CSV 安装完成（最多等待 3 分钟）"
-    runme run install-mesh:wait-csv-succeeded || {
-        log_error "CSV 安装超时或失败"
-        log_info "当前 CSV 状态:"
-        kubectl -n sail-operator get csv
-        return 1
-    }
-    log_success "CSV 安装成功"
-    
-    # 6. 验证安装
-    log_info "步骤 6: 验证安装"
-    local csv_output
-    csv_output=$(runme run install-mesh:check-csv-status 2>/dev/null || echo "")
-    
-    if [ -n "$csv_output" ]; then
-        log_success "servicemesh-operator2 安装验证通过"
-        echo "$csv_output"
-    else
-        log_error "无法获取 CSV 状态"
-        return 1
-    fi
-    
-    log_success "=========================================="
-    log_success "集群 $cluster 的 servicemesh-operator2 安装完成"
-    log_success "=========================================="
-    return 0
-}
-
 # 安装所有集群的 servicemesh-operator2
 install_all_servicemesh_operators() {
     log_info "开始安装 servicemesh-operator2 ..."
@@ -415,7 +285,15 @@ install_all_servicemesh_operators() {
     fi
     
     for cluster in "${clusters[@]}"; do
-        install_servicemesh_operator "$cluster"
+        # 设置 kubectl context
+        kubectl config use-context "$cluster"
+        
+        log_info "安装 servicemesh-operator2 到集群: $cluster"
+        install_operator \
+            "servicemesh-operator2" \
+            "sail-operator" \
+            "$PKG_SERVICEMESH_OPERATOR2_URL" \
+            "install-mesh"
     done
     
     log_success "所有集群的 servicemesh-operator2 安装完成"

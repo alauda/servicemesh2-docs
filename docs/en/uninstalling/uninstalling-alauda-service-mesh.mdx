@@ -86,97 +86,97 @@ The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Containe
 
 ### Delete the `Istio` resource
 
-    1.  Get the `Istio` resource name by executing this command:
+1.  Get the `Istio` resource name by executing this command:
 
-        ```shell
-        kubectl get istio -n istio-system
-        ```
+    ```shell {name=uninstall-mesh:get-istio}
+    kubectl get istio -n istio-system
+    ```
 
-        **Example output**
+    **Example output**
 
-        ```shell
-        AME                         NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
-        <name_of_custom_resource>   istio-system             1           1       1        default           Healthy   v1.28.1   1d
-        ```
+    ```shell {name=uninstall-mesh:get-istio-output}
+    NAME                         NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
+    <name_of_custom_resource>   istio-system             1           1       1        default           Healthy   v1.28.1   1d
+    ```
 
-    2.  Use the name from the previous command's output to replace `<name_of_custom_resource>`, and then run the following to remove it:
+2.  Use the name from the previous command's output to replace `<name_of_custom_resource>`, and then run the following to remove it:
 
-        ```shell
-        kubectl delete istio/<name_of_custom_resource>
-        ```
+    ```shell {name=uninstall-mesh:delete-istio}
+    kubectl delete istio/<name_of_custom_resource>
+    ```
 
-        **Example output**
+    **Example output**
 
-        ```shell
-        istio.sailoperator.io "<name_of_custom_resource>" deleted
-        ```
+    ```shell {name=uninstall-mesh:delete-istio-output}
+    istio.sailoperator.io "<name_of_custom_resource>" deleted
+    ```
 
 ### Delete the `IstioCNI` resource
 
-    1.  Get the name of the `IstioCNI` resource by executing this command:
+1.  Get the `IstioCNI` resource by executing this command:
 
-        ```shell
-        kubectl get istioCNI -n istio-system
-        ```
+    ```shell {name=uninstall-mesh:get-istiocni}
+    kubectl get istioCNI -n istio-system
+    ```
 
-        **Example output**
+    **Example output**
 
-        ```shell
-        NAME                        NAMESPACE   PROFILE   READY   STATUS    VERSION   AGE
-        <name_of_custom_resource>   istio-cni             True    Healthy   v1.28.1   1d
-        ```
+    ```shell {name=uninstall-mesh:get-istiocni-output}
+    NAME      NAMESPACE   PROFILE   READY   STATUS    VERSION   AGE
+    default   istio-cni             True    Healthy   v1.28.1   1d
+    ```
 
-    2.  Use the name from the previous command's output to replace `<name_of_custom_resource>`, and then run the following to remove it:
+2.  Run the following to remove it:
 
-        ```shell
-        kubectl delete istioCNI/<name_of_custom_resource>
-        ```
+    ```shell {name=uninstall-mesh:delete-istiocni}
+    kubectl delete istioCNI/default
+    ```
 
-        **Example output**
+    **Example output**
 
-        ```shell
-        istiocni.sailoperator.io "<name_of_custom_resource>" deleted
-        ```
+    ```shell {name=uninstall-mesh:delete-istiocni-output}
+    istiocni.sailoperator.io "default" deleted
+    ```
 
 ### Delete the `istio-system` and `istio-cni` namespaces
 
-    1.  Delete the `istio-system` namespace with the following command:
+1.  Delete the `istio-system` namespace with the following command:
 
-        ```shell
-        kubectl delete ns istio-system
-        ```
+    ```shell {name=uninstall-mesh:delete-ns-istio-system}
+    kubectl delete ns istio-system
+    ```
 
-        **Example output**
+    **Example output**
 
-        ```shell
-        namespace "istio-system" deleted
-        ```
+    ```shell {name=uninstall-mesh:delete-ns-istio-system-output}
+    namespace "istio-system" deleted
+    ```
 
-    2.  Delete the `istio-cni` namespace with the following command:
+2.  Delete the `istio-cni` namespace with the following command:
 
-        ```shell
-        kubectl delete ns istio-cni
-        ```
+    ```shell {name=uninstall-mesh:delete-ns-istio-cni}
+    kubectl delete ns istio-cni
+    ```
 
-        **Example output**
+    **Example output**
 
-        ```shell
-        namespace "istio-cni" deleted
-        ```
+    ```shell {name=uninstall-mesh:delete-ns-istio-cni-output}
+    namespace "istio-cni" deleted
+    ```
 
 ### Uninstall the Alauda Service Mesh v2 Operator
 
-    1.  Delete the `servicemesh-operator2` subscription:
+1.  Delete the `servicemesh-operator2` subscription:
 
-        ```shell
-        kubectl delete subscription servicemesh-operator2 -n sail-operator
-        ```
+    ```shell {name=uninstall-mesh:delete-subscription}
+    kubectl delete subscription servicemesh-operator2 -n sail-operator
+    ```
 
-        **Example output**
+    **Example output**
 
-        ```shell
-        subscription.operators.coreos.com "servicemesh-operator2" deleted
-        ```
+    ```shell {name=uninstall-mesh:delete-subscription-output}
+    subscription.operators.coreos.com "servicemesh-operator2" deleted
+    ```
 
 </Steps>
 
@@ -188,6 +188,6 @@ The deletion of Istio custom resource definitions (CRDs) is an optional step.
 
 1.  To delete the Istio CRDs, execute the command below:
 
-    ```shell
+    ```shell {name=uninstall-mesh:delete-crds}
     kubectl get crds -oname | grep -e istio.io -e sailoperator.io | xargs kubectl delete
     ```

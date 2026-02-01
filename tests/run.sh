@@ -15,7 +15,6 @@ source "$UTIL_DIR/common.sh"
 export PATH="$BIN_DIR:$PATH"
 
 # 默认参数
-RUN_ALL=false
 RUN_FILES=()
 NO_CLEANUP=false
 CLEANUP_ONLY=false
@@ -31,17 +30,12 @@ usage() {
 使用方法: $0 [选项]
 
 选项:
-  --all                 测试所有文档（按预定义顺序执行）
   --file <name>         测试指定文档（可指定多次，默认不执行初始化）
   --no-cleanup          不执行 cleanup 操作
   --cleanup-only        只执行 cleanup 操作
   --init-only           只执行环境初始化，不运行测试
   --force-init          强制执行环境初始化（用于 --file 模式）
   -h, --help            显示此帮助信息
-
-示例:
-  # 测试所有文档（自动执行初始化）
-  $0 --all
 
   # 测试指定文档（不执行初始化）
   $0 --file install-mesh-in-dual-stack-mode
@@ -84,10 +78,7 @@ EOF
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
-            --all)
-                RUN_ALL=true
-                shift
-                ;;
+
             --file)
                 RUN_FILES+=("$2")
                 shift 2
@@ -165,9 +156,7 @@ run_test_script() {
     local script_name
     script_name=$(basename "$test_script")
     
-    log_info "============================================"
-    log_info "执行测试: $script_name"
-    log_info "============================================"
+    log_header "执行测试: $script_name"
     
     # 加载测试脚本
     source "$test_script"
@@ -235,13 +224,10 @@ main() {
     check_env
     
     # 环境初始化
-    # --all 模式默认执行初始化，--file 模式默认不执行初始化
+    # --file 模式默认不执行初始化
     local should_init=false
     
     if [ "$INIT_ONLY" = true ]; then
-        should_init=true
-    elif [ "$RUN_ALL" = true ]; then
-        # --all 模式默认执行初始化
         should_init=true
     elif [ "$FORCE_INIT" = true ]; then
         # --file 模式且指定了 --force-init
@@ -264,48 +250,7 @@ main() {
     # 确定要运行的测试
     local test_scripts=()
     
-    if [ "$RUN_ALL" = true ]; then
-        log_info "按预定义顺序执行所有测试..."
-        
-        # 手动编排测试任务顺序
-        local test_files=()
-        
-        # 3.1 初始化（已在上面执行）
-        
-        # 3.2 执行 install-mesh-in-dual-stack-mode（仅双栈环境）
-        if [ "$IS_DUAL_STACK" = "true" ]; then
-            test_files+=("install-mesh-in-dual-stack-mode")
-        else
-            log_info "跳过 install-mesh-in-dual-stack-mode（非双栈环境）"
-        fi
-        
-        # 3.3 执行 install-mesh
-        test_files+=("install-mesh")
-        
-        # 3.4 预留执行其他后续添加进来的任务
-        # TODO: 在此处添加更多测试任务
-        # test_files+=("another-test-task")
-        
-        # 查找对应的测试脚本
-        for file in "${test_files[@]}"; do
-            local script_path
-            script_path=$(find "$REPO_ROOT/docs/en" -type f -name "runme-test_${file}.sh" | head -n 1)
-            
-            if [ -z "$script_path" ]; then
-                log_error "未找到测试脚本: runme-test_${file}.sh"
-                exit 1
-            fi
-            
-            test_scripts+=("$script_path")
-        done
-        
-        if [ ${#test_scripts[@]} -eq 0 ]; then
-            log_warn "没有需要执行的测试任务"
-            exit 0
-        fi
-        
-        log_info "将执行 ${#test_scripts[@]} 个测试任务"
-    elif [ ${#RUN_FILES[@]} -gt 0 ]; then
+    if [ ${#RUN_FILES[@]} -gt 0 ]; then
         for file in "${RUN_FILES[@]}"; do
             local script_path
             script_path=$(find "$REPO_ROOT/docs/en" -type f -name "runme-test_${file}.sh" | head -n 1)
@@ -318,7 +263,7 @@ main() {
             test_scripts+=("$script_path")
         done
     else
-        log_error "请指定 --all 或 --file 参数"
+        log_error "请指定 --file 参数"
         usage
         exit 1
     fi
