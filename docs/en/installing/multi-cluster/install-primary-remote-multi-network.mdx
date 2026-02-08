@@ -44,7 +44,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
   ### Create an `ISTIO_VERSION` environment variable that defines the Istio version to install
 
   ```bash
-  export ISTIO_VERSION=1.28.1
+  export ISTIO_VERSION=1.28.3
   ```
 
   ### Install IstioCNI on the **East** cluster
@@ -315,23 +315,24 @@ This cluster will host the `v1` version of the `helloworld` service.
 
         ```shell
         kubectl --context="${CTX_CLUSTER1}" apply \
-          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml \
-          -l service=helloworld -n sample
+          -l service=helloworld -n sample \
+          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
         ```
 
     b.  Then, deploy the `v1` instance of the `helloworld` application.
 
         ```shell
         kubectl --context="${CTX_CLUSTER1}" apply \
-          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml \
-          -l version=v1 -n sample
+          -l version=v1 -n sample \
+          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
         ```
 
 4.  Deploy the `sleep` application, which will act as a client for sending test requests.
 
     ```shell
     kubectl --context="${CTX_CLUSTER1}" apply \
-      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/sleep/sleep.yaml -n sample
+      -n sample \
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/sleep/sleep.yaml
     ```
 
 5.  Pause the process until the `helloworld-v1` deployment is fully available and ready.
@@ -368,23 +369,24 @@ This cluster will host the `v2` version of the `helloworld` service.
 
         ```shell
         kubectl --context="${CTX_CLUSTER2}" apply \
-          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml \
-          -l service=helloworld -n sample
+          -l service=helloworld -n sample \
+          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
         ```
 
     b.  Deploy the `v2` instance of the `helloworld` application.
 
         ```shell
         kubectl --context="${CTX_CLUSTER2}" apply \
-          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml \
-          -l version=v2 -n sample
+          -l version=v2 -n sample \
+          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
         ```
 
 4.  Deploy the client `sleep` application on the `West` cluster.
 
     ```shell
     kubectl --context="${CTX_CLUSTER2}" apply \
-      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/sleep/sleep.yaml -n sample
+      -n sample \
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/sleep/sleep.yaml
     ```
 
 5.  Wait for the `helloworld-v2` deployment to become fully available.

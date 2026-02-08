@@ -289,7 +289,7 @@ install_operator() {
     # 0.1 检查可用版本
     log_info "步骤 0.1: 检查可用版本"
     if ! retry_command "_check_packagemanifest_version $csv_name $runme_prefix" 20 5; then
-        log_error "无法找到预期的 CSV 名称: $csv_name"
+        log_error "无法找到预期 PackageManifest 资源中的 CSV 内容: $csv_name"
         return 1
     fi
 

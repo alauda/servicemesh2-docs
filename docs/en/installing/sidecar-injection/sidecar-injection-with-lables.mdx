@@ -31,7 +31,7 @@ This method injects a sidecar proxy into all workloads within a given namespace.
 
     ```shell
     NAME      NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
-    default   istio-system             True    Healthy   False    v1.28.1   2m
+    default   istio-system             True    Healthy   False    v1.28.3   2m
     ```
 
     Because the revision name is `default`, you can use the standard injection labels without specifying the exact revision.
@@ -176,7 +176,7 @@ With this method, you can select individual workloads for sidecar injection rath
 
     ```shell
     NAME      NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
-    my-mesh   istio-system             True    Healthy   False    v1.28.1   22s
+    my-mesh   istio-system             True    Healthy   False    v1.28.3   22s
     ```
 
     Because the revision name is `my-mesh`, the revision label `istio.io/rev=my-mesh` must be used to activate sidecar injection.
