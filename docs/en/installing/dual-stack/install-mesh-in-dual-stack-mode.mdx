@@ -43,7 +43,6 @@ Install Istio with dual-stack networking support to enable both IPv4 and IPv6 co
 
      ```bash {name=dual-stack:create-istio}
      kubectl create namespace istio-system
-     kubectl label namespace istio-system cpaas.io/project=cpaas-system
      cat <<EOF | kubectl apply -f -
      apiVersion: sailoperator.io/v1
      kind: Istio
