@@ -162,8 +162,12 @@ print_test_summary() {
     echo "测试总结"
     echo "========================================"
     echo "总计: $TESTS_TOTAL"
-    echo -e "${GREEN}通过: $TESTS_PASSED${NC}"
-    echo -e "${RED}失败: $TESTS_FAILED${NC}"
+    if [ "$TESTS_PASSED" -gt 0 ]; then
+        echo -e "${GREEN}通过: $TESTS_PASSED${NC}"
+    fi
+    if [ "$TESTS_FAILED" -gt 0 ]; then
+        echo -e "${RED}失败: $TESTS_FAILED${NC}"
+    fi
     echo "========================================"
     
     if [ "$TESTS_FAILED" -eq 0 ]; then
