@@ -87,24 +87,32 @@ test_kiali() {
     fi
     log_success "kiali-monitoring-basic-auth Secret 创建成功"
 
-    # 4. 生成 kiali.yaml 文件
-    log_info "步骤 4: 生成 kiali.yaml 文件"
+    # 4. Label istio-system namespace with project label
+    log_info "步骤 4: Label istio-system namespace with project label"
+    runme run config-kiali:label-istio-system-project-label || {
+        log_error "Label istio-system namespace 失败"
+        return 1
+    }
+    log_success "istio-system namespace 已打项目标签"
+
+    # 5. 生成 kiali.yaml 文件
+    log_info "步骤 5: 生成 kiali.yaml 文件"
     runme print config-kiali:kiali-yaml > "/tmp/kiali.yaml" || {
         log_error "获取 kiali.yaml 模板失败"
         return 1
     }
     log_success "kiali.yaml 文件生成成功"
 
-    # 5. 应用 Kiali 配置
-    log_info "步骤 5: 应用 Kiali 配置"
+    # 6. 应用 Kiali 配置
+    log_info "步骤 6: 应用 Kiali 配置"
     kubectl_apply_runme_block "config-kiali:apply-kiali" "/tmp/" || {
         log_error "应用 Kiali 配置失败"
         return 1
     }
     log_success "Kiali 配置应用成功"
 
-    # 6. 等待 Kiali CR 就绪
-    log_info "步骤 6: 等待 Kiali CR 就绪"
+    # 7. 等待 Kiali CR 就绪
+    log_info "步骤 7: 等待 Kiali CR 就绪"
     kubectl -nistio-system wait --for=condition=Successful kiali/kiali --timeout=3m || {
         log_warn "等待 Kiali CR 就绪超时，继续执行..."
     }
@@ -115,7 +123,7 @@ test_kiali() {
         return 1
     }
 
-    # 7. Kiali 访问地址
+    # 组合 Kiali 访问地址
     log_info "Kiali 访问地址: $PLATFORM_URL/clusters/$CLUSTER_NAME/kiali"
 
     log_success "Kiali 配置测试完成"
