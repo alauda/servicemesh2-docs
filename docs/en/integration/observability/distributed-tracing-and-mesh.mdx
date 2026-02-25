@@ -41,6 +41,12 @@ You can integrate Alauda Service Mesh with OpenTelemetry to instrument, generate
 **Procedure**
 
 <Steps>
+  ### Label the `istio-system` namespace with the project label:
+
+  ```bash
+  kubectl label namespace istio-system cpaas.io/project=cpaas-system --overwrite
+  ```
+
   ### Install a `Jaeger` instance in the `istio-system` namespace.
 
   Refer to the installation script in <ExternalSiteLink name="acp" href="/observability/tracing/installation.html#deploying-a-jaeger-instance" children="Deploying a Jaeger Instance" /> and use the example command below to deploy an Istio-dedicated `Jaeger`:

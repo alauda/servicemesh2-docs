@@ -279,6 +279,12 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
   secret/kiali-monitoring-basic-auth created
   ```
 
+  ### Label the `istio-system` namespace with the project label:
+
+  ```bash {name=config-kiali:label-istio-system-project-label}
+  kubectl label namespace istio-system cpaas.io/project=cpaas-system --overwrite
+  ```
+
   ### Create a file named kiali.yaml with the following content. Replace placeholder values as needed:
 
   ```yaml {name=config-kiali:kiali-yaml} title="kiali.yaml"
