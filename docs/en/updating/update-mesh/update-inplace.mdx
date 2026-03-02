@@ -37,7 +37,7 @@ You can use the following section to understand the update process. You can skip
 
 1. Create the `istio-cni` and `istio-system` namespace by running the following command:
 
-   ```bash
+   ```bash {name=update-inplace:create-namespaces}
    kubectl create ns istio-cni
    kubectl create ns istio-system
    ```
@@ -70,7 +70,7 @@ You can use the following section to understand the update process. You can skip
 
 4. Install the Istio CNI plugin with the desired version. The following example configuration creates an `IstioCNI` resource named default in the `istio-cni` namespace:
 
-   ```yaml
+   ```yaml {name=update-inplace:create-istio-cni}
    apiVersion: sailoperator.io/v1
    kind: IstioCNI
    metadata:
@@ -90,7 +90,7 @@ You can use the following section to understand the update process. You can skip
 
    **Example configuration**
 
-   ```yaml
+   ```yaml {name=update-inplace:create-istio}
    apiVersion: sailoperator.io/v1
    kind: Istio
    metadata:
@@ -106,31 +106,31 @@ You can use the following section to understand the update process. You can skip
     
     a. Generate the `bookinfo` namespace with the command below:
         
-        ```shell
+        ```shell {name=update-inplace:create-bookinfo-ns}
         kubectl create ns bookinfo
         ```
 
     b. Apply a label to the `bookinfo` namespace to activate automatic sidecar injection. Use the following command:
         
-        ```shell
+        ```shell {name=update-inplace:label-bookinfo-ns}
         kubectl label namespace bookinfo istio-injection=enabled
         ```
 
     c. Deploy the `bookinfo` application pods into the `bookinfo` namespace by executing this command:
         
-        ```shell
+        ```shell {name=update-inplace:deploy-bookinfo}
         kubectl -n bookinfo apply -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
         ```
 
 7. Inspect the `Istio` resource using the following command:
     
-    ```shell
+    ```shell {name=update-inplace:get-istio-install}
     kubectl get istio -n istio-system
     ```
-    
+
     **Example output**
-    
-    ```shell
+
+    ```text {name=update-inplace:get-istio-install-output}
     NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
     default   istio-system             1           1       1        default           Healthy   v1.26.3   6m3s
     ```
@@ -156,7 +156,7 @@ When updating Istio using the `InPlace` strategy, you can increment the version 
 
 1. Change the version in the `Istio` resource. For example, to update to Istio `1.28.3`, set the spec.version field to `v1.28.3` by running the following command:
 
-   ```bash
+   ```bash {name=update-inplace:patch-istio-version}
    kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.28.3"}}'
    ```
 
@@ -174,20 +174,20 @@ When updating Istio using the `InPlace` strategy, you can increment the version 
 
 2. Confirm that the new version of the control plane is ready by running the following command:
 
-   ```bash
+   ```bash {name=update-inplace:get-istio-update}
    kubectl get istio
    ```
 
    **Example output**
 
-   ```
+   ```text {name=update-inplace:get-istio-update-output}
    NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
    default   istio-system             1           1       1        default           Healthy   v1.28.3   18m5s
    ```
 
 3. Restart the application workloads so that the new version of the sidecar gets injected by running the following command:
 
-   ```bash
+   ```bash {name=update-inplace:restart-workloads}
    kubectl rollout restart deployment -n bookinfo
    ```
 
@@ -195,13 +195,13 @@ When updating Istio using the `InPlace` strategy, you can increment the version 
 
 Verify that the new version of the sidecar is running by entering the following command:
 
-```bash
+```bash {name=update-inplace:verify-proxy-status}
 istioctl proxy-status
 ```
 
 **Example output**
 
-```
+```text {name=update-inplace:verify-proxy-status-output}
 NAME                                        CLUSTER        CDS              LDS              EDS              RDS              ECDS        ISTIOD                      VERSION
 details-v1-5c89dbb599-4t927.bookinfo        Kubernetes     SYNCED (92s)     SYNCED (92s)     SYNCED (85s)     SYNCED (92s)     IGNORED     istiod-57559f96c4-v2h9g     1.28.3-asm-r0
 productpage-v1-f8fdd5649-xmxkt.bookinfo     Kubernetes     SYNCED (92s)     SYNCED (92s)     SYNCED (85s)     SYNCED (92s)     IGNORED     istiod-57559f96c4-v2h9g     1.28.3-asm-r0
@@ -212,3 +212,17 @@ reviews-v3-55d5b84fb9-wq9ds.bookinfo        Kubernetes     SYNCED (94s)     SYNC
 ```
 
 The column `VERSION` should match with the new control plane version.
+
+## Removing InPlace update resources from a development environment
+
+After completing your verification and experimentation, you should remove the InPlace update configuration to clean up the development environment and release resources.
+
+**Procedure**
+
+Execute the following commands to remove all Istio components and the sample applications:
+
+```bash {name=update-inplace:cleanup}
+kubectl delete istio/default istiocni/default
+kubectl delete ns/bookinfo
+kubectl delete ns/istio-system ns/istio-cni
+```

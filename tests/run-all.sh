@@ -79,9 +79,24 @@ else
 fi
 
 # ------------------------------------------------------------------
-# Case 4: 其他测试任务 (TODO)
+# Case 4: InPlace 更新策略测试
 # ------------------------------------------------------------------
-log_header "Case 4: 其他测试任务 (TODO)"
+log_header "Case 4: InPlace 更新策略测试 (Update InPlace)"
+
+if (
+    set -e
+    ./run.sh --file update-inplace
+); then
+    record_test_result 0
+else
+    record_test_result 1
+    exit 1
+fi
+
+# ------------------------------------------------------------------
+# Case 5: 其他测试任务 (TODO)
+# ------------------------------------------------------------------
+log_header "Case 5: 其他测试任务 (TODO)"
 log_info "TODO: 可以在此处添加更多测试任务"
 
 log_header "所有测试任务执行完成！"
