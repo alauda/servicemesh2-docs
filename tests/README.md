@@ -35,7 +35,7 @@ docs/en/installing/dual-stack/
 
 ### 2. 设置 kubectl 环境
 
-TODO: 考虑使用 kubectl acp，登录 ACP 后自动添加集群的 kubectl 配置
+TODO: 后续优化 ACP 集群 kubeconfig 配置方式
 
 ```bash
 # 从 ACP 平台下载集群 kubeconfig 文件
@@ -158,6 +158,7 @@ cd tests
 | Bookinfo 应用部署  | [runme-test_deploying-the-bookinfo-application.sh](../docs/en/installing/installing-service-mesh/application-deployment/runme-test_deploying-the-bookinfo-application.sh) | `./run.sh --file deploying-the-bookinfo-application` |
 | Kiali 卸载         | [runme-test_uninstalling-alauda-build-of-kiali.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-build-of-kiali.sh)                                              | `./run.sh --file uninstalling-alauda-build-of-kiali` |
 | 网格卸载           | [runme-test_uninstalling-alauda-service-mesh.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-service-mesh.sh)                                                  | `./run.sh --file uninstalling-alauda-service-mesh`   |
+| InPlace 更新策略   | [runme-test_update-inplace.sh](../docs/en/updating/update-mesh/runme-test_update-inplace.sh)                                                                              | `./run.sh --file update-inplace`                     |
 
 > **注意**：后续会逐步添加更多文档的自动化测试。
 
@@ -190,73 +191,24 @@ cd tests
 
 ## 编写新的测试脚本
 
-### 1. 确保文档中的代码块有名称
+推荐使用 Claude Code 的 `/auto-test-creator` skill 来自动生成测试脚本。该 skill 会自动完成以下所有步骤：
 
-在 MDX 文档中，为需要测试的代码块添加 `{name=xxx}` 属性：
+1. 分析目标 MDX 文档中的代码块
+2. 为代码块添加 `{name=prefix:action}` 属性（如缺失）
+3. 生成测试脚本（覆盖所有命名代码块）
+4. 更新本文档的测试文档表格
+5. 更新 `run-all.sh` 编排脚本
+6. 设置可执行权限
 
-````markdown
-```bash {name=my-test:create-resource}
-kubectl create namespace test
+### 使用方法
+
+在 Claude Code 中，指定要测试的 MDX 文档路径即可：
+
 ```
-````
-
-### 2. 创建测试脚本
-
-在文档同目录下创建 `runme-test_<文档名>.sh` 文件：
-
-```bash
-#!/usr/bin/env bash
-# 测试脚本描述
-
-set -e
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
-
-# 加载工具函数
-source "$REPO_ROOT/tests/util/common.sh"
-source "$REPO_ROOT/tests/util/verify.sh"
-
-# 测试函数
-test_my_feature() {
-    log_info "开始测试..."
-
-    # 执行文档中的代码块
-    runme run my-test:create-resource || {
-        log_error "创建资源失败"
-        return 1
-    }
-
-    # 验证输出
-    local output expected
-    output=$(runme run my-test:verify)
-    expected=$(runme print my-test:verify-output)
-
-    if ! __cmp_contains "$output" "$expected"; then
-        log_error "验证失败"
-        return 1
-    fi
-    log_success "测试通过"
-    return 0
-}
-
-# cleanup 函数
-cleanup_my_feature() {
-    log_info "清理资源..."
-    runme run my-test:cleanup
-    return 0
-}
+/auto-test-creator 为 docs/en/path/to/your-doc.mdx 创建自动化测试
 ```
 
-### 3. 添加可执行权限
-
-```bash
-chmod +x runme-test_<文档名>.sh
-```
-
-### 4. 更新 README.md
-
-在"当前已有的测试文档"表格中添加新的测试条目。
+Skill 定义文件位于 `.claude/skills/auto-test-creator/SKILL.md`，其中包含完整的命名规范、测试模式和公共函数说明。
 
 ## 故障排除
 
