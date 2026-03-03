@@ -71,6 +71,7 @@ You can use the following section to understand the update process. You can skip
 4. Install the Istio CNI plugin with the desired version. The following example configuration creates an `IstioCNI` resource named default in the `istio-cni` namespace:
 
    ```yaml {name=update-inplace:create-istio-cni}
+   cat <<EOF | kubectl apply -f -
    apiVersion: sailoperator.io/v1
    kind: IstioCNI
    metadata:
@@ -84,6 +85,7 @@ You can use the following section to understand the update process. You can skip
          excludeNamespaces:
            - istio-cni
            - kube-system
+   EOF
    ```
 
 5. Deploy the Istio control plane using the `InPlace` update strategy. The following example configuration creates an `Istio` resource named `default` in the `istio-system` namespace:
@@ -91,6 +93,7 @@ You can use the following section to understand the update process. You can skip
    **Example configuration**
 
    ```yaml {name=update-inplace:create-istio}
+   cat <<EOF | kubectl apply -f -
    apiVersion: sailoperator.io/v1
    kind: Istio
    metadata:
@@ -100,29 +103,36 @@ You can use the following section to understand the update process. You can skip
      version: v1.26.3
      updateStrategy:
        type: InPlace
+   EOF
    ```
 
-6. Set up the application workloads to execute in the cluster. For instance, you can deploy the `bookinfo` sample application into the `bookinfo` namespace.
+6. Wait for the Istio control plane to become ready by running the following command:
+
+   ```bash {name=update-inplace:wait-istio-ready}
+   kubectl wait --for condition=Ready istio/default --timeout=3m
+   ```
+
+7. Set up the application workloads to execute in the cluster. For instance, you can deploy the `bookinfo` sample application into the `bookinfo` namespace.
     
-    a. Generate the `bookinfo` namespace with the command below:
-        
-        ```shell {name=update-inplace:create-bookinfo-ns}
-        kubectl create ns bookinfo
-        ```
+   a. Generate the `bookinfo` namespace with the command below:
+   
+   ```shell {name=update-inplace:create-bookinfo-ns}
+   kubectl create ns bookinfo
+   ```
 
-    b. Apply a label to the `bookinfo` namespace to activate automatic sidecar injection. Use the following command:
-        
-        ```shell {name=update-inplace:label-bookinfo-ns}
-        kubectl label namespace bookinfo istio-injection=enabled
-        ```
+   b. Apply a label to the `bookinfo` namespace to activate automatic sidecar injection. Use the following command:
+   
+   ```shell {name=update-inplace:label-bookinfo-ns}
+   kubectl label namespace bookinfo istio-injection=enabled
+   ```
 
-    c. Deploy the `bookinfo` application pods into the `bookinfo` namespace by executing this command:
-        
-        ```shell {name=update-inplace:deploy-bookinfo}
-        kubectl -n bookinfo apply -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
-        ```
+   c. Deploy the `bookinfo` application pods into the `bookinfo` namespace by executing this command:
+   
+   ```shell {name=update-inplace:deploy-bookinfo}
+   kubectl -n bookinfo apply -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
+   ```
 
-7. Inspect the `Istio` resource using the following command:
+8. Inspect the `Istio` resource using the following command:
     
     ```shell {name=update-inplace:get-istio-install}
     kubectl get istio -n istio-system
@@ -172,7 +182,13 @@ When updating Istio using the `InPlace` strategy, you can increment the version 
 
    The Service Mesh v2 Operator deploys a new version of the control plane that replaces the old version of the control plane. The sidecars automatically reconnect to the new control plane.
 
-2. Confirm that the new version of the control plane is ready by running the following command:
+2. Wait for the Istio control plane to become ready by running the following command:
+
+   ```bash {name=update-inplace:wait-istio-update-ready}
+   kubectl wait --for condition=Ready istio/default --timeout=3m
+   ```
+
+3. Confirm that the new version of the control plane is ready by running the following command:
 
    ```bash {name=update-inplace:get-istio-update}
    kubectl get istio
@@ -185,7 +201,7 @@ When updating Istio using the `InPlace` strategy, you can increment the version 
    default   istio-system             1           1       1        default           Healthy   v1.28.3   18m5s
    ```
 
-3. Restart the application workloads so that the new version of the sidecar gets injected by running the following command:
+4. Restart the application workloads so that the new version of the sidecar gets injected by running the following command:
 
    ```bash {name=update-inplace:restart-workloads}
    kubectl rollout restart deployment -n bookinfo

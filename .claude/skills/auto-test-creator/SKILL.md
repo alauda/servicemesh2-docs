@@ -1,10 +1,14 @@
 ---
 name: auto-test-creator
 description: >
-  为 MDX 文档创建自动化测试脚本。当用户需要为文档编写测试、创建 runme 测试脚本、
-  或提到"文档测试"、"自动化测试"、"测试脚本"时使用此 skill。
-  适用于：为 docs/en/ 目录下的 MDX 文档创建 runme-test_*.sh 测试脚本、
-  为 MDX 代码块添加 name 属性、更新测试文档表格和测试编排脚本。
+  Use this skill whenever the user wants to create, update, debug, or manage automated test scripts
+  for MDX documentation files. This includes: generating runme-test_*.sh scripts for docs/en/ MDX files,
+  adding or checking {name=prefix:action} attributes on MDX code blocks, updating the tests/README.md
+  test table, modifying tests/run-all.sh orchestration script (including --no-cleanup/--cleanup-only
+  split execution), or troubleshooting failing runme test scripts. Trigger this skill when the user
+  mentions any of: MDX testing, runme tests, document testing, code block name attributes, test script
+  generation, run-all.sh updates, test coverage for documentation, or automated doc validation.
+  Also use when the user references specific MDX files and wants to verify their code blocks work correctly.
 ---
 
 # auto-test-creator: MDX 文档自动化测试脚本生成器
@@ -19,8 +23,78 @@ description: >
 2. 提取所有代码块，分析哪些需要测试
 3. 确认代码块是否已有 `{name=prefix:action}` 属性
 4. 如果代码块缺少 name 属性，需要先添加
+5. **检测潜在的缺失步骤**（见下方详细说明）
 
-### 第二步：为 MDX 代码块添加 name 属性
+#### 缺失步骤检测
+
+分析 MDX 文档时，需要关注以下可能存在的缺失执行步骤：
+
+- **隐含的前置条件**：文档中的命令可能依赖未在文档中显式记录的前置步骤（如创建命名空间、设置标签、安装依赖等）
+- **等待/就绪步骤缺失**：部署资源后通常需要等待就绪，但文档中可能跳过了等待步骤
+- **环境变量设置遗漏**：后续命令可能引用了未在文档中设置的环境变量
+- **代码块之间的逻辑断层**：前后代码块之间缺少必要的中间步骤
+- **清理步骤不完整**：如果文档描述了资源创建但缺少对应的清理步骤
+
+将所有发现的问题记录到执行计划中，供用户审阅。
+
+### 第二步：创建执行计划
+
+在开始编写测试脚本之前，先创建执行计划（plan），等待用户审批后再实施。
+
+**计划内容必须包含：**
+
+1. **文档概要**：文档功能描述、包含的代码块数量
+2. **代码块清单**：列出所有需要添加/修改 name 属性的代码块，及其拟定的 name
+3. **测试步骤规划**：列出测试脚本中每个步骤的详细说明，包括：
+   - 步骤编号和描述
+   - 使用的测试模式（A-H）
+   - 对应的 runme 代码块名称
+4. **缺失步骤分析**（如有发现）：
+   - 具体描述发现的问题
+   - 建议的处理方式（在文档中补充步骤 / 在测试脚本中增加辅助逻辑）
+5. **cleanup 判断**：是否需要 cleanup 函数，依据是什么
+6. **编排脚本更新方案**：在 `run-all.sh` 中的放置位置和执行方式
+
+**计划格式示例：**
+
+```markdown
+## 执行计划：<文档名称> 测试脚本
+
+### 1. 文档概要
+- 文件路径：`docs/en/xxx/yyy.mdx`
+- 功能描述：xxx
+- 代码块总数：N 个（M 个需要测试）
+
+### 2. 代码块命名规划
+| # | 代码块类型 | 当前状态 | 拟定 name | 备注 |
+|---|----------|---------|----------|------|
+| 1 | bash | 缺少 name | `prefix:action` | |
+| 2 | text | 缺少 name | `prefix:action-output` | 输出验证块 |
+
+### 3. 测试步骤规划
+| 步骤 | 描述 | 测试模式 | runme 代码块 |
+|------|------|---------|-------------|
+| 1 | 创建资源 | 模式 A | `prefix:create-resource` |
+| 2 | 验证输出 | 模式 B | `prefix:verify` + `prefix:verify-output` |
+
+### 4. 缺失步骤分析（如无则省略此节）
+- ⚠️ 步骤 3 和步骤 4 之间缺少等待部署就绪的步骤
+- ⚠️ 文档未包含命名空间创建步骤，但后续命令依赖该命名空间
+
+### 5. cleanup 判断
+- [有/无] cleanup 函数
+- 依据：文档中 [包含/不包含] 清理步骤代码块
+
+### 6. 编排脚本更新
+- 添加到 Case N：<描述>
+- 执行方式：[直接执行 / 分步执行（--no-cleanup + --cleanup-only）]
+```
+
+**使用 `EnterPlanMode` 工具进入计划模式**，将计划写入 plan 文件，等待用户审批。
+
+### 第三步：为 MDX 代码块添加 name 属性
+
+用户审批计划后，按照计划执行以下操作。
 
 **命名规范：**
 
@@ -50,7 +124,7 @@ namespace/test created
 - 代码块类型可以是 `bash`、`shell`、`yaml`、`text`、`html` 等
 - YAML 文件内容代码块可以用 `name` 标记以便 `runme print` 获取内容
 
-### 第三步：创建测试脚本
+### 第四步：创建测试脚本
 
 在 MDX 文档同目录下创建 `runme-test_<文档名>.sh` 文件。
 
@@ -142,6 +216,8 @@ if ! __cmp_contains "$output" "$expected"; then
 fi
 log_success "<验证>通过"
 ```
+
+**注**：不能死板的使用 `__cmp_contains`，要先分析 `expected` 的内容，如果其中包含一些变化值，比如时间，则要通过关键内容来验证。
 
 **模式 C - 获取模板内容并写入文件：**
 
@@ -290,7 +366,7 @@ output=$(runme run <prefix>:<action> 2>&1) || {
 }
 ```
 
-### 第四步：更新测试文档表格
+### 第五步：更新测试文档表格
 
 编辑 `tests/README.md`，在 "当前已有的测试文档" 表格中添加新条目：
 
@@ -298,18 +374,38 @@ output=$(runme run <prefix>:<action> 2>&1) || {
 | <文档名称> | [runme-test_<文档名>.sh](<相对路径>) | `./run.sh --file <文档名>` |
 ```
 
-### 第五步：更新测试编排脚本
+### 第六步：更新测试编排脚本
 
 编辑 `tests/run-all.sh`，在合适的位置添加新的测试 case 或加入已有 case。
 
-**添加到已有 case（如 Case 3）：**
+#### 判断执行方式
+
+根据测试脚本是否包含 cleanup 函数来决定执行方式：
+
+**无 cleanup 函数 — 直接执行：**
 
 ```bash
-# 在 Case 3 的 if ( ... ) 块中添加
-./run.sh --file <new-test-name>
+./run.sh --file <test-name>
 ```
 
-**创建新的 case：**
+**有 cleanup 函数 — 分两步执行：**
+
+测试和清理分开执行，这样即使清理失败也能明确定位问题，且允许在调试时跳过清理（`--no-cleanup`）或单独重试清理（`--cleanup-only`）。
+
+```bash
+./run.sh --file <test-name> --no-cleanup
+./run.sh --file <test-name> --cleanup-only
+```
+
+#### 添加到已有 case
+
+```bash
+# 在对应 case 的 if ( ... ) 块中添加
+./run.sh --file <new-test-name> --no-cleanup
+./run.sh --file <new-test-name> --cleanup-only
+```
+
+#### 创建新的 case
 
 ```bash
 # ------------------------------------------------------------------
@@ -319,7 +415,8 @@ log_header "Case N: <测试描述>"
 
 if (
     set -e
-    ./run.sh --file <test-name>
+    ./run.sh --file <test-name> --no-cleanup
+    ./run.sh --file <test-name> --cleanup-only
 ); then
     record_test_result 0
 else
@@ -328,7 +425,7 @@ else
 fi
 ```
 
-### 第六步：设置可执行权限
+### 第七步：设置可执行权限
 
 ```bash
 chmod +x <测试脚本路径>
@@ -355,3 +452,4 @@ chmod +x <测试脚本路径>
 - `docs/en/integration/observability/runme-test_kiali.sh`
 - `docs/en/uninstalling/runme-test_uninstalling-alauda-build-of-kiali.sh`
 - `docs/en/uninstalling/runme-test_uninstalling-alauda-service-mesh.sh`
+- `docs/en/updating/update-mesh/runme-test_update-inplace.sh`
