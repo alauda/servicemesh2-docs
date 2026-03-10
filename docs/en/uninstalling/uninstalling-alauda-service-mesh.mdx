@@ -89,7 +89,7 @@ The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Containe
 1.  Get the `Istio` resource name by executing this command:
 
     ```shell {name=uninstall-mesh:get-istio}
-    kubectl get istio -n istio-system
+    kubectl get istio
     ```
 
     **Example output**
@@ -116,7 +116,7 @@ The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Containe
 1.  Get the `IstioCNI` resource by executing this command:
 
     ```shell {name=uninstall-mesh:get-istiocni}
-    kubectl get istioCNI -n istio-system
+    kubectl get istioCNI
     ```
 
     **Example output**
@@ -175,7 +175,7 @@ The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Containe
     **Example output**
 
     ```shell {name=uninstall-mesh:delete-subscription-output}
-    subscription.operators.coreos.com "servicemesh-operator2" deleted
+    subscription.operators.coreos.com "servicemesh-operator2" deleted from sail-operator namespace
     ```
 
 </Steps>

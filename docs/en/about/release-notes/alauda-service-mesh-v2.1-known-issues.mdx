@@ -1,0 +1,35 @@
+---
+weight: 19000
+---
+
+# Alauda Service Mesh v2.1 known issues 
+
+This section documents known issues and limitations that affect Alauda Service Mesh.
+
+## Ambient mode is not supported on FIPS-enabled clusters
+
+Clusters configured to enforce Federal Information Processing Standards (FIPS) are currently incompatible with Istio ambient mode. If your environment requires FIPS compliance, you should continue to deploy the service mesh using sidecar mode. Ambient mode support for FIPS-enabled clusters is expected to be addressed in a future release.
+
+## Kiali tracing integration is not functional in ambient mode
+
+When using Istio ambient mode, Kiali may fail to query distributed traces and generate incorrect links to the tracing backend (such as Jaeger). This occurs because the service name used for trace lookup does not match the actual service name recorded by the tracing collector in ambient mode deployments.
+
+The root cause is a change in how Istio ambient mode generates traces. In ambient mode, the waypoint proxy produces traces with a different service naming convention than what Kiali expects. As a result, Kiali is unable to locate the corresponding traces and the tracing links point to non-existent services.
+
+**Workaround:** Use the Jaeger UI directly to query and view distributed traces, or wait for a future Kiali version upgrade that includes the fix.
+
+**Fixed in:** Kiali v2.22.0. The fix introduces a `use_waypoint_name` configuration option under `external_services.tracing` that allows Kiali to correctly resolve service names in ambient mode tracing.
+
+**Reference:** [kiali/kiali#9158](https://github.com/kiali/kiali/issues/9158)
+
+## Multi-cluster service mesh does not support IPv6 load balancer IP
+
+In multi-cluster (primary/remote) deployments, the Istio Helm chart only recognizes IPv4 addresses for the `global.remotePilotAddress` configuration parameter. If an IPv6 address is provided (such as `2001:db8::1`), the `EndpointSlice` template in `istio-discovery` fails to render correctly, causing the Istio installation to fail.
+
+This limitation stems from a regex pattern in the Helm chart template that validates only IPv4 dotted-decimal notation and does not account for IPv6 hexadecimal colon-separated format.
+
+**Workaround:** Use an IPv4 address or a DNS hostname for `remotePilotAddress` instead of an IPv6 literal.
+
+**Fixed in:** The fix has been merged into the upstream Istio master branch and will be included in a future Istio release.
+
+**Reference:** [istio/istio#58646](https://github.com/istio/istio/issues/58646)

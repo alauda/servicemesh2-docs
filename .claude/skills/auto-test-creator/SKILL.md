@@ -217,7 +217,7 @@ fi
 log_success "<验证>通过"
 ```
 
-**注**：不能死板的使用 `__cmp_contains`，要先分析 `expected` 的内容，如果其中包含一些变化值，比如时间，则要通过关键内容来验证。
+**注**：不能死板的使用 `__cmp_contains`，要先分析 `expected` 的内容。如果输出包含动态值（如 pod 名称后缀、IP、AGE、时间戳等），应使用**模式 I（`__cmp_lines`）**来验证关键字段而非精确匹配。
 
 **模式 C - 获取模板内容并写入文件：**
 
@@ -353,6 +353,73 @@ fi
 ```
 
 **识别占位符的方法**：阅读 MDX 文档时，注意命令中用尖括号 `<>` 包裹的内容。如果文档说"用前一步的输出替换 `<xxx>`"，则需要在脚本中实现动态替换。
+
+**模式 I - 使用 `__cmp_lines` 验证含动态值的输出：**
+
+`kubectl get pod`、`kubectl get svc`、`istioctl proxy-status` 等命令的输出中包含动态生成的值（pod 名称后缀、IP 地址、AGE 时间、VIP 等），无法做精确匹配。`__cmp_lines` 函数通过逐行关键字断言来解决这个问题：
+- `+ keyword`：断言输出中**必须包含**该关键字的行
+- `- keyword`：断言输出中**不能包含**该关键字的行
+
+这比手动编写 `grep -q` 循环更简洁、可读性更好，且与项目其他测试脚本保持一致。
+
+```bash
+# 输出包含动态值（pod 名称后缀、AGE 等），使用 __cmp_lines 验证关键字段
+log_info "步骤 X: 验证资源状态"
+local output
+output=$(runme run <prefix>:<verify-action> 2>&1)
+
+if ! __cmp_lines "$output" "$(cat <<'EOF'
++ keyword-that-must-exist
++ another-required-keyword
+- keyword-that-must-not-exist
+EOF
+)"; then
+    log_error "验证失败"
+    log_error "实际输出: $output"
+    return 1
+fi
+log_success "验证通过"
+```
+
+**何时使用 `__cmp_lines`：**
+- `kubectl get pods` 输出：pod 名含随机后缀、AGE 列动态变化 → 用 `+ pod-prefix` 和 `+ Running` 等关键字验证
+- `kubectl get svc` 输出：ClusterIP 动态分配 → 用 `+ service-name` 验证
+- `istioctl proxy-status` 输出：pod 名和版本号 → 用 `+ deployment-name` 和 `+ version` 验证
+- 任何包含动态 IP、时间戳、随机 ID 的表格输出
+
+**参考实现**：`docs/en/updating/update-mesh/runme-test_update-inplace.sh` 中步骤 9、12、15 展示了 `__cmp_lines` 的标准用法。
+
+**与手动 grep 循环的对比：**
+
+避免写这样的冗长代码：
+```bash
+# ❌ 不推荐：手动 grep 循环
+local missing=()
+for item in "pod-a" "pod-b" "pod-c"; do
+    if ! echo "$output" | grep -q "$item"; then
+        missing+=("$item")
+    fi
+done
+if [ ${#missing[@]} -ne 0 ]; then
+    log_error "验证失败"
+    return 1
+fi
+```
+
+用 `__cmp_lines` 替代：
+```bash
+# ✅ 推荐：使用 __cmp_lines
+if ! __cmp_lines "$output" "$(cat <<'EOF'
++ pod-a
++ pod-b
++ pod-c
+EOF
+)"; then
+    log_error "验证失败"
+    log_error "实际输出: $output"
+    return 1
+fi
+```
 
 #### 捕获 stderr
 

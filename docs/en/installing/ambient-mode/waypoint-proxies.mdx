@@ -1,0 +1,165 @@
+---
+weight: 40
+---
+
+# Waypoint proxies
+
+Once ZTunnel proxies are in place, waypoint proxies can be introduced to enable advanced Layer 7 processing capabilities. 
+
+Ambient mode decouples Istio's functionality into two distinct layers:
+
+- A **secure L4 overlay** managed by ZTunnel proxies
+- An **L7 layer** managed by optional waypoint proxies
+
+A waypoint proxy is an Envoy-based proxy that performs L7 processing for workloads operating in ambient mode. It functions as a gateway for a specific resource — such as a namespace, service, or pod — and can be installed, upgraded, and scaled independently of the applications it serves. Configuration relies on the `Kubernetes Gateway API`.
+
+In contrast to the sidecar model, where every workload runs its own Envoy proxy, waypoint proxies reduce resource consumption by serving multiple workloads that share the same security boundary (for example, all workloads in a namespace).
+
+A destination waypoint enforces policies by acting as a gateway: all incoming traffic bound for a resource such as a namespace, service, or pod passes through the waypoint before reaching the destination.
+
+The `ZTunnel` node proxy handles L4 functions including mTLS encryption, L4 traffic processing, and telemetry. `ZTunnel` and waypoint proxies communicate via `HBONE` (HTTP-Based Overlay Network), a protocol that tunnels traffic over HTTP/2 CONNECT with mTLS on port `15008`.
+
+Consider deploying a waypoint proxy if your workloads require any of the following L7 capabilities:
+
+- **Traffic management** — Advanced HTTP routing, load balancing, circuit breaking, rate limiting, fault injection, retries, and timeouts
+- **Security** — Authorization policies based on L7 attributes such as request type or HTTP headers
+- **Observability** — HTTP metrics, access logging, and tracing for application traffic
+
+## Deploying a waypoint proxy
+
+You can deploy a waypoint proxy in the Bookinfo application namespace to route traffic through the Istio ambient data plane and enforce L7 policies.
+
+**Prerequisites**
+
+- Alauda Service Mesh Operator 2.1.1 or later is installed.
+- An active ACP CLI (`kubectl`) session by a cluster administrator with the `cluster-admin` role.
+- You have `istioctl` installed locally so that you can use to run these instructions.
+- Istio is deployed in ambient mode.
+- The Bookinfo sample application is deployed (for the following example).
+- The `istio.io/dataplane-mode=ambient` label has been applied to the target namespace.
+
+**Procedure**
+
+1. Create a waypoint proxy in the `bookinfo` namespace. Save the following as `waypoint.yaml`:
+
+    ```yaml {name=ambient-waypoint:gateway-yaml}
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: Gateway
+    metadata:
+      labels:
+        istio.io/waypoint-for: service # [!code callout]
+      name: waypoint
+      namespace: bookinfo
+    spec:
+      gatewayClassName: istio-waypoint
+      listeners:
+        - name: mesh
+          port: 15008
+          protocol: HBONE
+    ```
+
+    <Callouts>
+        1. The `istio.io/waypoint-for: service` label indicates that this waypoint processes traffic for services. The label value determines the type of traffic handled. For details, see [Waypoint traffic types](https://istio.io/latest/docs/ambient/usage/waypoint/#waypoint-traffic-types) (Istio documentation).
+    </Callouts>
+
+2. Apply the waypoint custom resource (CR):
+
+    ```bash {name=ambient-waypoint:apply-gateway}
+    kubectl apply -f waypoint.yaml
+    ```
+
+3. Enroll the `bookinfo` namespace to use the waypoint:
+
+    ```bash {name=ambient-waypoint:label-namespace}
+    kubectl label namespace bookinfo istio.io/use-waypoint=waypoint
+    ```
+
+    After enrolling the namespace, requests from any pod in the ambient data plane to services in `bookinfo` are routed through the waypoint for L7 processing and policy enforcement.
+
+**Verification**
+
+Confirm that the waypoint proxy is associated with all services in the `bookinfo` namespace:
+
+```bash {name=ambient-waypoint:verify-services}
+istioctl -n ztunnel ztunnel-config services
+```
+
+**Example output**
+
+```text {name=ambient-waypoint:verify-services-output}
+NAMESPACE    SERVICE NAME   SERVICE VIP  WAYPOINT ENDPOINTS
+bookinfo     details        10.4.21.11   waypoint 1/1
+bookinfo     details-v1     10.4.84.241  waypoint 1/1
+bookinfo     productpage    10.4.192.245 waypoint 1/1
+bookinfo     productpage-v1 10.4.35.101  waypoint 1/1
+bookinfo     ratings        10.4.203.217 waypoint 1/1
+bookinfo     ratings-v1     10.4.156.208 waypoint 1/1
+bookinfo     reviews        10.4.188.144 waypoint 3/3
+bookinfo     reviews-v1     10.4.247.94  waypoint 1/1
+bookinfo     reviews-v2     10.4.147.169 waypoint 1/1
+bookinfo     reviews-v3     10.4.203.165 waypoint 1/1
+bookinfo     waypoint       10.4.15.65   None     1/1
+istio-system istiod         10.4.110.96  None     1/1
+```
+
+:::note
+You can also configure only specific services or pods to use a waypoint by labeling the respective service or pod. When explicitly enrolling a pod, also add the `istio.io/waypoint-for: workload` label to the corresponding gateway resource.
+:::
+
+## Enabling cross-namespace waypoint usage
+
+A cross-namespace waypoint allows resources in one namespace to route traffic through a waypoint deployed in a different namespace.
+
+**Procedure**
+
+1. Add the `istio-discovery=enabled` label to the `common-infrastructure` namespace:
+
+    ```bash {name=ambient-waypoint:label-common-ns}
+    kubectl label namespace common-infrastructure istio-discovery=enabled
+    ```
+
+2. Create a Gateway resource that permits workloads in the `bookinfo` namespace to use the waypoint from the `common-infrastructure` namespace. Save the following as `waypoint-common.yaml`:
+
+    ```yaml {name=ambient-waypoint:cross-ns-gateway-yaml}
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: Gateway
+    metadata:
+      name: waypoint-common
+      namespace: common-infrastructure
+    spec:
+      gatewayClassName: istio-waypoint
+      listeners:
+        - name: mesh
+          port: 15008
+          protocol: HBONE
+          allowedRoutes:
+            namespaces:
+              from: Selector
+              selector:
+                matchLabels:
+                  kubernetes.io/metadata.name: bookinfo
+    ```
+
+3. Apply the cross-namespace waypoint:
+
+    ```bash {name=ambient-waypoint:apply-cross-ns-gateway}
+    kubectl apply -f waypoint-common.yaml
+    ```
+
+4. Add the labels required to use the cross-namespace waypoint:
+
+    - Specify the namespace where the waypoint resides:
+
+        ```bash {name=ambient-waypoint:label-waypoint-ns}
+        kubectl label namespace bookinfo istio.io/use-waypoint-namespace=common-infrastructure
+        ```
+
+    - Specify the waypoint to use:
+
+        ```bash {name=ambient-waypoint:label-use-waypoint}
+        kubectl label namespace bookinfo istio.io/use-waypoint=waypoint-common
+        ```
+
+## Additional resources
+
+- [Waypoint traffic types](https://istio.io/latest/docs/ambient/usage/waypoint/#waypoint-traffic-types) (Istio documentation)
