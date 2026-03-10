@@ -19,14 +19,14 @@ You can deploy Istio in ambient mode on Alauda Container Platform with Alauda Se
 
 1. Create the `istio-cni` namespace and add a label `istio-discovery=enabled`:
 
-    ```bash
+    ```bash {name=ambient-install:create-ns-istio-cni}
     kubectl create namespace istio-cni
     kubectl label namespace istio-cni istio-discovery=enabled
     ```
 
 2. Create the IstioCNI resource named `istio-cni.yaml`:
 
-    ```yaml
+    ```yaml {name=ambient-install:istiocni-yaml}
     apiVersion: sailoperator.io/v1
     kind: IstioCNI
     metadata:
@@ -51,13 +51,13 @@ You can deploy Istio in ambient mode on Alauda Container Platform with Alauda Se
 
 3. Apply the IstioCNI CR:
 
-    ```bash
+    ```bash {name=ambient-install:apply-istiocni}
     kubectl apply -f istio-cni.yaml
     ```
 
 4. Wait for the IstioCNI pods to become ready:
 
-    ```bash
+    ```bash {name=ambient-install:wait-istiocni}
     kubectl wait --for=condition=Ready istiocnis/default --timeout=3m
     ```
 
@@ -65,14 +65,14 @@ You can deploy Istio in ambient mode on Alauda Container Platform with Alauda Se
 
 1. Create the `istio-system` namespace and add a label `istio-discovery=enabled`:
 
-    ```bash
+    ```bash {name=ambient-install:create-ns-istio-system}
     kubectl create namespace istio-system
     kubectl label namespace istio-system istio-discovery=enabled
     ```
 
 2. Create an Istio resource named `istio.yaml`:
 
-    ```yaml
+    ```yaml {name=ambient-install:istio-yaml}
     apiVersion: sailoperator.io/v1
     kind: Istio
     metadata:
@@ -97,13 +97,13 @@ You can deploy Istio in ambient mode on Alauda Container Platform with Alauda Se
 
 3. Apply the Istio custom resource (CR):
 
-    ```bash
+    ```bash {name=ambient-install:apply-istio}
     kubectl apply -f istio.yaml
     ```
 
 4. Wait for the Istio control plane to become ready:
 
-    ```bash
+    ```bash {name=ambient-install:wait-istio}
     kubectl wait --for=condition=Ready istios/default --timeout=3m
     ```
 
@@ -111,7 +111,7 @@ You can deploy Istio in ambient mode on Alauda Container Platform with Alauda Se
 
 1. Create the `ztunnel` namespace and add a label `istio-discovery=enabled`:
 
-    ```bash
+    ```bash {name=ambient-install:create-ns-ztunnel}
     kubectl create namespace ztunnel
     kubectl label namespace ztunnel istio-discovery=enabled
     ```
@@ -122,7 +122,7 @@ You can deploy Istio in ambient mode on Alauda Container Platform with Alauda Se
 
 2. Create the ZTunnel resource named `ztunnel.yaml`:
 
-    ```yaml
+    ```yaml {name=ambient-install:ztunnel-yaml}
     apiVersion: sailoperator.io/v1
     kind: ZTunnel
     metadata:
@@ -133,12 +133,12 @@ You can deploy Istio in ambient mode on Alauda Container Platform with Alauda Se
 
 3. Apply the ZTunnel CR:
 
-    ```bash
+    ```bash {name=ambient-install:apply-ztunnel}
     kubectl apply -f ztunnel.yaml
     ```
 
 4. Wait for the ZTunnel pods to become ready:
 
-    ```bash
+    ```bash {name=ambient-install:wait-ztunnel}
     kubectl wait --for=condition=Ready ztunnel/default --timeout=3m
     ```

@@ -159,6 +159,7 @@ cd tests
 | Kiali 卸载         | [runme-test_uninstalling-alauda-build-of-kiali.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-build-of-kiali.sh)                                              | `./run.sh --file uninstalling-alauda-build-of-kiali` |
 | 网格卸载           | [runme-test_uninstalling-alauda-service-mesh.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-service-mesh.sh)                                                  | `./run.sh --file uninstalling-alauda-service-mesh`   |
 | InPlace 更新策略   | [runme-test_update-inplace.sh](../docs/en/updating/update-mesh/runme-test_update-inplace.sh)                                                                              | `./run.sh --file update-inplace`                     |
+| Ambient Mode 安装  | [runme-test_installing-ambient-mode.sh](../docs/en/installing/ambient-mode/runme-test_installing-ambient-mode.sh)                                                          | `./run.sh --file installing-ambient-mode`            |
 
 > **注意**：后续会逐步添加更多文档的自动化测试。
 
