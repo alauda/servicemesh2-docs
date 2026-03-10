@@ -95,10 +95,35 @@ else
 fi
 
 # ------------------------------------------------------------------
-# Case 5: 其他测试任务 (TODO)
+# Case 5: Ambient Mode 安装测试
 # ------------------------------------------------------------------
-log_header "Case 5: 其他测试任务 (TODO)"
-log_info "TODO: 可以在此处添加更多测试任务"
+log_header "Case 5: Ambient Mode 安装测试"
+
+if (
+    set -e
+    # 安装 ambient 网格和应用（operator 可能已经被删除，所以要 --force-init）
+    ./run.sh --file installing-ambient-mode --force-init
+    ./run.sh --file deploying-ambient-bookinfo --no-cleanup
+    ./run.sh --file waypoint-proxies
+    # L7 特性测试（独立测试，包含清理步骤）
+    ./run.sh --file ambient-l7-features --no-cleanup
+    ./run.sh --file ambient-l7-features --cleanup-only
+    # 入口网关 K8S Gateway API 测试
+    ./run.sh --file exposing-a-service-via-k8s-gateway-api-in-ambient-mode --no-cleanup
+    ./run.sh --file exposing-a-service-via-k8s-gateway-api-in-ambient-mode --cleanup-only
+    # 出口网关 (Egress Gateway) 测试
+    ./run.sh --file routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode --no-cleanup
+    ./run.sh --file routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode --cleanup-only
+    # 清理 bookinfo
+    ./run.sh --file deploying-ambient-bookinfo --cleanup-only
+    # 卸载 ambient 网格
+    ./run.sh --file uninstalling-alauda-service-mesh-in-ambient-mode
+); then
+    record_test_result 0
+else
+    record_test_result 1
+    exit 1
+fi
 
 log_header "所有测试任务执行完成！"
 
