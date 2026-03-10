@@ -92,7 +92,7 @@ You can deploy Istio in ambient mode on Alauda Container Platform with Alauda Se
     <Callouts>
         1. You must set the `profile` field to `ambient`.
         2. You must configure `.spec.values.pilot.trustedZtunnelNamespace` to match the namespace where the ZTunnel resource will be installed..
-        3. The `discoverySelectors` configuration ensures that the control plane only monitors namespaces labeled with `istio-discovery=enabled`, which helps reduce configuration overhead and enables multiple service meshes to coexist on the same cluster. See [Discovery selectors in ambient mode](./discovery-selectors.mdx) for details.
+        3. The `discoverySelectors` configuration ensures that the control plane only monitors namespaces labeled with `istio-discovery=enabled`, which helps reduce configuration overhead and enables multiple service meshes to coexist on the same cluster. See [Discovery selectors in ambient mode](./ambient-discovery-selectors.mdx) for details.
     </Callouts>
 
 3. Apply the Istio custom resource (CR):
