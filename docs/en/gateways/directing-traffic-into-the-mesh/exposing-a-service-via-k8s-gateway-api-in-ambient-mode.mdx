@@ -1,0 +1,343 @@
+---
+weight: 40
+---
+
+# Exposing a service via Kubernetes Gateway API in ambient mode
+
+In Istio ambient mode, the Kubernetes Gateway API serves as the recommended method for configuring ingress traffic routing. You can create `Gateway` and `HTTPRoute` resources to deploy a gateway that makes mesh-internal services accessible to external traffic.
+
+## Waypoint proxies for Layer 7 routing
+
+To enforce Layer 7 (L7) routing policies — including path-based routing and header matching — deploy a waypoint proxy in the namespace containing your target service. The waypoint proxy handles L7 traffic processing and applies routing rules defined through `HTTPRoute` and `GRPCRoute` resources.
+
+:::warning
+In ambient mode, `VirtualService` resources have limited compatibility and should not be combined with Gateway API configuration. Use Kubernetes Gateway API resources as the standard approach for traffic routing in ambient mode.
+:::
+
+## Prerequisites
+
+- Alauda Service Mesh v2 Operator is installed.
+- The `Istio` and `IstioCNI` resources are configured with the ambient profile.
+- A `Ztunnel` resource has been created.
+- Confirm [Linux kernel compatibility](../gateway-installation/about-gateway-injection.mdx#linux-kernel-compatibility-notice).
+
+
+## Procedure
+
+1.  Create a namespace called `httpbin`:
+
+    ```shell {name=ambient-gw-api:create-httpbin-ns}
+    kubectl create namespace httpbin
+    ```
+
+2. Add the `istio-discovery=enabled` label to the `httpbin` namespace:
+
+    ```bash {name=ambient-gw-api:label-httpbin-discovery}
+    kubectl label namespace httpbin istio-discovery=enabled
+    ```
+
+3.  Enable ambient mode for the namespace by applying the dataplane mode label:
+
+    ```shell {name=ambient-gw-api:label-httpbin-ambient}
+    kubectl label namespace httpbin istio.io/dataplane-mode=ambient
+    ```
+
+4.  Deploy the `httpbin` sample service:
+
+    ```shell {name=ambient-gw-api:deploy-httpbin}
+    kubectl apply -n httpbin -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/httpbin/httpbin.yaml
+    ```
+
+5.  Create a file named `httpbin-waypoint.yaml` to define a waypoint proxy. This `Gateway` resource uses the `istio-waypoint` gateway class to process L7 traffic for services in the namespace.
+
+    ```yaml {name=ambient-gw-api:waypoint-yaml}
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: Gateway
+    metadata:
+      name: httpbin-waypoint
+      namespace: httpbin
+      labels:
+        istio.io/waypoint-for: service  # [!code callout]
+    spec:
+      gatewayClassName: istio-waypoint  # [!code callout]
+      listeners:
+        - name: mesh
+          port: 15008
+          protocol: HBONE
+    ```
+
+    <Callouts>
+        1.  Indicates that this waypoint proxy handles traffic destined for Kubernetes services.
+        2.  Specifies the `istio-waypoint` gateway class, which deploys a waypoint proxy instead of a standard ingress gateway.
+    </Callouts>
+
+6.  Apply the waypoint proxy configuration:
+
+    ```shell {name=ambient-gw-api:apply-waypoint}
+    kubectl apply -f httpbin-waypoint.yaml
+    ```
+
+7.  Label the `httpbin` service to direct ingress traffic through the waypoint proxy:
+
+    ```shell {name=ambient-gw-api:label-svc-waypoint}
+    kubectl label service httpbin -n httpbin istio.io/ingress-use-waypoint=true
+    ```
+
+    <Directive type="note">
+
+    The `istio.io/ingress-use-waypoint=true` label ensures that traffic arriving from the ingress gateway passes through the waypoint proxy, allowing L7 policies configured on the waypoint to be enforced before traffic reaches the `httpbin` service.
+
+    </Directive>
+
+8.  Associate all services in the namespace with the waypoint proxy by labeling the namespace:
+
+    ```shell {name=ambient-gw-api:label-ns-waypoint}
+    kubectl label ns httpbin istio.io/use-waypoint=httpbin-waypoint
+    ```
+
+9.  Create a file named `httpbin-gw.yaml` that defines a Kubernetes `Gateway` resource. This configures the gateway proxies to accept HTTP traffic on port 80 for the host `httpbin.example.com`.
+
+    ```yaml {name=ambient-gw-api:gateway-yaml}
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: Gateway
+    metadata:
+      annotations:
+        networking.istio.io/service-type: ClusterIP  # [!code callout]
+      name: httpbin-gateway
+      namespace: httpbin
+    spec:
+      gatewayClassName: istio
+      listeners:
+        - name: default
+          hostname: "httpbin.example.com"  # [!code callout]
+          port: 80
+          protocol: HTTP
+          allowedRoutes:
+            namespaces:
+              from: All
+    ```
+
+    <Callouts>
+        1.  Specifies the gateway's `Service` type; defaults to `LoadBalancer`.
+        2.  Specifies the virtual hostname that clients use when accessing a mesh service on this port.
+    </Callouts>
+
+10. Apply the gateway configuration:
+
+    ```shell {name=ambient-gw-api:apply-gateway}
+    kubectl apply -f httpbin-gw.yaml
+    ```
+
+11. Create a file named `httpbin-ingress-hr.yaml` that defines an `HTTPRoute` resource for the ingress gateway. This resource specifies how traffic is routed from the gateway proxy to the `httpbin` service.
+
+    ```yaml {name=ambient-gw-api:ingress-hr-yaml}
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    metadata:
+      name: httpbin-ingress
+      namespace: httpbin
+    spec:
+      parentRefs:  # [!code callout]
+        - name: httpbin-gateway
+          namespace: httpbin
+      hostnames:
+        - "httpbin.example.com"
+      rules:
+        - backendRefs:  # [!code callout]
+            - name: httpbin
+              port: 8000
+    ```
+
+    <Callouts>
+        1.  Binds this `HTTPRoute` to the Kubernetes `Gateway` created in the previous step.
+        2.  Routes matching traffic to the `httpbin` service on port 8000.
+    </Callouts>
+
+12. Apply the ingress HTTPRoute:
+
+    ```shell {name=ambient-gw-api:apply-ingress-hr}
+    kubectl apply -f httpbin-ingress-hr.yaml
+    ```
+
+13. Create a file named `httpbin-waypoint-hr.yaml` that defines an `HTTPRoute` resource for the waypoint proxy. This resource configures path-based routing rules that the waypoint enforces.
+
+    ```yaml {name=ambient-gw-api:waypoint-hr-yaml}
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    metadata:
+      name: httpbin-waypoint-route
+      namespace: httpbin
+    spec:
+      parentRefs:  # [!code callout]
+        - group: ""
+          kind: Service
+          name: httpbin
+          namespace: httpbin
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /status
+            - path:
+                type: PathPrefix
+                value: /headers
+          backendRefs:  # [!code callout]
+            - name: httpbin
+              port: 8000
+    ```
+
+    <Callouts>
+        1.  Binds this `HTTPRoute` to the `httpbin` service. Combined with the `istio.io/ingress-use-waypoint=true` label, this configures the L7 routing rules enforced by the waypoint proxy for traffic destined to the service.
+        2.  Forwards matching traffic to the `httpbin` service on port 8000.
+    </Callouts>
+
+14. Apply the waypoint HTTPRoute:
+
+    ```shell {name=ambient-gw-api:apply-waypoint-hr}
+    kubectl apply -f httpbin-waypoint-hr.yaml
+    ```
+
+    <Directive type="note">
+
+    In this configuration, traffic from the ingress gateway flows through the waypoint proxy because of the `istio.io/ingress-use-waypoint=true` label on the service. The waypoint `HTTPRoute` then applies path-based routing policies before the traffic reaches the `httpbin` service.
+
+    </Directive>
+
+15. Wait for the waypoint proxy to become ready:
+
+    ```shell {name=ambient-gw-api:wait-waypoint}
+    kubectl wait --for=condition=programmed gtw httpbin-waypoint -n httpbin
+    ```
+
+## Verification
+
+1.  Create a namespace for a `curl` client:
+
+    ```shell {name=ambient-gw-api:create-curl-ns}
+    kubectl create namespace curl
+    ```
+
+2.  Deploy the `curl` client:
+
+    ```shell {name=ambient-gw-api:deploy-curl}
+    kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/curl/curl.yaml
+    ```
+
+3. Add the `istio-discovery=enabled` label to the `curl` namespace:
+
+    ```bash {name=ambient-gw-api:label-curl-discovery}
+    kubectl label namespace curl istio-discovery=enabled
+    ```
+
+4.  Enable ambient mode for the `curl` namespace:
+
+    ```shell {name=ambient-gw-api:label-curl-ambient}
+    kubectl label namespace curl istio.io/dataplane-mode=ambient
+    ```
+
+5.  Store the name of the `curl` pod in a variable:
+
+    ```shell {name=ambient-gw-api:get-curl-pod}
+    export CURL_POD=$(kubectl get pods -n curl -l app=curl -o jsonpath='{.items[*].metadata.name}')
+    echo "CURL_POD=$CURL_POD"
+    ```
+
+6.  From the `curl` client, send a request to the `/headers` endpoint of the `httpbin` application through the ingress gateway `Service`. Set the `Host` header to `httpbin.example.com` to match the host specified in the Kubernetes `Gateway` and `HTTPRoute` resources:
+
+    ```shell {name=ambient-gw-api:test-headers}
+    kubectl exec $CURL_POD -n curl -- \
+      curl -sS -I \
+        -H Host:httpbin.example.com \
+        httpbin-gateway-istio.httpbin.svc.cluster.local/headers
+    ```
+
+    The response should return an `HTTP/1.1 200 OK` status, indicating the request was handled successfully.
+
+    **Example output**
+
+    ```shell {name=ambient-gw-api:test-headers-output}
+    HTTP/1.1 200 OK
+    ...
+    server: istio-envoy
+    ...
+    ```
+
+7.  Send a request to an endpoint without a matching URI prefix in the waypoint `HTTPRoute`:
+
+    ```shell {name=ambient-gw-api:test-get}
+    kubectl exec $CURL_POD -n curl -- \
+      curl -sS -I \
+        -H Host:httpbin.example.com \
+        httpbin-gateway-istio.httpbin.svc.cluster.local/get
+    ```
+
+    The response returns `HTTP/1.1 404 Not Found`, which is expected because the `/get` path has no corresponding prefix match defined in the waypoint `HTTPRoute`.
+
+    **Example output**
+
+    ```shell {name=ambient-gw-api:test-get-output}
+    HTTP/1.1 404 Not Found
+    ...
+    server: istio-envoy
+    ...
+    ```
+
+8.  Expose the gateway proxy to traffic outside the cluster by changing the `Service` type to the default `LoadBalancer`:
+
+    ```shell {name=ambient-gw-api:expose-lb}
+    kubectl -n httpbin annotate gtw httpbin-gateway networking.istio.io/service-type-
+    ```
+
+9.  Verify that the `httpbin` service is reachable from outside the cluster using the external hostname or IP address of the gateway `Service`. Set the `INGRESS_HOST` variable according to your cluster environment.
+
+    a.  Set the `INGRESS_HOST` variable:
+
+    ```shell {name=ambient-gw-api:get-ingress-host}
+    export INGRESS_HOST=$(kubectl get gtw httpbin-gateway -n httpbin -o jsonpath='{.status.addresses[0].value}')
+    echo "INGRESS_HOST=$INGRESS_HOST"
+    ```
+
+    b.  Set the `INGRESS_PORT` variable:
+
+    ```shell {name=ambient-gw-api:get-ingress-port}
+    export INGRESS_PORT=$(kubectl get gtw httpbin-gateway -n httpbin -o jsonpath='{.spec.listeners[?(@.name=="default")].port}')
+    echo "INGRESS_PORT=$INGRESS_PORT"
+    ```
+
+    c.  Send a `curl` request to the `httpbin` service using the gateway host:
+
+    :::info
+    If `$INGRESS_HOST` is an IPv6 address, enclose it in square brackets when constructing the URL. For example:
+
+    ```shell
+    curl -sS -g -I -H Host:httpbin.example.com http://[$INGRESS_HOST]:$INGRESS_PORT/headers
+    ```
+    :::
+
+    ```shell {name=ambient-gw-api:test-external}
+    curl -sS -g -I -H Host:httpbin.example.com http://$INGRESS_HOST:$INGRESS_PORT/headers
+    ```
+
+10. Confirm that the response includes the `HTTP/1.1 200 OK` status, which indicates the request succeeded.
+
+    **Example output**
+
+    ```shell {name=ambient-gw-api:test-external-output}
+    HTTP/1.1 200 OK
+    ...
+    server: istio-envoy
+    ...
+    ```
+
+## Cleanup
+
+Remove the resources created in this procedure:
+
+```shell {name=ambient-gw-api:cleanup}
+# Remove the namespaces from the ambient data plane
+kubectl label namespace curl istio.io/dataplane-mode-
+kubectl label namespace httpbin istio.io/dataplane-mode-
+# Remove the namespaces
+kubectl delete namespace curl
+kubectl delete namespace httpbin
+```

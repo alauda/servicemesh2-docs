@@ -1,0 +1,186 @@
+---
+weight: 30
+---
+
+# Routing egress traffic via a gateway with the Kubernetes Gateway API in ambient mode
+
+This guide demonstrates how to use the Kubernetes Gateway API together with a waypoint proxy to route outbound HTTP traffic through an egress gateway in ambient mode.
+
+## Prerequisites
+
+- Alauda Service Mesh v2 Operator is installed.
+- The `Istio` and `IstioCNI` resources are configured with the ambient profile.
+- A `Ztunnel` resource has been created.
+- Confirm [Linux kernel compatibility](../gateway-installation/about-gateway-injection.mdx#linux-kernel-compatibility-notice).
+
+## Procedure
+
+1.  Create a namespace called `egress-gateway`:
+
+    ```shell {name=ambient-egress:create-namespace}
+    kubectl create namespace egress-gateway
+    ```
+
+2. Add the `istio-discovery=enabled` label to the `egress-gateway` namespace:
+
+    ```shell {name=ambient-egress:label-discovery}
+    kubectl label namespace egress-gateway istio-discovery=enabled
+    ```
+
+3.  Enable ambient mode for the namespace by applying the dataplane mode label:
+
+    ```shell {name=ambient-egress:label-ambient}
+    kubectl label namespace egress-gateway istio.io/dataplane-mode=ambient
+    ```
+
+4.  Create a YAML file named `egress-se.yaml` that defines a `ServiceEntry` for the external service. The `istio.io/use-waypoint` label associates this entry with the waypoint proxy.
+
+    ```yaml {name=ambient-egress:service-entry-yaml}
+    apiVersion: networking.istio.io/v1
+    kind: ServiceEntry
+    metadata:
+      name: httpbin-ext
+      namespace: egress-gateway
+      labels:
+        istio.io/use-waypoint: waypoint  # [!code callout]
+    spec:
+      hosts:
+        - httpbin.org
+      ports:
+        - number: 80
+          name: http
+          protocol: HTTP
+      resolution: DNS
+    ```
+
+    <Callouts>
+        1.  Directs traffic for this `ServiceEntry` through the waypoint proxy named `waypoint` in the same namespace.
+    </Callouts>
+
+5.  Apply the `ServiceEntry`:
+
+    ```shell {name=ambient-egress:apply-service-entry}
+    kubectl apply -f egress-se.yaml
+    ```
+
+6.  Create a YAML file named `waypoint.yaml` that deploys a waypoint proxy in the `egress-gateway` namespace. The waypoint proxy intercepts and processes L7 traffic for services in this namespace.
+
+    ```yaml {name=ambient-egress:waypoint-yaml}
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: Gateway
+    metadata:
+      name: waypoint
+      namespace: egress-gateway
+      labels:
+        istio.io/gateway-for: service  # [!code callout]
+    spec:
+      gatewayClassName: istio-waypoint  # [!code callout]
+      listeners:
+        - name: mesh
+          port: 15008
+          protocol: HBONE
+    ```
+
+    <Callouts>
+        1.  Indicates that this waypoint proxy handles traffic destined for Kubernetes services.
+        2.  Specifies the `istio-waypoint` gateway class, which deploys a waypoint proxy rather than a standard ingress gateway.
+    </Callouts>
+
+7.  Apply the waypoint proxy configuration:
+
+    ```shell {name=ambient-egress:apply-waypoint}
+    kubectl apply -f waypoint.yaml
+    ```
+
+    <Directive type="note">
+
+    As an alternative to creating the YAML file manually, you can deploy the waypoint proxy using the following command:
+
+    ```shell
+    istioctl waypoint apply --enroll-namespace --name waypoint --namespace egress-gateway
+    ```
+
+    When you use the `--enroll-namespace` option, all services in the `egress-gateway` namespace (including `ServiceEntries`) will route their traffic through the waypoint.
+
+    </Directive>
+
+## Verification
+
+1.  Confirm the waypoint proxy is ready by checking its status:
+
+    ```shell {name=ambient-egress:verify-gateway}
+    kubectl get gateways.gateway.networking.k8s.io waypoint -n egress-gateway
+    ```
+
+    The `PROGRAMMED` column should display `True`, indicating the configuration succeeded.
+
+    **Example output**
+
+    ```shell {name=ambient-egress:verify-gateway-output}
+    NAME       CLASS            ADDRESS      PROGRAMMED   AGE
+    waypoint   istio-waypoint   10.4.61.76   True         38s
+    ```
+
+2.  Deploy the `curl` client in the `egress-gateway` namespace:
+
+    ```shell {name=ambient-egress:deploy-curl}
+    kubectl apply -n egress-gateway -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/curl/curl.yaml
+    ```
+
+3.  Store the name of the `curl` pod in a variable:
+
+    ```shell {name=ambient-egress:get-curl-pod}
+    export CURL_POD=$(kubectl get pods -n egress-gateway -l app=curl -o jsonpath='{.items[*].metadata.name}')
+    echo "CURL_POD=$CURL_POD"
+    ```
+
+4.  From the `curl` client, verify that you can reach `httpbin.org` through the egress gateway:
+
+    ```shell {name=ambient-egress:verify-egress}
+    kubectl exec $CURL_POD -n egress-gateway -- \
+      curl -sS -v http://httpbin.org/get
+    ```
+
+    A successful response from `httpbin.org` confirms that egress traffic is being routed through the configured gateway. 
+
+    **Example output**
+
+    ```shell {name=ambient-egress:verify-egress-output}
+    < HTTP/1.1 200 OK
+    ...
+    < server: istio-envoy
+    ...
+    ```
+    
+    The ztunnel logs should indicate traffic flowing through the waypoint, similar to the following output:
+
+    **Example ztunnel log output**
+
+    ```shell
+    2026-03-09T10:18:02.686121Z	info	access	connection complete
+      src.addr=10.3.0.134:35092
+      src.workload="curl-c658c5974-6zsnb"
+      src.namespace="egress-gateway"
+      src.identity="spiffe://cluster.local/ns/egress-gateway/sa/curl"
+      dst.addr=10.3.0.131:15008
+      dst.hbone_addr=240.240.0.3:80
+      dst.service="httpbin.org"
+      dst.workload="waypoint-7d688546dc-v8x9c"
+      dst.namespace="egress-gateway"
+      dst.identity="spiffe://cluster.local/ns/egress-gateway/sa/waypoint"
+      direction="outbound"
+      bytes_sent=78
+      bytes_recv=641
+      duration="790ms"
+    ```
+
+## Cleanup
+
+Remove the `egress-gateway` namespace and all associated resources:
+
+```shell {name=ambient-egress:cleanup}
+# Remove the namespace from the ambient data plane
+kubectl label namespace egress-gateway istio.io/dataplane-mode-
+# Remove the namespace
+kubectl delete namespace egress-gateway
+```

@@ -1,0 +1,144 @@
+---
+weight: 10
+---
+
+# Installing Istio ambient mode
+
+You can deploy Istio in ambient mode on Alauda Container Platform with Alauda Service Mesh Operator 2.1.1 or later.
+
+## Prerequisites
+
+- The Alauda Container Platform Networking for Multus plugin must be installed, and kube-ovn must be v4.1.5 or later.
+- Alauda Service Mesh Operator 2.1.1 or later is installed.
+- An active ACP CLI (`kubectl`) session by a cluster administrator with the `cluster-admin` role.
+- You have `istioctl` installed locally so that you can use to run these instructions.
+
+## Procedure
+
+### Install the Istio Container Network Interface (CNI)
+
+1. Create the `istio-cni` namespace and add a label `istio-discovery=enabled`:
+
+    ```bash {name=ambient-install:create-ns-istio-cni}
+    kubectl create namespace istio-cni
+    kubectl label namespace istio-cni istio-discovery=enabled
+    ```
+
+2. Create the IstioCNI resource named `istio-cni.yaml`:
+
+    ```yaml {name=ambient-install:istiocni-yaml}
+    apiVersion: sailoperator.io/v1
+    kind: IstioCNI
+    metadata:
+      name: default
+    spec:
+      namespace: istio-cni
+      profile: ambient # [!code callout]
+      values:
+        cni:
+          cniConfDir: /etc/cni/multus/net.d
+          excludeNamespaces:
+            - istio-cni
+            - kube-system
+          ambient:
+            reconcileIptablesOnStartup: true # [!code callout]
+    ```
+
+    <Callouts>
+        1. You must set the `profile` field to `ambient`.
+        2. Set `spec.values.cni.ambient.reconcileIptablesOnStartup` to `true`. The `reconcileIptablesOnStartup` option enables the IstioCNI agent to detect and repair incompatible iptables rules in already-running ambient pods during CNI agent startup, handling scenarios such as upgrades or rule drift.
+    </Callouts>
+
+3. Apply the IstioCNI CR:
+
+    ```bash {name=ambient-install:apply-istiocni}
+    kubectl apply -f istio-cni.yaml
+    ```
+
+4. Wait for the IstioCNI pods to become ready:
+
+    ```bash {name=ambient-install:wait-istiocni}
+    kubectl wait --for=condition=Ready istiocnis/default --timeout=3m
+    ```
+
+### Install the Istio control plane
+
+1. Create the `istio-system` namespace and add a label `istio-discovery=enabled`:
+
+    ```bash {name=ambient-install:create-ns-istio-system}
+    kubectl create namespace istio-system
+    kubectl label namespace istio-system istio-discovery=enabled
+    ```
+
+2. Create an Istio resource named `istio.yaml`:
+
+    ```yaml {name=ambient-install:istio-yaml}
+    apiVersion: sailoperator.io/v1
+    kind: Istio
+    metadata:
+      name: default
+    spec:
+      namespace: istio-system
+      profile: ambient # [!code callout]
+      values:
+        pilot:
+          trustedZtunnelNamespace: ztunnel # [!code callout]
+        meshConfig:
+          discoverySelectors: # [!code callout]
+            - matchLabels:
+                istio-discovery: enabled
+    ```
+
+    <Callouts>
+        1. You must set the `profile` field to `ambient`.
+        2. You must configure `.spec.values.pilot.trustedZtunnelNamespace` to match the namespace where the ZTunnel resource will be installed..
+        3. The `discoverySelectors` configuration ensures that the control plane only monitors namespaces labeled with `istio-discovery=enabled`, which helps reduce configuration overhead and enables multiple service meshes to coexist on the same cluster. See [Discovery selectors in ambient mode](./ambient-discovery-selectors.mdx) for details.
+    </Callouts>
+
+3. Apply the Istio custom resource (CR):
+
+    ```bash {name=ambient-install:apply-istio}
+    kubectl apply -f istio.yaml
+    ```
+
+4. Wait for the Istio control plane to become ready:
+
+    ```bash {name=ambient-install:wait-istio}
+    kubectl wait --for=condition=Ready istios/default --timeout=3m
+    ```
+
+### Install the ZTunnel proxy
+
+1. Create the `ztunnel` namespace and add a label `istio-discovery=enabled`:
+
+    ```bash {name=ambient-install:create-ns-ztunnel}
+    kubectl create namespace ztunnel
+    kubectl label namespace ztunnel istio-discovery=enabled
+    ```
+
+    :::note
+    The namespace name for the `ZTunnel` resource must match the `trustedZtunnelNamespace` parameter in the `Istio` configuration.
+    :::
+
+2. Create the ZTunnel resource named `ztunnel.yaml`:
+
+    ```yaml {name=ambient-install:ztunnel-yaml}
+    apiVersion: sailoperator.io/v1
+    kind: ZTunnel
+    metadata:
+      name: default
+    spec:
+      namespace: ztunnel
+    ```
+
+3. Apply the ZTunnel CR:
+
+    ```bash {name=ambient-install:apply-ztunnel}
+    kubectl apply -f ztunnel.yaml
+    ```
+
+4. Wait for the ZTunnel pods to become ready:
+
+    ```bash {name=ambient-install:wait-ztunnel}
+    kubectl wait --for=condition=Ready ztunnel/default --timeout=3m
+    ```
