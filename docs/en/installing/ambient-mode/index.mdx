@@ -1,0 +1,35 @@
+---
+weight: 400
+---
+
+# Istio ambient mode
+
+Istio ambient mode introduces a sidecar-less mesh architecture for Alauda Service Mesh. It leverages node-level Layer 4 (L4) proxies alongside optional Layer 7 (L7) proxies, reducing both operational complexity and per-pod resource consumption.
+
+## About Istio ambient mode
+
+The ambient mode architecture comprises the following key components:
+
+- **ZTunnel proxy** — A per-node proxy responsible for establishing secure, transparent TCP connections on behalf of every workload running on that node. Operating at Layer 4, it handles mutual TLS (mTLS) termination and L4 policy enforcement outside application pods.
+- **Waypoint proxy** — An optional, per-service-account or per-namespace proxy that enables advanced Layer 7 capabilities including traffic management, fine-grained policy enforcement, and deep observability. L7 features can be activated selectively, avoiding the overhead of deploying sidecars for every service.
+- **Istio CNI plugin** — Intercepts and redirects traffic to the ZTunnel proxy on each node, providing transparent traffic capture without modifying application pods.
+
+Ambient mode delivers the following advantages:
+
+- **Simplified operations** — Eliminates the need to manage sidecar injection, lowering the barrier to mesh adoption and day-to-day maintenance.
+- **Lower resource consumption** — A shared, per-node ZTunnel proxy provides core L4 mesh features, while optional waypoint proxies keep per-pod overhead to a minimum.
+- **Incremental adoption** — Workloads can join the mesh initially with L4 capabilities such as mTLS and basic policies. Waypoint proxies can be added later to unlock L7 features like HTTP traffic management when needed.
+
+    :::note
+    Activating L7 features requires deploying waypoint proxies, which adds only minimal overhead for the targeted services.
+    :::
+
+- **Enhanced security** — Establishes a secure, zero-trust network foundation with mTLS enabled by default for all meshed workloads, ensuring encrypted and authenticated communication across the mesh.
+
+:::note
+Ambient mode is a newer architecture that may involve different operational considerations compared to the traditional sidecar model.
+:::
+
+Although well-defined discovery selectors allow an ambient-mode mesh to coexist alongside a sidecar-mode mesh, this scenario has not been fully validated. To prevent potential conflicts, deploy Istio ambient mode only on clusters without an existing Alauda Service Mesh installation. Ambient mode remains a Technology Preview feature.
+
+<Overview overviewHeaders={[]} />
