@@ -188,22 +188,29 @@ check_package_uploaded() {
     local artifact_version
     artifact_version=$(parse_artifact_version_from_package "$package_url")
     
-    log_info "检查插件是否已上传到集群 $cluster: $artifact_version"
-    
-    # 检查资源是否存在
-    if ! kubectl --context="$cluster" get artifactversion -n cpaas-system "$artifact_version" &> /dev/null; then
-        return 1
-    fi
-    
-    # 检查状态
-    local reason
-    reason=$(kubectl --context="$cluster" get artifactversion -n cpaas-system "$artifact_version" -o jsonpath='{.status.reason}' 2>/dev/null || echo "")
-    
-    if [ "$reason" = "Success" ]; then
-        log_success "插件已上传: $artifact_version"
-        return 0
-    fi
-    
+    # 两种可能的名称：原始名称 和 带 operatorhub- 前缀的名称
+    local artifact_version_prefixed="operatorhub-${artifact_version}"
+
+    log_info "检查插件是否已上传到集群 $cluster: $artifact_version 或 $artifact_version_prefixed"
+
+    # 依次检查两种名称
+    local name
+    for name in "$artifact_version" "$artifact_version_prefixed"; do
+        # 检查资源是否存在
+        if ! kubectl --context="$cluster" get artifactversion -n cpaas-system "$name" &> /dev/null; then
+            continue
+        fi
+
+        # 检查状态
+        local reason
+        reason=$(kubectl --context="$cluster" get artifactversion -n cpaas-system "$name" -o jsonpath='{.status.reason}' 2>/dev/null || echo "")
+
+        if [ "$reason" = "Success" ]; then
+            log_success "插件已上传: $name"
+            return 0
+        fi
+    done
+
     return 1
 }
 
