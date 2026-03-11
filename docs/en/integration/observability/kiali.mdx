@@ -231,7 +231,9 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
 
   The output is a base64-encoded certificate. Store this value for use in later steps.
 
-  **Note**: If the command returns an empty output, contact your administrator to obtain the ACP CA certificate.
+  <Directive type="danger" title="CA certificate missing">
+  If the command returns an empty output, try using `kubectl -n cpaas-system get secret dex.tls -o jsonpath='{.data.tls\.crt}'` or contact your administrator to obtain the ACP CA certificate.
+  </Directive>
 
   ### Retrieve platform configuration from the business cluster:
 
@@ -409,10 +411,10 @@ This capability supports the analysis of request flow behavior, aiding in root c
          provider: jaeger  # [!code callout]
          use_grpc: true
          internal_url: "http://jaeger-prod-query.istio-system:16685/jaeger"  # [!code callout]
-         # (Optional) Public facing URL of Jaeger
-         # external_url: "<platform-url>/clusters/<cluster>/istio/jaeger"
          # When external_url is not defined, disable_version_check should be set to true
          disable_version_check: true
+         # (Optional) Public facing URL of Jaeger [!code callout]
+         # external_url: "<platform-url>/clusters/<cluster>/istio/jaeger"
    ```
 
    <Callouts>
@@ -420,6 +422,7 @@ This capability supports the analysis of request flow behavior, aiding in root c
      2. Specifies whether tracing is enabled.
      3. Specifies the tracing provider (`jaeger` or `tempo`).
      4. Specifies the internal URL for the Jaeger or Tempo API.
+     5. The `external_url` that the Kiali UI uses when displaying Tracing UI links to the user. This URL must be accessible to clients external to the cluster (e.g. a browser) in order to generate valid links.
    </Callouts>
 
 2. Save the updated spec in `kiali_cr.yaml`.
