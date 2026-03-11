@@ -67,7 +67,7 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
     ```
 
     <Callouts>
-        1.  Indicates that this waypoint proxy handles traffic destined for Kubernetes services.
+        1. The `istio.io/waypoint-for: service` label indicates that this waypoint processes traffic for services. The label value determines the type of traffic handled. For details, see [Waypoint traffic types](https://istio.io/latest/docs/ambient/usage/waypoint/#waypoint-traffic-types) (Istio documentation).
         2.  Specifies the `istio-waypoint` gateway class, which deploys a waypoint proxy instead of a standard ingress gateway.
     </Callouts>
 
