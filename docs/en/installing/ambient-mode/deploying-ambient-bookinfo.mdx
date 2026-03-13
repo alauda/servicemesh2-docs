@@ -34,7 +34,7 @@ You can deploy the Bookinfo sample application in ambient mode without sidecar i
     kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
     ```
 
-    Apply the `bookinfo-versions` YAML file for the `Bookinfo` application:
+    Apply the `bookinfo-versions` YAML file to create multiple versions of the `Bookinfo` services:
 
     ```bash {name=ambient-bookinfo:deploy-versions}
     kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo-versions.yaml

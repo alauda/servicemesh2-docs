@@ -15,6 +15,95 @@ description: >
 
 为项目中的 MDX 文档生成自动化测试脚本，确保文档中的命令和步骤可执行且输出正确。
 
+## 读取 OCP 文档链接
+
+当用户提供 Red Hat OpenShift Container Platform (OCP) 文档链接作为参考时，按以下顺序获取内容：
+
+### 优先尝试 WebFetch
+
+直接使用 `WebFetch` 工具获取文档内容。OCP 文档链接通常形如：
+- `https://docs.openshift.com/container-platform/4.x/...`
+- `https://docs.redhat.com/en/documentation/openshift_container_platform/...`
+
+### WebFetch 失败时的 Fallback 方案
+
+OCP 文档站点可能因为反爬机制、重定向或认证限制导致 WebFetch 无法正常获取内容。此时使用 curl + python3 作为替代方案：
+
+**第 1 步：使用 curl 下载 HTML 文件**
+
+```bash
+curl -L -o /tmp/ocp-doc.html "<OCP文档URL>" \
+  -H "User-Agent: Mozilla/5.0" \
+  --connect-timeout 15 \
+  --max-time 30
+```
+
+`-L` 跟随重定向，`-H` 设置合理的 User-Agent 以避免被拒绝。
+
+**第 2 步：使用 python3 提取文档结构和内容**
+
+```python
+python3 -c "
+from html.parser import HTMLParser
+import sys
+
+class DocExtractor(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.in_content = False
+        self.content = []
+        self.current_tag = ''
+        # OCP 文档正文通常在 main 或 article 标签中
+        self.content_tags = {'main', 'article'}
+        self.skip_tags = {'script', 'style', 'nav', 'header', 'footer'}
+        self.in_skip = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self.skip_tags:
+            self.in_skip += 1
+        if tag in self.content_tags:
+            self.in_content = True
+        self.current_tag = tag
+        if self.in_content and self.in_skip == 0:
+            if tag in ('h1','h2','h3','h4'):
+                self.content.append('\n' + '#' * int(tag[1]) + ' ')
+            elif tag == 'p':
+                self.content.append('\n')
+            elif tag == 'li':
+                self.content.append('\n- ')
+            elif tag == 'pre':
+                self.content.append('\n\`\`\`\n')
+            elif tag == 'code' and self.current_tag != 'pre':
+                self.content.append('\`')
+
+    def handle_endtag(self, tag):
+        if tag in self.skip_tags:
+            self.in_skip -= 1
+        if self.in_content and self.in_skip == 0:
+            if tag == 'pre':
+                self.content.append('\n\`\`\`\n')
+            elif tag == 'code' and self.current_tag != 'pre':
+                self.content.append('\`')
+
+    def handle_data(self, data):
+        if self.in_content and self.in_skip == 0:
+            self.content.append(data.strip())
+
+with open('/tmp/ocp-doc.html', 'r', encoding='utf-8') as f:
+    html = f.read()
+parser = DocExtractor()
+parser.feed(html)
+print(''.join(parser.content))
+" > /tmp/ocp-doc-content.md
+```
+
+提取完成后读取 `/tmp/ocp-doc-content.md` 获取文档的结构化内容。
+
+**注意事项：**
+- 提取结果可能不完美，重点关注文档中的命令、配置和步骤结构
+- 如果 python3 标准库的 `html.parser` 无法满足需求，可尝试使用 `pip install beautifulsoup4` 后用 BeautifulSoup 解析
+- 提取后应与用户确认内容是否完整，特别是代码块部分
+
 ## 工作流程
 
 ### 第一步：分析目标 MDX 文档

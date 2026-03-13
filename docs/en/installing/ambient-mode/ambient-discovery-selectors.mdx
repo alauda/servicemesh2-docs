@@ -51,10 +51,10 @@ To restrict the scope of the service mesh in ambient mode, configure the `discov
       values:
         pilot:
           trustedZtunnelNamespace: ztunnel
-      meshConfig:
-        discoverySelectors:
-          - matchLabels:
-              istio-discovery: enabled
+        meshConfig:
+          discoverySelectors:
+            - matchLabels:
+                istio-discovery: enabled
     ```
 
 5. Apply the configuration:
