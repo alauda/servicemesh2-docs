@@ -15,95 +15,6 @@ description: >
 
 为项目中的 MDX 文档生成自动化测试脚本，确保文档中的命令和步骤可执行且输出正确。
 
-## 读取 OCP 文档链接
-
-当用户提供 Red Hat OpenShift Container Platform (OCP) 文档链接作为参考时，按以下顺序获取内容：
-
-### 优先尝试 WebFetch
-
-直接使用 `WebFetch` 工具获取文档内容。OCP 文档链接通常形如：
-- `https://docs.openshift.com/container-platform/4.x/...`
-- `https://docs.redhat.com/en/documentation/openshift_container_platform/...`
-
-### WebFetch 失败时的 Fallback 方案
-
-OCP 文档站点可能因为反爬机制、重定向或认证限制导致 WebFetch 无法正常获取内容。此时使用 curl + python3 作为替代方案：
-
-**第 1 步：使用 curl 下载 HTML 文件**
-
-```bash
-curl -L -o /tmp/ocp-doc.html "<OCP文档URL>" \
-  -H "User-Agent: Mozilla/5.0" \
-  --connect-timeout 15 \
-  --max-time 30
-```
-
-`-L` 跟随重定向，`-H` 设置合理的 User-Agent 以避免被拒绝。
-
-**第 2 步：使用 python3 提取文档结构和内容**
-
-```python
-python3 -c "
-from html.parser import HTMLParser
-import sys
-
-class DocExtractor(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.in_content = False
-        self.content = []
-        self.current_tag = ''
-        # OCP 文档正文通常在 main 或 article 标签中
-        self.content_tags = {'main', 'article'}
-        self.skip_tags = {'script', 'style', 'nav', 'header', 'footer'}
-        self.in_skip = 0
-
-    def handle_starttag(self, tag, attrs):
-        if tag in self.skip_tags:
-            self.in_skip += 1
-        if tag in self.content_tags:
-            self.in_content = True
-        self.current_tag = tag
-        if self.in_content and self.in_skip == 0:
-            if tag in ('h1','h2','h3','h4'):
-                self.content.append('\n' + '#' * int(tag[1]) + ' ')
-            elif tag == 'p':
-                self.content.append('\n')
-            elif tag == 'li':
-                self.content.append('\n- ')
-            elif tag == 'pre':
-                self.content.append('\n\`\`\`\n')
-            elif tag == 'code' and self.current_tag != 'pre':
-                self.content.append('\`')
-
-    def handle_endtag(self, tag):
-        if tag in self.skip_tags:
-            self.in_skip -= 1
-        if self.in_content and self.in_skip == 0:
-            if tag == 'pre':
-                self.content.append('\n\`\`\`\n')
-            elif tag == 'code' and self.current_tag != 'pre':
-                self.content.append('\`')
-
-    def handle_data(self, data):
-        if self.in_content and self.in_skip == 0:
-            self.content.append(data.strip())
-
-with open('/tmp/ocp-doc.html', 'r', encoding='utf-8') as f:
-    html = f.read()
-parser = DocExtractor()
-parser.feed(html)
-print(''.join(parser.content))
-" > /tmp/ocp-doc-content.md
-```
-
-提取完成后读取 `/tmp/ocp-doc-content.md` 获取文档的结构化内容。
-
-**注意事项：**
-- 提取结果可能不完美，重点关注文档中的命令、配置和步骤结构
-- 如果 python3 标准库的 `html.parser` 无法满足需求，可尝试使用 `pip install beautifulsoup4` 后用 BeautifulSoup 解析
-- 提取后应与用户确认内容是否完整，特别是代码块部分
-
 ## 工作流程
 
 ### 第一步：分析目标 MDX 文档
@@ -150,31 +61,37 @@ print(''.join(parser.content))
 ## 执行计划：<文档名称> 测试脚本
 
 ### 1. 文档概要
+
 - 文件路径：`docs/en/xxx/yyy.mdx`
 - 功能描述：xxx
 - 代码块总数：N 个（M 个需要测试）
 
 ### 2. 代码块命名规划
-| # | 代码块类型 | 当前状态 | 拟定 name | 备注 |
-|---|----------|---------|----------|------|
-| 1 | bash | 缺少 name | `prefix:action` | |
-| 2 | text | 缺少 name | `prefix:action-output` | 输出验证块 |
+
+| #   | 代码块类型 | 当前状态  | 拟定 name              | 备注       |
+| --- | ---------- | --------- | ---------------------- | ---------- |
+| 1   | bash       | 缺少 name | `prefix:action`        |            |
+| 2   | text       | 缺少 name | `prefix:action-output` | 输出验证块 |
 
 ### 3. 测试步骤规划
-| 步骤 | 描述 | 测试模式 | runme 代码块 |
-|------|------|---------|-------------|
-| 1 | 创建资源 | 模式 A | `prefix:create-resource` |
-| 2 | 验证输出 | 模式 B | `prefix:verify` + `prefix:verify-output` |
+
+| 步骤 | 描述     | 测试模式 | runme 代码块                             |
+| ---- | -------- | -------- | ---------------------------------------- |
+| 1    | 创建资源 | 模式 A   | `prefix:create-resource`                 |
+| 2    | 验证输出 | 模式 B   | `prefix:verify` + `prefix:verify-output` |
 
 ### 4. 缺失步骤分析（如无则省略此节）
+
 - ⚠️ 步骤 3 和步骤 4 之间缺少等待部署就绪的步骤
 - ⚠️ 文档未包含命名空间创建步骤，但后续命令依赖该命名空间
 
 ### 5. cleanup 判断
+
 - [有/无] cleanup 函数
 - 依据：文档中 [包含/不包含] 清理步骤代码块
 
 ### 6. 编排脚本更新
+
 - 添加到 Case N：<描述>
 - 执行方式：[直接执行 / 分步执行（--no-cleanup + --cleanup-only）]
 ```
@@ -195,9 +112,10 @@ print(''.join(parser.content))
 
 **示例：**
 
-```markdown
+````markdown
 <!-- 命令代码块 -->
-```bash {name=my-feature:create-resource}
+
+````bash {name=my-feature:create-resource}
 kubectl create namespace test
 \```
 
@@ -205,9 +123,11 @@ kubectl create namespace test
 ```text {name=my-feature:create-resource-output}
 namespace/test created
 \```
-```
+````
+````
 
 **重要注意事项：**
+
 - 每个需要测试的代码块都必须有 name 属性
 - 需要验证输出的命令，必须有配对的 `-output` 代码块
 - 代码块类型可以是 `bash`、`shell`、`yaml`、`text`、`html` 等
@@ -269,11 +189,11 @@ cleanup_<feature_name>() {
 
 根据脚本在项目中的深度计算相对路径（从 `docs/en/` 开始算起）：
 
-| 脚本目录深度 | 示例路径 | REPO_ROOT |
-|------------|---------|-----------|
-| 3 级 | `docs/en/uninstalling/` | `$SCRIPT_DIR/../../..` |
-| 4 级 | `docs/en/installing/dual-stack/` | `$SCRIPT_DIR/../../../..` |
-| 5 级 | `docs/en/installing/.../application-deployment/` | `$SCRIPT_DIR/../../../../..` |
+| 脚本目录深度 | 示例路径                                         | REPO_ROOT                    |
+| ------------ | ------------------------------------------------ | ---------------------------- |
+| 3 级         | `docs/en/uninstalling/`                          | `$SCRIPT_DIR/../../..`       |
+| 4 级         | `docs/en/installing/dual-stack/`                 | `$SCRIPT_DIR/../../../..`    |
+| 5 级         | `docs/en/installing/.../application-deployment/` | `$SCRIPT_DIR/../../../../..` |
 
 **计算方法**：从脚本所在目录数回到仓库根目录需要几层 `..`。
 
@@ -362,33 +282,34 @@ install_operator \
 
 来自 `tests/util/common.sh`：
 
-| 函数 | 用途 |
-|------|------|
-| `log_info/warn/error/success` | 日志输出 |
-| `kubectl_apply_with_mirror` | 带镜像加速的 kubectl apply |
-| `kubectl_apply_runme_block` | 在指定目录中执行 runme block |
-| `_wait_for_deployment` | 等待 Deployment 就绪 |
-| `_wait_for_resource` | 等待资源创建 |
-| `retry_command` | 重试执行命令 |
-| `install_operator` | 通用 Operator 安装 |
+| 函数                          | 用途                         |
+| ----------------------------- | ---------------------------- |
+| `log_info/warn/error/success` | 日志输出                     |
+| `kubectl_apply_with_mirror`   | 带镜像加速的 kubectl apply   |
+| `kubectl_apply_runme_block`   | 在指定目录中执行 runme block |
+| `_wait_for_deployment`        | 等待 Deployment 就绪         |
+| `_wait_for_resource`          | 等待资源创建                 |
+| `retry_command`               | 重试执行命令                 |
+| `install_operator`            | 通用 Operator 安装           |
 
 来自 `tests/util/verify.sh`：
 
-| 函数 | 用途 |
-|------|------|
-| `__cmp_same` | 精确匹配 |
-| `__cmp_contains` | 包含子串 |
-| `__cmp_not_contains` | 不包含子串 |
-| `__cmp_elided` | 模糊匹配（支持 `...` 通配符） |
-| `__cmp_regex` | 正则匹配 |
-| `__cmp_first_line` | 首行匹配 |
-| `__cmp_lines` | 逐行验证（`+` 必须包含，`-` 不能包含） |
+| 函数                 | 用途                                   |
+| -------------------- | -------------------------------------- |
+| `__cmp_same`         | 精确匹配                               |
+| `__cmp_contains`     | 包含子串                               |
+| `__cmp_not_contains` | 不包含子串                             |
+| `__cmp_elided`       | 模糊匹配（支持 `...` 通配符）          |
+| `__cmp_regex`        | 正则匹配                               |
+| `__cmp_first_line`   | 首行匹配                               |
+| `__cmp_lines`        | 逐行验证（`+` 必须包含，`-` 不能包含） |
 
 **注意**：`__cmp_like` 目前有问题，不要使用。
 
 #### 100% 测试覆盖率
 
 测试脚本必须覆盖 MDX 文档中所有带 `{name=}` 属性的代码块：
+
 - 所有命令代码块都必须通过 `runme run` 执行
 - 所有输出代码块都必须通过 `runme print` 获取并用于验证
 - 不能遗漏任何代码块
@@ -446,6 +367,7 @@ fi
 **模式 I - 使用 `__cmp_lines` 验证含动态值的输出：**
 
 `kubectl get pod`、`kubectl get svc`、`istioctl proxy-status` 等命令的输出中包含动态生成的值（pod 名称后缀、IP 地址、AGE 时间、VIP 等），无法做精确匹配。`__cmp_lines` 函数通过逐行关键字断言来解决这个问题：
+
 - `+ keyword`：断言输出中**必须包含**该关键字的行
 - `- keyword`：断言输出中**不能包含**该关键字的行
 
@@ -471,6 +393,7 @@ log_success "验证通过"
 ```
 
 **何时使用 `__cmp_lines`：**
+
 - `kubectl get pods` 输出：pod 名含随机后缀、AGE 列动态变化 → 用 `+ pod-prefix` 和 `+ Running` 等关键字验证
 - `kubectl get svc` 输出：ClusterIP 动态分配 → 用 `+ service-name` 验证
 - `istioctl proxy-status` 输出：pod 名和版本号 → 用 `+ deployment-name` 和 `+ version` 验证
@@ -481,6 +404,7 @@ log_success "验证通过"
 **与手动 grep 循环的对比：**
 
 避免写这样的冗长代码：
+
 ```bash
 # ❌ 不推荐：手动 grep 循环
 local missing=()
@@ -496,6 +420,7 @@ fi
 ```
 
 用 `__cmp_lines` 替代：
+
 ```bash
 # ✅ 推荐：使用 __cmp_lines
 if ! __cmp_lines "$output" "$(cat <<'EOF'
@@ -527,7 +452,7 @@ output=$(runme run <prefix>:<action> 2>&1) || {
 编辑 `tests/README.md`，在 "当前已有的测试文档" 表格中添加新条目：
 
 ```markdown
-| <文档名称> | [runme-test_<文档名>.sh](<相对路径>) | `./run.sh --file <文档名>` |
+| <文档名称> | [runme-test\_<文档名>.sh](相对路径) | `./run.sh --file <文档名>` |
 ```
 
 ### 第六步：更新测试编排脚本
