@@ -53,3 +53,7 @@ testing/allure-results/
 
 tests/bin/
 tests/package/
+
+.DS_Store
+tmp
+.conductor
