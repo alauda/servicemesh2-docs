@@ -1,0 +1,64 @@
+---
+weight: 20
+---
+
+# Discovery selectors in ambient mode
+
+In ambient mode, the control plane includes workloads once it discovers them and the appropriate label enables traffic redirection through the ZTunnel proxy. By default, the control plane watches workloads across all namespaces in the cluster, which means every proxy receives configuration for every namespace — even for workloads that are not enrolled in the mesh.
+
+In shared or multi-tenant clusters, restricting mesh participation to specific namespaces helps reduce configuration overhead and enables multiple service meshes to coexist on the same cluster. For details on discovery selectors, see [Scoping the Service Mesh with discovery selectors](../installing-service-mesh/scoping-the-service-mesh/using-discovery-selectors.mdx).
+
+## Scoping the Service Mesh with discovery selectors
+
+To restrict the scope of the service mesh in ambient mode, configure the `discoverySelectors` parameter within the `meshConfig` section of the Istio resource. This configuration controls which namespaces the control plane monitors based on label selectors.
+
+### Prerequisites
+
+- An Istio control plane resource has been created.
+- An IstioCNI resource has been created.
+- A ZTunnel resource has been created.
+
+### Procedure
+
+1. Label the namespace containing the IstioCNI resource (for example, `istio-cni`):
+
+    ```bash
+    kubectl label namespace istio-cni istio-discovery=enabled
+    ```
+
+
+2. Label the namespace containing the Istio control plane resource (for example, `istio-system`):
+
+    ```bash
+    kubectl label namespace istio-system istio-discovery=enabled
+    ```
+3. Label the namespace containing the ZTunnel resource (for example, `ztunnel`):
+
+    ```bash
+    kubectl label namespace ztunnel istio-discovery=enabled
+    ```
+
+4. Update the Istio control plane resource to include a `discoverySelectors` section with the matching label. Create a YAML file named `istio-discovery-selectors.yaml`:
+
+    ```yaml
+    apiVersion: sailoperator.io/v1
+    kind: Istio
+    metadata:
+      name: default
+    spec:
+      namespace: istio-system
+      profile: ambient
+      values:
+        pilot:
+          trustedZtunnelNamespace: ztunnel
+        meshConfig:
+          discoverySelectors:
+            - matchLabels:
+                istio-discovery: enabled
+    ```
+
+5. Apply the configuration:
+
+    ```bash
+    kubectl apply -f istio-discovery-selectors.yaml
+    ```

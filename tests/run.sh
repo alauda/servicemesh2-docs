@@ -163,8 +163,8 @@ run_test_script() {
     
     # 查找测试函数和 cleanup 函数
     local test_func cleanup_func
-    test_func=$(declare -F | awk '$3 ~ /^test_[a-z_]+$/ && $3 !~ /test_scripts/ {print $3; exit}')
-    cleanup_func=$(declare -F | awk '$3 ~ /^cleanup_[a-z_]+$/ {print $3; exit}')
+    test_func=$(declare -F | awk '$3 ~ /^test_[a-z0-9_]+$/ && $3 !~ /test_scripts/ {print $3; exit}')
+    cleanup_func=$(declare -F | awk '$3 ~ /^cleanup_[a-z0-9_]+$/ {print $3; exit}')
     
     if [ -z "$test_func" ]; then
         log_error "在 $script_name 中未找到测试函数 (test_*)"

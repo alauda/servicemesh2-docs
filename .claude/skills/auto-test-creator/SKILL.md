@@ -61,31 +61,37 @@ description: >
 ## 执行计划：<文档名称> 测试脚本
 
 ### 1. 文档概要
+
 - 文件路径：`docs/en/xxx/yyy.mdx`
 - 功能描述：xxx
 - 代码块总数：N 个（M 个需要测试）
 
 ### 2. 代码块命名规划
-| # | 代码块类型 | 当前状态 | 拟定 name | 备注 |
-|---|----------|---------|----------|------|
-| 1 | bash | 缺少 name | `prefix:action` | |
-| 2 | text | 缺少 name | `prefix:action-output` | 输出验证块 |
+
+| #   | 代码块类型 | 当前状态  | 拟定 name              | 备注       |
+| --- | ---------- | --------- | ---------------------- | ---------- |
+| 1   | bash       | 缺少 name | `prefix:action`        |            |
+| 2   | text       | 缺少 name | `prefix:action-output` | 输出验证块 |
 
 ### 3. 测试步骤规划
-| 步骤 | 描述 | 测试模式 | runme 代码块 |
-|------|------|---------|-------------|
-| 1 | 创建资源 | 模式 A | `prefix:create-resource` |
-| 2 | 验证输出 | 模式 B | `prefix:verify` + `prefix:verify-output` |
+
+| 步骤 | 描述     | 测试模式 | runme 代码块                             |
+| ---- | -------- | -------- | ---------------------------------------- |
+| 1    | 创建资源 | 模式 A   | `prefix:create-resource`                 |
+| 2    | 验证输出 | 模式 B   | `prefix:verify` + `prefix:verify-output` |
 
 ### 4. 缺失步骤分析（如无则省略此节）
+
 - ⚠️ 步骤 3 和步骤 4 之间缺少等待部署就绪的步骤
 - ⚠️ 文档未包含命名空间创建步骤，但后续命令依赖该命名空间
 
 ### 5. cleanup 判断
+
 - [有/无] cleanup 函数
 - 依据：文档中 [包含/不包含] 清理步骤代码块
 
 ### 6. 编排脚本更新
+
 - 添加到 Case N：<描述>
 - 执行方式：[直接执行 / 分步执行（--no-cleanup + --cleanup-only）]
 ```
@@ -106,9 +112,10 @@ description: >
 
 **示例：**
 
-```markdown
+````markdown
 <!-- 命令代码块 -->
-```bash {name=my-feature:create-resource}
+
+````bash {name=my-feature:create-resource}
 kubectl create namespace test
 \```
 
@@ -116,9 +123,11 @@ kubectl create namespace test
 ```text {name=my-feature:create-resource-output}
 namespace/test created
 \```
-```
+````
+````
 
 **重要注意事项：**
+
 - 每个需要测试的代码块都必须有 name 属性
 - 需要验证输出的命令，必须有配对的 `-output` 代码块
 - 代码块类型可以是 `bash`、`shell`、`yaml`、`text`、`html` 等
@@ -180,11 +189,11 @@ cleanup_<feature_name>() {
 
 根据脚本在项目中的深度计算相对路径（从 `docs/en/` 开始算起）：
 
-| 脚本目录深度 | 示例路径 | REPO_ROOT |
-|------------|---------|-----------|
-| 3 级 | `docs/en/uninstalling/` | `$SCRIPT_DIR/../../..` |
-| 4 级 | `docs/en/installing/dual-stack/` | `$SCRIPT_DIR/../../../..` |
-| 5 级 | `docs/en/installing/.../application-deployment/` | `$SCRIPT_DIR/../../../../..` |
+| 脚本目录深度 | 示例路径                                         | REPO_ROOT                    |
+| ------------ | ------------------------------------------------ | ---------------------------- |
+| 3 级         | `docs/en/uninstalling/`                          | `$SCRIPT_DIR/../../..`       |
+| 4 级         | `docs/en/installing/dual-stack/`                 | `$SCRIPT_DIR/../../../..`    |
+| 5 级         | `docs/en/installing/.../application-deployment/` | `$SCRIPT_DIR/../../../../..` |
 
 **计算方法**：从脚本所在目录数回到仓库根目录需要几层 `..`。
 
@@ -217,7 +226,7 @@ fi
 log_success "<验证>通过"
 ```
 
-**注**：不能死板的使用 `__cmp_contains`，要先分析 `expected` 的内容，如果其中包含一些变化值，比如时间，则要通过关键内容来验证。
+**注**：不能死板的使用 `__cmp_contains`，要先分析 `expected` 的内容。如果输出包含动态值（如 pod 名称后缀、IP、AGE、时间戳等），应使用**模式 I（`__cmp_lines`）**来验证关键字段而非精确匹配。
 
 **模式 C - 获取模板内容并写入文件：**
 
@@ -273,33 +282,34 @@ install_operator \
 
 来自 `tests/util/common.sh`：
 
-| 函数 | 用途 |
-|------|------|
-| `log_info/warn/error/success` | 日志输出 |
-| `kubectl_apply_with_mirror` | 带镜像加速的 kubectl apply |
-| `kubectl_apply_runme_block` | 在指定目录中执行 runme block |
-| `_wait_for_deployment` | 等待 Deployment 就绪 |
-| `_wait_for_resource` | 等待资源创建 |
-| `retry_command` | 重试执行命令 |
-| `install_operator` | 通用 Operator 安装 |
+| 函数                          | 用途                         |
+| ----------------------------- | ---------------------------- |
+| `log_info/warn/error/success` | 日志输出                     |
+| `kubectl_apply_with_mirror`   | 带镜像加速的 kubectl apply   |
+| `kubectl_apply_runme_block`   | 在指定目录中执行 runme block |
+| `_wait_for_deployment`        | 等待 Deployment 就绪         |
+| `_wait_for_resource`          | 等待资源创建                 |
+| `retry_command`               | 重试执行命令                 |
+| `install_operator`            | 通用 Operator 安装           |
 
 来自 `tests/util/verify.sh`：
 
-| 函数 | 用途 |
-|------|------|
-| `__cmp_same` | 精确匹配 |
-| `__cmp_contains` | 包含子串 |
-| `__cmp_not_contains` | 不包含子串 |
-| `__cmp_elided` | 模糊匹配（支持 `...` 通配符） |
-| `__cmp_regex` | 正则匹配 |
-| `__cmp_first_line` | 首行匹配 |
-| `__cmp_lines` | 逐行验证（`+` 必须包含，`-` 不能包含） |
+| 函数                 | 用途                                   |
+| -------------------- | -------------------------------------- |
+| `__cmp_same`         | 精确匹配                               |
+| `__cmp_contains`     | 包含子串                               |
+| `__cmp_not_contains` | 不包含子串                             |
+| `__cmp_elided`       | 模糊匹配（支持 `...` 通配符）          |
+| `__cmp_regex`        | 正则匹配                               |
+| `__cmp_first_line`   | 首行匹配                               |
+| `__cmp_lines`        | 逐行验证（`+` 必须包含，`-` 不能包含） |
 
 **注意**：`__cmp_like` 目前有问题，不要使用。
 
 #### 100% 测试覆盖率
 
 测试脚本必须覆盖 MDX 文档中所有带 `{name=}` 属性的代码块：
+
 - 所有命令代码块都必须通过 `runme run` 执行
 - 所有输出代码块都必须通过 `runme print` 获取并用于验证
 - 不能遗漏任何代码块
@@ -354,6 +364,77 @@ fi
 
 **识别占位符的方法**：阅读 MDX 文档时，注意命令中用尖括号 `<>` 包裹的内容。如果文档说"用前一步的输出替换 `<xxx>`"，则需要在脚本中实现动态替换。
 
+**模式 I - 使用 `__cmp_lines` 验证含动态值的输出：**
+
+`kubectl get pod`、`kubectl get svc`、`istioctl proxy-status` 等命令的输出中包含动态生成的值（pod 名称后缀、IP 地址、AGE 时间、VIP 等），无法做精确匹配。`__cmp_lines` 函数通过逐行关键字断言来解决这个问题：
+
+- `+ keyword`：断言输出中**必须包含**该关键字的行
+- `- keyword`：断言输出中**不能包含**该关键字的行
+
+这比手动编写 `grep -q` 循环更简洁、可读性更好，且与项目其他测试脚本保持一致。
+
+```bash
+# 输出包含动态值（pod 名称后缀、AGE 等），使用 __cmp_lines 验证关键字段
+log_info "步骤 X: 验证资源状态"
+local output
+output=$(runme run <prefix>:<verify-action> 2>&1)
+
+if ! __cmp_lines "$output" "$(cat <<'EOF'
++ keyword-that-must-exist
++ another-required-keyword
+- keyword-that-must-not-exist
+EOF
+)"; then
+    log_error "验证失败"
+    log_error "实际输出: $output"
+    return 1
+fi
+log_success "验证通过"
+```
+
+**何时使用 `__cmp_lines`：**
+
+- `kubectl get pods` 输出：pod 名含随机后缀、AGE 列动态变化 → 用 `+ pod-prefix` 和 `+ Running` 等关键字验证
+- `kubectl get svc` 输出：ClusterIP 动态分配 → 用 `+ service-name` 验证
+- `istioctl proxy-status` 输出：pod 名和版本号 → 用 `+ deployment-name` 和 `+ version` 验证
+- 任何包含动态 IP、时间戳、随机 ID 的表格输出
+
+**参考实现**：`docs/en/updating/update-mesh/runme-test_update-inplace.sh` 中步骤 9、12、15 展示了 `__cmp_lines` 的标准用法。
+
+**与手动 grep 循环的对比：**
+
+避免写这样的冗长代码：
+
+```bash
+# ❌ 不推荐：手动 grep 循环
+local missing=()
+for item in "pod-a" "pod-b" "pod-c"; do
+    if ! echo "$output" | grep -q "$item"; then
+        missing+=("$item")
+    fi
+done
+if [ ${#missing[@]} -ne 0 ]; then
+    log_error "验证失败"
+    return 1
+fi
+```
+
+用 `__cmp_lines` 替代：
+
+```bash
+# ✅ 推荐：使用 __cmp_lines
+if ! __cmp_lines "$output" "$(cat <<'EOF'
++ pod-a
++ pod-b
++ pod-c
+EOF
+)"; then
+    log_error "验证失败"
+    log_error "实际输出: $output"
+    return 1
+fi
+```
+
 #### 捕获 stderr
 
 对于可能输出到 stderr 的命令（如 kubectl），使用 `2>&1` 确保完整捕获输出：
@@ -371,7 +452,7 @@ output=$(runme run <prefix>:<action> 2>&1) || {
 编辑 `tests/README.md`，在 "当前已有的测试文档" 表格中添加新条目：
 
 ```markdown
-| <文档名称> | [runme-test_<文档名>.sh](<相对路径>) | `./run.sh --file <文档名>` |
+| <文档名称> | [runme-test\_<文档名>.sh](相对路径) | `./run.sh --file <文档名>` |
 ```
 
 ### 第六步：更新测试编排脚本

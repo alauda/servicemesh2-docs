@@ -1,0 +1,124 @@
+---
+weight: 30
+---
+
+# Deploying the Bookinfo application in ambient mode
+
+You can deploy the Bookinfo sample application in ambient mode without sidecar injection by relying on the ZTunnel proxy. For background on the Bookinfo application, see [Deploying the Bookinfo Application](../installing-service-mesh/application-deployment/deploying-the-bookinfo-application.mdx).
+
+## Prerequisites
+
+- An active ACP CLI (`kubectl`) session by a cluster administrator with the `cluster-admin` role.
+- You have `istioctl` installed locally so that you can use to run these instructions.
+- Alauda Service Mesh Operator 2.1.1 or later is installed the Istio resource has been created, and the Operator has deployed Istio.
+- An `IstioCNI` resource has been created, and the Operator has deployed the required `IstioCNI` pods.
+- A `ZTunnel` resource has been created, and the Operator has deployed the required `ZTunnel` pods.
+
+## Procedure
+
+1. Create the `bookinfo` namespace:
+
+    ```bash {name=ambient-bookinfo:create-namespace}
+    kubectl create namespace bookinfo
+    ```
+
+2. Add the `istio-discovery=enabled` label to the `bookinfo` namespace:
+
+    ```bash {name=ambient-bookinfo:label-discovery}
+    kubectl label namespace bookinfo istio-discovery=enabled
+    ```
+
+3. Deploy the `Bookinfo` application:
+
+    ```bash {name=ambient-bookinfo:deploy-application}
+    kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
+    ```
+
+    Apply the `bookinfo-versions` YAML file to create multiple versions of the `Bookinfo` services:
+
+    ```bash {name=ambient-bookinfo:deploy-versions}
+    kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo-versions.yaml
+    ```
+
+4. Verify that the Bookinfo pods are running:
+
+    ```bash {name=ambient-bookinfo:verify-pods}
+    kubectl get pods -n bookinfo
+    ```
+
+    **Example output**
+
+    ```text {name=ambient-bookinfo:verify-pods-output}
+    NAME                              READY   STATUS    RESTARTS   AGE
+    details-v1-569946bc86-f5xks       1/1     Running   0          2m30s
+    productpage-v1-6c76dd65f7-tk5mr   1/1     Running   0          2m29s
+    ratings-v1-5fd569d7c8-5x778       1/1     Running   0          2m30s
+    reviews-v1-7668bf774d-qvpjh       1/1     Running   0          2m30s
+    reviews-v2-55dd985686-bxv5v       1/1     Running   0          2m29s
+    reviews-v3-5d7d6bddd8-2wr5w       1/1     Running   0          2m29s
+    ```
+
+5. Confirm that the Bookinfo application is responding:
+
+    ```bash {name=ambient-bookinfo:verify-application}
+    kubectl exec "$(kubectl get pod -l app=ratings -n bookinfo \
+      -o jsonpath='{.items[0].metadata.name}')" \
+      -c ratings -n bookinfo \
+      -- curl -sS productpage:9080/productpage | grep -o "<title>.*</title>"
+    ```
+
+    **Example output**
+
+    ```html {name=ambient-bookinfo:verify-application-output}
+    <title>Simple Bookstore App</title>
+    ```
+
+6. Enroll the Bookinfo application in the ambient mesh by labeling either the entire namespace or individual pods:
+
+    - To include all workloads in the `bookinfo` namespace:
+
+        ```bash {name=ambient-bookinfo:enroll-ambient}
+        kubectl label namespace bookinfo istio.io/dataplane-mode=ambient
+        ```
+
+    - To include only specific workloads, apply the `istio.io/dataplane-mode=ambient` label directly to individual pods. See the [Additional resources](#additional-resources) section for details on the labels used to add or exclude workloads from the mesh.
+
+        :::note
+        Enrolling workloads in the ambient mesh does not require restarting or redeploying application pods. Unlike sidecar mode, the number of containers in each pod remains unchanged.
+        :::
+
+7. Confirm that the ZTunnel proxy has successfully established listening sockets in the pod network namespaces:
+
+    ```bash {name=ambient-bookinfo:verify-ztunnel}
+    istioctl -n ztunnel ztunnel-config workloads
+    ```
+
+    After adding `bookinfo` namespace to the Ambient mesh, you would see `HBONE` protocol.
+
+    **Example output**
+
+    ```text {name=ambient-bookinfo:verify-ztunnel-output}
+    NAMESPACE    POD NAME                        ADDRESS    NODE           WAYPOINT PROTOCOL
+    bookinfo     details-v1-569946bc86-f5xks     10.3.0.143 192.168.131.32 None     HBONE
+    bookinfo     productpage-v1-6c76dd65f7-tk5mr 10.3.0.148 192.168.131.32 None     HBONE
+    bookinfo     ratings-v1-5fd569d7c8-5x778     10.3.0.144 192.168.131.32 None     HBONE
+    bookinfo     reviews-v1-7668bf774d-qvpjh     10.3.0.145 192.168.131.32 None     HBONE
+    bookinfo     reviews-v2-55dd985686-bxv5v     10.3.0.146 192.168.131.32 None     HBONE
+    bookinfo     reviews-v3-5d7d6bddd8-2wr5w     10.3.0.147 192.168.131.32 None     HBONE
+    istio-cni    istio-cni-node-vfrbr            10.3.0.140 192.168.131.32 None     TCP
+    istio-system istiod-57f9449cdd-56gl8         10.3.0.141 192.168.131.32 None     TCP
+    ztunnel      ztunnel-lf7c9                   10.3.0.142 192.168.131.32 None     TCP
+    ```
+
+## Cleanup
+
+```bash {name=ambient-bookinfo:cleanup}
+# Remove the namespace from the ambient data plane
+kubectl label namespace bookinfo istio.io/dataplane-mode-
+# Remove the Bookinfo namespace
+kubectl delete namespace bookinfo
+```
+
+## Additional resources
+
+- [Adding workloads to a mesh in ambient mode](https://istio.io/latest/docs/ambient/usage/add-workloads/) (Istio documentation)

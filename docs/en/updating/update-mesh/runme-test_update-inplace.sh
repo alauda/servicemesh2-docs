@@ -147,7 +147,12 @@ EOF
     if ! __cmp_lines "$output" "$(cat <<'EOF'
 + 1.28.3
 + bookinfo
++ details-v1
 + productpage-v1
++ ratings-v1
++ reviews-v1
++ reviews-v2
++ reviews-v3
 EOF
     )"; then
         log_error "验证 sidecar 代理状态失败"
