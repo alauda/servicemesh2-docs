@@ -243,8 +243,15 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
   export ALB_CLASS_NAME=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.systemAlbIngressClassName}')
 
   export OIDC_ISSUER=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.oidcIssuer}')
-  export OIDC_CLIENT_ID=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.oidcClientID}')
-  export OIDC_CLIENT_SECRET=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.oidcClientSecret}')
+  OIDC_CLIENT_SECRET_REF=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.oidcClientSecretRef}')
+  if [ -n "$OIDC_CLIENT_SECRET_REF" ]; then
+    SYSTEM_NAMESPACE=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.systemNamespace}')
+    export OIDC_CLIENT_ID=$(kubectl -n"$SYSTEM_NAMESPACE" get secret "$OIDC_CLIENT_SECRET_REF" -o go-template='{{index .data "client-id"}}' | base64 -d)
+    export OIDC_CLIENT_SECRET=$(kubectl -n"$SYSTEM_NAMESPACE" get secret "$OIDC_CLIENT_SECRET_REF" -o go-template='{{index .data "client-secret"}}' | base64 -d)
+  else
+    export OIDC_CLIENT_ID=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.oidcClientID}')
+    export OIDC_CLIENT_SECRET=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.oidcClientSecret}')
+  fi
 
   export MONITORING_URL=$(kubectl get feature monitoring -o jsonpath='{.spec.accessInfo.database.address}')
   ```
