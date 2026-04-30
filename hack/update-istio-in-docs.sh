@@ -18,9 +18,10 @@
 # Original script: https://github.com/istio-ecosystem/sail-operator/blob/main/hack/update-istio-in-docs.sh
 #
 # Description:
-#   This script updates Istio version references in MDX documentation files.
+#   This script updates Istio version references in documentation files.
 #   It replaces all occurrences of the old version with the new version in both
-#   standard format (x.y.z) and revision format (x-y-z).
+#   standard format (x.y.z) and revision format (x-y-z) for `.mdx` and `.sh`
+#   files under `docs/en/`.
 #
 # Usage:
 #   ./update-istio-in-docs.sh <NEW_VERSION> <OLD_VERSION>
@@ -85,8 +86,8 @@ fi
 ESCAPED_OLD_VERSION=$(echo "$OLD_VERSION" | sed 's/\./\\./g')
 ESCAPED_NEW_VERSION=$(echo "$NEW_VERSION" | sed 's/\./\\./g')
 
-# 查找并更新所有 .mdx 文件（排除 docs/en/about/release-notes/）
-echo "Searching for .mdx files in docs/en/ (excluding docs/en/about/release-notes)..."
+# 查找并更新所有 .mdx 和 .sh 文件（排除 docs/en/about/release-notes/）
+echo "Searching for .mdx and .sh files in docs/en/ (excluding docs/en/about/release-notes)..."
 
 file_count=0
 while IFS= read -r -d '' file; do
@@ -99,6 +100,6 @@ while IFS= read -r -d '' file; do
     "$SED_CMD" -i -E "s/$OLD_VERSION_REVISION_FORMAT/$NEW_VERSION_REVISION_FORMAT/g" "$file"
     
     ((file_count++))
-done < <(find docs/en -type f -name '*.mdx' ! -path 'docs/en/about/release-notes/*' -print0)
+done < <(find docs/en -type f \( -name '*.mdx' -o -name '*.sh' \) ! -path 'docs/en/about/release-notes/*' -print0)
 
 echo "Updated $file_count documentation files successfully."

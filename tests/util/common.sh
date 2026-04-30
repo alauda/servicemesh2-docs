@@ -85,7 +85,10 @@ kubectl_apply_with_mirror() {
         
         # 下载 YAML 文件，替换镜像地址，然后应用
         log_info "下载并替换镜像地址: $url"
-        curl -sSL "$url" | sed "s|docker\.io|${REGISTRY_MIRROR_ADDRESS}|g" | eval "${cmd_content//-f $url/-f -}"
+        curl -sSL "$url" \
+            | sed "s|docker\.io|${REGISTRY_MIRROR_ADDRESS}|g" \
+            | sed "s|registry\.istio\.io/release|${REGISTRY_MIRROR_ADDRESS}/istio|g" \
+            | eval "${cmd_content//-f $url/-f -}"
     else
         # 没有设置镜像加速，直接执行原命令
         eval "$cmd_content"

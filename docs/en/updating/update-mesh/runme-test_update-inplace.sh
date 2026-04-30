@@ -94,7 +94,7 @@ EOF
     log_success "Istio 资源状态验证通过（安装后）"
 
     # 10. 更新 Istio 版本
-    log_info "步骤 10: 更新 Istio 版本至 v1.28.3"
+    log_info "步骤 10: 更新 Istio 版本至 v1.28.6"
     runme run update-inplace:patch-istio-version || {
         log_error "更新 Istio 版本失败"
         return 1
@@ -114,7 +114,7 @@ EOF
 
     if ! __cmp_lines "$output" "$(cat <<'EOF'
 + Healthy
-+ v1.28.3
++ v1.28.6
 EOF
     )"; then
         log_error "检查 Istio 更新状态失败"
@@ -145,7 +145,7 @@ EOF
     output=$(runme run update-inplace:verify-proxy-status 2>&1)
 
     if ! __cmp_lines "$output" "$(cat <<'EOF'
-+ 1.28.3
++ 1.28.6
 + bookinfo
 + details-v1
 + productpage-v1
