@@ -179,7 +179,7 @@ The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Containe
 
     ```shell {name=uninstall-ambient:get-ztunnel-output}
     NAME      NAMESPACE   READY   STATUS    VERSION   AGE
-    default   ztunnel     True    Healthy   v1.28.3   1d
+    default   ztunnel     True    Healthy   v1.28.6   1d
     ```
 
 4.  Delete the `ZTunnel` resource:
@@ -206,7 +206,7 @@ The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Containe
 
     ```shell {name=uninstall-ambient:get-istio-output}
     NAME                       NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS            VERSION   AGE
-    <name_of_custom_resource>  istio-system   ambient   1           1       1        default           ZTunnelNotFound   v1.28.3   1d
+    <name_of_custom_resource>  istio-system   ambient   1           1       1        default           ZTunnelNotFound   v1.28.6   1d
     ```
 
 2.  Use the name from the previous command's output to replace `<name_of_custom_resource>`, and then run the following to remove it:
@@ -233,7 +233,7 @@ The Alauda Service Mesh v2 Operator can be uninstalled using the Alauda Containe
 
     ```shell {name=uninstall-ambient:get-istiocni-output}
     NAME      NAMESPACE   PROFILE   READY   STATUS    VERSION   AGE
-    default   istio-cni   ambient   True    Healthy   v1.28.3   1d
+    default   istio-cni   ambient   True    Healthy   v1.28.6   1d
     ```
 
 2.  Run the following to remove it:

@@ -85,7 +85,7 @@ log_header "Case 4: InPlace 更新策略测试 (Update InPlace)"
 
 if (
     set -e
-    ./run.sh --file update-inplace --no-cleanup
+    ./run.sh --file update-inplace --no-cleanup --force-init
     ./run.sh --file update-inplace --cleanup-only
 ); then
     record_test_result 0
@@ -108,16 +108,16 @@ if (
     # L7 特性测试（独立测试，包含清理步骤）
     ./run.sh --file ambient-l7-features --no-cleanup
     ./run.sh --file ambient-l7-features --cleanup-only
-    # 入口网关 K8S Gateway API 测试
+    # 入口网关 K8S Gateway API 测试（集群需要支持 `LoadBalancer`）
     ./run.sh --file exposing-a-service-via-k8s-gateway-api-in-ambient-mode --no-cleanup
     ./run.sh --file exposing-a-service-via-k8s-gateway-api-in-ambient-mode --cleanup-only
     # 出口网关 (Egress Gateway) 测试
     ./run.sh --file routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode --no-cleanup
     ./run.sh --file routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode --cleanup-only
-    # 清理 bookinfo
-    ./run.sh --file deploying-ambient-bookinfo --cleanup-only
     # 卸载 ambient 网格
     ./run.sh --file uninstalling-alauda-service-mesh-in-ambient-mode
+    # 清理 bookinfo
+    ./run.sh --file deploying-ambient-bookinfo --cleanup-only
 ); then
     record_test_result 0
 else
