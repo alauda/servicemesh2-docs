@@ -85,7 +85,7 @@ log_header "Case 4: InPlace 更新策略测试 (Update InPlace)"
 
 if (
     set -e
-    ./run.sh --file update-inplace --no-cleanup
+    ./run.sh --file update-inplace --no-cleanup --force-init
     ./run.sh --file update-inplace --cleanup-only
 ); then
     record_test_result 0
