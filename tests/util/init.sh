@@ -39,29 +39,25 @@ check_tools() {
     log_success "所有必要工具检查通过"
 }
 
-# 安装 runme 工具
-install_runme() {
-    log_info "检查 runme 工具..."
+# ==============================================================================
+# 工具安装公共函数
+# ==============================================================================
 
-    if [ -f "$BIN_DIR/runme" ]; then
-        local version_output
-        version_output=$("$BIN_DIR/runme" --version 2>&1 || echo "")
+# 检测操作系统和架构,根据传入的命名约定设置全局变量
+# 用法: _detect_os_arch <darwin_name> <linux_name> <amd64_name> <arm64_name>
+# 输出: 设置 DETECTED_OS / DETECTED_ARCH 两个全局变量
+# 失败 (不支持的平台): exit 1
+# 示例:
+#   _detect_os_arch darwin linux x86_64 arm64    # runme:    runme_${os}_${arch}.tar.gz
+#   _detect_os_arch darwin linux amd64  arm64    # violet:   violet_${os}_${arch}
+#   _detect_os_arch osx    linux amd64  arm64    # istioctl: istioctl-${ver}-${os}-${arch}.tar.gz
+_detect_os_arch() {
+    local darwin_name="$1" linux_name="$2"
+    local amd_name="$3" arm_name="$4"
 
-        if echo "$version_output" | grep -q "runme version ${RUNME_VERSION}"; then
-            log_success "runme $RUNME_VERSION 已安装"
-            return 0
-        else
-            log_warn "runme 版本不匹配，重新安装"
-        fi
-    fi
-
-    log_info "安装 runme $RUNME_VERSION ..."
-
-    # 检测操作系统和架构
-    local os arch url
     case "$(uname -s)" in
-        Darwin) os="darwin" ;;
-        Linux)  os="linux" ;;
+        Darwin) DETECTED_OS="$darwin_name" ;;
+        Linux)  DETECTED_OS="$linux_name" ;;
         *)
             log_error "不支持的操作系统: $(uname -s)"
             exit 1
@@ -69,95 +65,98 @@ install_runme() {
     esac
 
     case "$(uname -m)" in
-        x86_64|amd64) arch="x86_64" ;;
-        arm64|aarch64) arch="arm64" ;;
+        x86_64|amd64) DETECTED_ARCH="$amd_name" ;;
+        arm64|aarch64) DETECTED_ARCH="$arm_name" ;;
         *)
             log_error "不支持的架构: $(uname -m)"
             exit 1
             ;;
     esac
+}
 
-    url="https://downloads.runme.dev/runme/${RUNME_VERSION}/runme_${os}_${arch}.tar.gz"
+# 通用工具安装(下载 → 解压 → 验证),适用于 runme/violet/istioctl 等单二进制工具
+# 用法: _install_tool <name> <version_cmd_args> <version_pattern> <url> <is_archive>
+# 参数:
+#   name              - 工具名 (binary 的最终文件名,放置在 BIN_DIR/<name>)
+#   version_cmd_args  - 取版本命令的参数 (如 "--version" / "version --remote=false")
+#   version_pattern   - 版本输出需包含的字符串 (如 "runme version 1.2.3" / "Version: v")
+#   url               - 下载 URL
+#   is_archive        - "true" 表示 URL 是 tar.gz 需解压,"false" 表示直接是二进制
+# 行为:
+#   - 已安装且匹配:   log_success + return 0
+#   - 不存在或不匹配: 重新下载安装,失败则 exit 1
+_install_tool() {
+    local name="$1"
+    local version_cmd_args="$2"
+    local version_pattern="$3"
+    local url="$4"
+    local is_archive="$5"
+    local bin_path="$BIN_DIR/$name"
 
-    log_info "下载 runme: $url"
-    curl -sSL "$url" -o "$BIN_DIR/runme.tar.gz" || {
-        log_error "下载 runme 失败"
-        exit 1
-    }
+    log_info "检查 $name 工具 (期望版本含: $version_pattern)..."
 
-    log_info "解压 runme..."
-    tar -xzf "$BIN_DIR/runme.tar.gz" -C "$BIN_DIR" || {
-        log_error "解压 runme 失败"
-        exit 1
-    }
+    # 已存在则做一次版本校验,匹配则直接返回
+    if [ -f "$bin_path" ]; then
+        local current
+        # shellcheck disable=SC2086
+        current=$("$bin_path" $version_cmd_args 2>&1 || echo "")
+        if echo "$current" | grep -q "$version_pattern"; then
+            log_success "$name 已安装"
+            return 0
+        fi
+        log_warn "$name 版本不匹配,重新安装 (当前输出: ${current:-空})"
+    fi
 
-    rm -f "$BIN_DIR/runme.tar.gz"
-    chmod +x "$BIN_DIR/runme"
+    log_info "下载 $name: $url"
+    if [ "$is_archive" = "true" ]; then
+        local tarball="$BIN_DIR/${name}.tar.gz"
+        curl -fsSL "$url" -o "$tarball" || {
+            log_error "下载 $name 失败: $url"
+            exit 1
+        }
+        log_info "解压 $name..."
+        tar -xzf "$tarball" -C "$BIN_DIR" || {
+            log_error "解压 $name 失败"
+            exit 1
+        }
+        rm -f "$tarball"
+    else
+        curl -fsSL "$url" -o "$bin_path" || {
+            log_error "下载 $name 失败: $url"
+            exit 1
+        }
+    fi
+
+    chmod +x "$bin_path"
 
     # 验证安装
-    if "$BIN_DIR/runme" --version | grep -q "runme version ${RUNME_VERSION}"; then
-        log_success "runme $RUNME_VERSION 安装成功"
+    local actual
+    # shellcheck disable=SC2086
+    actual=$("$bin_path" $version_cmd_args 2>&1 || echo "")
+    if echo "$actual" | grep -q "$version_pattern"; then
+        log_success "$name 安装成功"
     else
-        log_error "runme 安装验证失败"
+        log_error "$name 安装验证失败 (输出: $actual)"
         exit 1
     fi
 }
 
-# 安装 violet 工具
+# ==============================================================================
+# 具体工具安装函数 (基于 _detect_os_arch + _install_tool 公共逻辑)
+# ==============================================================================
+
+# 安装 runme 工具 (版本由 RUNME_VERSION 环境变量指定)
+install_runme() {
+    _detect_os_arch darwin linux x86_64 arm64
+    local url="https://downloads.runme.dev/runme/${RUNME_VERSION}/runme_${DETECTED_OS}_${DETECTED_ARCH}.tar.gz"
+    _install_tool runme "--version" "runme version ${RUNME_VERSION}" "$url" true
+}
+
+# 安装 violet 工具 (固定 latest,无具体版本号校验)
 install_violet() {
-    log_info "检查 violet 工具..."
-
-    if [ -f "$BIN_DIR/violet" ]; then
-        local version_output
-        version_output=$("$BIN_DIR/violet" version 2>&1 || echo "")
-
-        if echo "$version_output" | grep -q "Version: v"; then
-            log_success "violet 已安装"
-            return 0
-        else
-            log_warn "violet 验证失败，重新安装"
-        fi
-    fi
-
-    log_info "安装 violet ..."
-
-    # 检测操作系统和架构
-    local os arch url
-    case "$(uname -s)" in
-        Darwin) os="darwin" ;;
-        Linux)  os="linux" ;;
-        *)
-            log_error "不支持的操作系统: $(uname -s)"
-            exit 1
-            ;;
-    esac
-
-    case "$(uname -m)" in
-        x86_64|amd64) arch="amd64" ;;
-        arm64|aarch64) arch="arm64" ;;
-        *)
-            log_error "不支持的架构: $(uname -m)"
-            exit 1
-            ;;
-    esac
-
-    url="http://package-minio.alauda.cn:9199/packages/violet/latest/violet_${os}_${arch}"
-
-    log_info "下载 violet: $url"
-    curl -sSL "$url" -o "$BIN_DIR/violet" || {
-        log_error "下载 violet 失败"
-        exit 1
-    }
-
-    chmod +x "$BIN_DIR/violet"
-
-    # 验证安装
-    if "$BIN_DIR/violet" version | grep -q "Version: v"; then
-        log_success "violet 安装成功"
-    else
-        log_error "violet 安装验证失败"
-        exit 1
-    fi
+    _detect_os_arch darwin linux amd64 arm64
+    local url="http://package-minio.alauda.cn:9199/packages/violet/latest/violet_${DETECTED_OS}_${DETECTED_ARCH}"
+    _install_tool violet "version" "Version: v" "$url" false
 }
 
 # 安装 istioctl 工具
@@ -166,8 +165,6 @@ install_violet() {
 # 代码块中读取 (例: export ISTIO_VERSION=1.28.6 → 1.28.6)
 # 验证: istioctl version --remote=false 输出形如 "client version: 1.28.6"
 install_istioctl() {
-    log_info "检查 istioctl 工具..."
-
     # 从 runme 块中提取 istio 版本号
     local istio_version
     istio_version=$("$BIN_DIR/runme" print multi-primary-multi-network:set-istio-version 2>/dev/null \
@@ -181,67 +178,10 @@ install_istioctl() {
     fi
     log_info "目标 istioctl 版本: $istio_version"
 
-    # 检查已安装版本
-    if [ -f "$BIN_DIR/istioctl" ]; then
-        local version_output
-        version_output=$("$BIN_DIR/istioctl" version --remote=false 2>&1 || echo "")
-
-        if echo "$version_output" | grep -q "client version: $istio_version"; then
-            log_success "istioctl $istio_version 已安装"
-            return 0
-        else
-            log_warn "istioctl 版本不匹配 (当前: ${version_output:-未知}, 期望: $istio_version),重新安装"
-        fi
-    fi
-
-    log_info "安装 istioctl $istio_version ..."
-
-    # 检测操作系统和架构 (istioctl 发布包命名: osx/linux + amd64/arm64)
-    local os arch url
-    case "$(uname -s)" in
-        Darwin) os="osx" ;;
-        Linux)  os="linux" ;;
-        *)
-            log_error "不支持的操作系统: $(uname -s)"
-            exit 1
-            ;;
-    esac
-
-    case "$(uname -m)" in
-        x86_64|amd64) arch="amd64" ;;
-        arm64|aarch64) arch="arm64" ;;
-        *)
-            log_error "不支持的架构: $(uname -m)"
-            exit 1
-            ;;
-    esac
-
-    url="https://github.com/istio/istio/releases/download/${istio_version}/istioctl-${istio_version}-${os}-${arch}.tar.gz"
-
-    log_info "下载 istioctl: $url"
-    curl -fsSL "$url" -o "$BIN_DIR/istioctl.tar.gz" || {
-        log_error "下载 istioctl 失败: $url"
-        exit 1
-    }
-
-    log_info "解压 istioctl..."
-    tar -xzf "$BIN_DIR/istioctl.tar.gz" -C "$BIN_DIR" || {
-        log_error "解压 istioctl 失败"
-        exit 1
-    }
-
-    rm -f "$BIN_DIR/istioctl.tar.gz"
-    chmod +x "$BIN_DIR/istioctl"
-
-    # 验证安装: istioctl version --remote=false 输出形如 "client version: 1.28.6"
-    local actual_version
-    actual_version=$("$BIN_DIR/istioctl" version --remote=false 2>&1 || echo "")
-    if echo "$actual_version" | grep -q "client version: $istio_version"; then
-        log_success "istioctl $istio_version 安装成功"
-    else
-        log_error "istioctl 安装验证失败 (输出: $actual_version)"
-        exit 1
-    fi
+    # istioctl 发布包命名: Darwin → osx (与 runme/violet 不同)
+    _detect_os_arch osx linux amd64 arm64
+    local url="https://github.com/istio/istio/releases/download/${istio_version}/istioctl-${istio_version}-${DETECTED_OS}-${DETECTED_ARCH}.tar.gz"
+    _install_tool istioctl "version --remote=false" "client version: $istio_version" "$url" true
 }
 
 # 下载插件包
