@@ -127,6 +127,49 @@ else
     exit 1
 fi
 
+# ------------------------------------------------------------------
+# Case 6: 多集群 - 多主多网络拓扑 (Multi-Primary Multi-Network)
+# 注：会切换到双集群 kubeconfig，必须放在所有单集群 case 之后
+# ------------------------------------------------------------------
+if [ -z "${EAST_CLUSTER_NAME:-}" ] || [ -z "${WEST_CLUSTER_NAME:-}" ]; then
+    log_header "Case 6/7: 跳过多集群测试 (未设置 EAST_CLUSTER_NAME / WEST_CLUSTER_NAME)"
+else
+    log_header "Case 6: 多集群 - 多主多网络拓扑 (Multi-Primary Multi-Network)"
+
+    if (
+        set -e
+        # 切到双集群 kubeconfig
+        ./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"
+        # 多主多网络安装 + 验证 + 卸载
+        ./run.sh --file install-multi-primary-multi-network --no-cleanup
+        ./run.sh --file install-multi-primary-multi-network --cleanup-only
+    ); then
+        record_test_result 0
+    else
+        record_test_result 1
+        exit 1
+    fi
+
+    # ------------------------------------------------------------------
+    # Case 7: 多集群 - 主-远多网络拓扑 (Primary-Remote Multi-Network)
+    # ------------------------------------------------------------------
+    log_header "Case 7: 多集群 - 主-远多网络拓扑 (Primary-Remote Multi-Network)"
+
+    if (
+        set -e
+        # 重新初始化双集群 kubeconfig (Case 6 卸载后保险一步,确保上下文干净)
+        ./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"
+        # 主-远多网络安装 + 验证 + 卸载
+        ./run.sh --file install-primary-remote-multi-network --no-cleanup
+        ./run.sh --file install-primary-remote-multi-network --cleanup-only
+    ); then
+        record_test_result 0
+    else
+        record_test_result 1
+        exit 1
+    fi
+fi
+
 log_header "所有测试任务执行完成！"
 
 # 注意：print_test_summary 已通过 trap 注册，脚本退出时会自动执行，此处无需再次调用

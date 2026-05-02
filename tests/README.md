@@ -201,10 +201,14 @@ cd tests
 | Ambient Gateway API    | [runme-test_exposing-a-service-via-k8s-gateway-api-in-ambient-mode.sh](../docs/en/gateways/directing-traffic-into-the-mesh/runme-test_exposing-a-service-via-k8s-gateway-api-in-ambient-mode.sh)    | `./run.sh --file exposing-a-service-via-k8s-gateway-api-in-ambient-mode`     |
 | Ambient Egress Gateway | [runme-test_routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode.sh](../docs/en/gateways/directing-outbound-traffic/runme-test_routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode.sh) | `./run.sh --file routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode` |
 | Ambient 模式网格卸载   | [runme-test_uninstalling-alauda-service-mesh-in-ambient-mode.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-service-mesh-in-ambient-mode.sh)                                            | `./run.sh --file uninstalling-alauda-service-mesh-in-ambient-mode`           |
+| 多集群 - 多主多网络    | [runme-test_install-multi-primary-multi-network.sh](../docs/en/installing/multi-cluster/runme-test_install-multi-primary-multi-network.sh)                                                          | `./run.sh --file install-multi-primary-multi-network`                        |
+| 多集群 - 主-远多网络   | [runme-test_install-primary-remote-multi-network.sh](../docs/en/installing/multi-cluster/runme-test_install-primary-remote-multi-network.sh)                                                        | `./run.sh --file install-primary-remote-multi-network`                       |
 
 > **注意**：后续会逐步添加更多文档的自动化测试。
 >
 > **Waypoint 代理部署**测试暂未覆盖 "Enabling cross-namespace waypoint usage" 部分，后续补充。
+>
+> **多集群 multi-cluster 测试** 需要 `EAST_CLUSTER_NAME` 与 `WEST_CLUSTER_NAME` 双集群环境。运行前需先用 `./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"` 初始化双集群 kubeconfig；测试文档中的 `configuration-overview.mdx` 步骤已合并进每个 install 测试脚本，无需单独运行。
 
 ## 工作原理
 
@@ -345,6 +349,6 @@ Skill 定义文件位于 `.claude/skills/auto-test-creator/SKILL.md`，其中包
 - [ ] PLATFORM_CA 自动获取
 - [ ] Multus 集群插件自动安装
 - [ ] MetalLB 集群插件自动安装
-- [ ] multi-cluster 文档自动化测试
+- [x] multi-cluster 文档自动化测试
 - [ ] 逐步补充其他测试文档
 - [ ] 优化测试 case 结果统计
