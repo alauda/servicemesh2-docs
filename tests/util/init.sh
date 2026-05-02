@@ -160,6 +160,90 @@ install_violet() {
     fi
 }
 
+# 安装 istioctl 工具
+# 版本号通过 runme print 从 install-multi-primary-multi-network.mdx 的
+#   multi-primary-multi-network:set-istio-version
+# 代码块中读取 (例: export ISTIO_VERSION=1.28.6 → 1.28.6)
+# 验证: istioctl version --remote=false 输出形如 "client version: 1.28.6"
+install_istioctl() {
+    log_info "检查 istioctl 工具..."
+
+    # 从 runme 块中提取 istio 版本号
+    local istio_version
+    istio_version=$("$BIN_DIR/runme" print multi-primary-multi-network:set-istio-version 2>/dev/null \
+        | grep -oE 'ISTIO_VERSION=[0-9]+\.[0-9]+\.[0-9]+' \
+        | head -n 1 \
+        | cut -d= -f2)
+
+    if [ -z "$istio_version" ]; then
+        log_error "无法从 multi-primary-multi-network:set-istio-version 块中提取 ISTIO_VERSION"
+        exit 1
+    fi
+    log_info "目标 istioctl 版本: $istio_version"
+
+    # 检查已安装版本
+    if [ -f "$BIN_DIR/istioctl" ]; then
+        local version_output
+        version_output=$("$BIN_DIR/istioctl" version --remote=false 2>&1 || echo "")
+
+        if echo "$version_output" | grep -q "client version: $istio_version"; then
+            log_success "istioctl $istio_version 已安装"
+            return 0
+        else
+            log_warn "istioctl 版本不匹配 (当前: ${version_output:-未知}, 期望: $istio_version),重新安装"
+        fi
+    fi
+
+    log_info "安装 istioctl $istio_version ..."
+
+    # 检测操作系统和架构 (istioctl 发布包命名: osx/linux + amd64/arm64)
+    local os arch url
+    case "$(uname -s)" in
+        Darwin) os="osx" ;;
+        Linux)  os="linux" ;;
+        *)
+            log_error "不支持的操作系统: $(uname -s)"
+            exit 1
+            ;;
+    esac
+
+    case "$(uname -m)" in
+        x86_64|amd64) arch="amd64" ;;
+        arm64|aarch64) arch="arm64" ;;
+        *)
+            log_error "不支持的架构: $(uname -m)"
+            exit 1
+            ;;
+    esac
+
+    url="https://github.com/istio/istio/releases/download/${istio_version}/istioctl-${istio_version}-${os}-${arch}.tar.gz"
+
+    log_info "下载 istioctl: $url"
+    curl -fsSL "$url" -o "$BIN_DIR/istioctl.tar.gz" || {
+        log_error "下载 istioctl 失败: $url"
+        exit 1
+    }
+
+    log_info "解压 istioctl..."
+    tar -xzf "$BIN_DIR/istioctl.tar.gz" -C "$BIN_DIR" || {
+        log_error "解压 istioctl 失败"
+        exit 1
+    }
+
+    rm -f "$BIN_DIR/istioctl.tar.gz"
+    chmod +x "$BIN_DIR/istioctl"
+
+    # 验证安装: istioctl version --remote=false 输出形如 "client version: 1.28.6"
+    local actual_version
+    actual_version=$("$BIN_DIR/istioctl" version --remote=false 2>&1 || echo "")
+    if echo "$actual_version" | grep -q "client version: $istio_version"; then
+        log_success "istioctl $istio_version 安装成功"
+    else
+        log_error "istioctl 安装验证失败 (输出: $actual_version)"
+        exit 1
+    fi
+}
+
 # 下载插件包
 download_package() {
     local url="$1"
@@ -316,6 +400,7 @@ main() {
     check_tools
     install_runme
     install_violet
+    install_istioctl
     setup_kubeconfig "${clusters[@]}" || return 1
     upload_all_packages "${clusters[@]}" || return 1
     install_all_servicemesh_operators "${clusters[@]}" || return 1
