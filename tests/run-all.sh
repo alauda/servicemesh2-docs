@@ -140,6 +140,8 @@ else
         set -e
         # 切到双集群 kubeconfig
         ./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"
+        # 公共前置: 生成 CA 证书并下发 cacerts 到两个集群
+        ./run.sh --file configuration-overview
         # 多主多网络安装 + 验证 + 卸载
         ./run.sh --file install-multi-primary-multi-network --no-cleanup
         ./run.sh --file install-multi-primary-multi-network --cleanup-only
@@ -159,6 +161,8 @@ else
         set -e
         # 重新初始化双集群 kubeconfig (Case 6 卸载后保险一步,确保上下文干净)
         ./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"
+        # 重新下发 cacerts (Case 6 cleanup 已删除 istio-system,需要重建)
+        ./run.sh --file configuration-overview
         # 主-远多网络安装 + 验证 + 卸载
         ./run.sh --file install-primary-remote-multi-network --no-cleanup
         ./run.sh --file install-primary-remote-multi-network --cleanup-only

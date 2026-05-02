@@ -212,6 +212,35 @@ _wait_for_deployment() {
     return 0
 }
 
+# 等待 Service 的 LoadBalancer ingress (IP 或 hostname) 就绪
+# 用法: _wait_for_ingress_lb <namespace> <service> [context] [timeout]
+# 说明:
+#   - 通过 kubectl wait --for=jsonpath='{.status.loadBalancer.ingress}' 等待
+#     ingress 字段被填充 (IP 或 hostname 均可,无需关心具体类型)
+#   - context 可选,留空时使用 kubectl 当前默认 context
+#   - timeout 默认 2m,可传入 30s / 5m 等 kubectl 接受的时长格式
+_wait_for_ingress_lb() {
+    local namespace="$1"
+    local service="$2"
+    local context="${3:-}"
+    local timeout="${4:-2m}"
+
+    if [ -n "$context" ]; then
+        log_info "等待 LoadBalancer ingress 就绪: ns=$namespace svc=$service context=$context (timeout=$timeout)"
+    else
+        log_info "等待 LoadBalancer ingress 就绪: ns=$namespace svc=$service (timeout=$timeout)"
+    fi
+
+    if ! kubectl --context "$context" -n "$namespace" wait \
+            --for=jsonpath='{.status.loadBalancer.ingress}' \
+            "svc/$service" --timeout="$timeout"; then
+        log_error "等待 LoadBalancer ingress 超时: ns=$namespace svc=$service"
+        return 1
+    fi
+    log_success "LoadBalancer ingress 就绪: ns=$namespace svc=$service"
+    return 0
+}
+
 # 重试执行命令
 # 用法: retry_command <command> [max_retries] [interval]
 retry_command() {

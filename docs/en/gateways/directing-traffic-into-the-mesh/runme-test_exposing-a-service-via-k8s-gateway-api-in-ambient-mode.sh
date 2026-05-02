@@ -196,11 +196,7 @@ test_exposing_a_service_via_k8s_gateway_api_in_ambient_mode() {
         return 1
     }
     # 等待 svc 的 LoadBalancer 可用
-    kubectl wait --for=jsonpath='{.status.loadBalancer.ingress}' svc/httpbin-gateway-istio \
-        -n httpbin --timeout=2m || {
-        log_error "等待 LoadBalancer 获取外部地址失败"
-        return 1
-    }
+    _wait_for_ingress_lb httpbin httpbin-gateway-istio || return 1
 
     # 步骤 20: 获取 INGRESS_HOST
     log_info "步骤 20: 获取 INGRESS_HOST"

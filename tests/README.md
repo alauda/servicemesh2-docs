@@ -201,6 +201,7 @@ cd tests
 | Ambient Gateway API    | [runme-test_exposing-a-service-via-k8s-gateway-api-in-ambient-mode.sh](../docs/en/gateways/directing-traffic-into-the-mesh/runme-test_exposing-a-service-via-k8s-gateway-api-in-ambient-mode.sh)    | `./run.sh --file exposing-a-service-via-k8s-gateway-api-in-ambient-mode`     |
 | Ambient Egress Gateway | [runme-test_routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode.sh](../docs/en/gateways/directing-outbound-traffic/runme-test_routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode.sh) | `./run.sh --file routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode` |
 | Ambient 模式网格卸载   | [runme-test_uninstalling-alauda-service-mesh-in-ambient-mode.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-service-mesh-in-ambient-mode.sh)                                            | `./run.sh --file uninstalling-alauda-service-mesh-in-ambient-mode`           |
+| 多集群 - 配置概述（CA 证书） | [runme-test_configuration-overview.sh](../docs/en/installing/multi-cluster/runme-test_configuration-overview.sh)                                                                              | `./run.sh --file configuration-overview`                                     |
 | 多集群 - 多主多网络    | [runme-test_install-multi-primary-multi-network.sh](../docs/en/installing/multi-cluster/runme-test_install-multi-primary-multi-network.sh)                                                          | `./run.sh --file install-multi-primary-multi-network`                        |
 | 多集群 - 主-远多网络   | [runme-test_install-primary-remote-multi-network.sh](../docs/en/installing/multi-cluster/runme-test_install-primary-remote-multi-network.sh)                                                        | `./run.sh --file install-primary-remote-multi-network`                       |
 
@@ -208,7 +209,7 @@ cd tests
 >
 > **Waypoint 代理部署**测试暂未覆盖 "Enabling cross-namespace waypoint usage" 部分，后续补充。
 >
-> **多集群 multi-cluster 测试** 需要 `EAST_CLUSTER_NAME` 与 `WEST_CLUSTER_NAME` 双集群环境。运行前需先用 `./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"` 初始化双集群 kubeconfig；测试文档中的 `configuration-overview.mdx` 步骤已合并进每个 install 测试脚本，无需单独运行。
+> **多集群 multi-cluster 测试** 需要 `EAST_CLUSTER_NAME` 与 `WEST_CLUSTER_NAME` 双集群环境。运行前需先用 `./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"` 初始化双集群 kubeconfig；并需先执行 `./run.sh --file configuration-overview` 完成两个集群上的 cacerts 下发，然后才能运行 `install-multi-primary-multi-network` 或 `install-primary-remote-multi-network`。
 
 ## 工作原理
 
