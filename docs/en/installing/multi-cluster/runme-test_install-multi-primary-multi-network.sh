@@ -138,13 +138,13 @@ test_install_multi_primary_multi_network() {
     runme run multi-primary-multi-network:label-sample-ns-east || return 1
 
     log_info "步骤 2.3: East 部署 helloworld service"
-    runme run multi-primary-multi-network:deploy-helloworld-svc-east || return 1
+    kubectl_apply_with_mirror multi-primary-multi-network:deploy-helloworld-svc-east || return 1
 
     log_info "步骤 2.4: East 部署 helloworld v1"
-    runme run multi-primary-multi-network:deploy-helloworld-v1-east || return 1
+    kubectl_apply_with_mirror multi-primary-multi-network:deploy-helloworld-v1-east || return 1
 
     log_info "步骤 2.5: East 部署 sleep"
-    runme run multi-primary-multi-network:deploy-sleep-east || return 1
+    kubectl_apply_with_mirror multi-primary-multi-network:deploy-sleep-east || return 1
 
     log_info "步骤 2.6: East 等待 helloworld-v1 就绪"
     runme run multi-primary-multi-network:wait-helloworld-v1-east || return 1
@@ -159,13 +159,13 @@ test_install_multi_primary_multi_network() {
     runme run multi-primary-multi-network:label-sample-ns-west || return 1
 
     log_info "步骤 2.10: West 部署 helloworld service"
-    runme run multi-primary-multi-network:deploy-helloworld-svc-west || return 1
+    kubectl_apply_with_mirror multi-primary-multi-network:deploy-helloworld-svc-west || return 1
 
     log_info "步骤 2.11: West 部署 helloworld v2"
-    runme run multi-primary-multi-network:deploy-helloworld-v2-west || return 1
+    kubectl_apply_with_mirror multi-primary-multi-network:deploy-helloworld-v2-west || return 1
 
     log_info "步骤 2.12: West 部署 sleep"
-    runme run multi-primary-multi-network:deploy-sleep-west || return 1
+    kubectl_apply_with_mirror multi-primary-multi-network:deploy-sleep-west || return 1
 
     log_info "步骤 2.13: West 等待 helloworld-v2 就绪"
     runme run multi-primary-multi-network:wait-helloworld-v2-west || return 1
