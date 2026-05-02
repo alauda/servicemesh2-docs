@@ -60,7 +60,7 @@ export PLATFORM_USERNAME='your-username'
 export PLATFORM_PASSWORD='your-password'
 
 # ACP 平台 API token（用于自动获取集群 kubeconfig）
-# 获取方式：在 ACP UI 上为账号生成 API token，或参考 ACP 文档
+# 获取方式：在 ACP UI （账号的 Profile 页面）上生成 API token
 export ACP_API_TOKEN='your-acp-api-token'
 
 # 选择集群连接模式（可选，默认 proxy）
@@ -342,6 +342,7 @@ Skill 定义文件位于 `.claude/skills/auto-test-creator/SKILL.md`，其中包
 ## TODO
 
 - [x] 通过 ACP API 自动获取 kubeconfig（替代手动下载）
+- [ ] PLATFORM_CA 自动获取
 - [ ] Multus 集群插件自动安装
 - [ ] MetalLB 集群插件自动安装
 - [ ] multi-cluster 文档自动化测试

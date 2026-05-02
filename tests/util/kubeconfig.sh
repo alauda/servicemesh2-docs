@@ -113,8 +113,13 @@ fetch_cluster_kubeconfig() {
     # - 重命名 cluster 为 ${cluster}
     # - context 名设为 ${cluster}
     # - current-context 设为 ${cluster}
+    # - cert/key 字段（*-data）若为原始 PEM 文本则 base64 编码
+    #   （ACP API 返回的是裸 PEM，但 kubeconfig 规范要求 *-data 字段必须是单行 base64）
     local processed
     processed=$(echo "$body" | jq --arg ctx "$target_context" --arg cluster "$cluster" '
+        # 若值含 PEM 头部则 base64 编码，否则原样返回
+        def ensure_b64: if (. // "") | test("-----BEGIN") then @base64 else . end;
+
         (.contexts[]? | select(.name == $ctx)) as $target |
         if $target == null then
             error("API 响应中未找到 context: " + $ctx)
@@ -127,10 +132,21 @@ fetch_cluster_kubeconfig() {
             "apiVersion": (.apiVersion // "v1"),
             "kind": (.kind // "Config"),
             "clusters": [
-                .clusters[]? | select(.name == $cluster_ref) | .name = $cluster
+                .clusters[]? | select(.name == $cluster_ref)
+                | .name = $cluster
+                | if .cluster["certificate-authority-data"] then
+                      .cluster["certificate-authority-data"] |= ensure_b64
+                  else . end
             ],
             "users": [
-                .users[]? | select(.name == $user_ref) | .name = $new_user
+                .users[]? | select(.name == $user_ref)
+                | .name = $new_user
+                | if .user["client-certificate-data"] then
+                      .user["client-certificate-data"] |= ensure_b64
+                  else . end
+                | if .user["client-key-data"] then
+                      .user["client-key-data"] |= ensure_b64
+                  else . end
             ],
             "contexts": [{
                 "name": $cluster,
@@ -148,17 +164,18 @@ fetch_cluster_kubeconfig() {
 
     # 写入临时 JSON 后用 kubectl 转换为标准 YAML 格式
     mkdir -p "$(dirname "$output")"
-    local tmp_json
+    local tmp_json kubectl_err
     tmp_json=$(mktemp)
     echo "$processed" > "$tmp_json"
     chmod 600 "$tmp_json"
 
-    if ! KUBECONFIG="$tmp_json" kubectl config view --raw --flatten > "$output" 2>/dev/null; then
+    kubectl_err=$(KUBECONFIG="$tmp_json" kubectl config view --raw --flatten 2>&1 > "$output") || {
         log_error "转换 kubeconfig 格式失败 (kubectl 无法解析 API 响应)"
+        log_error "kubectl 错误: $kubectl_err"
         log_error "原始 JSON: $processed"
-        rm -f "$tmp_json"
+        rm -f "$tmp_json" "$output"
         return 1
-    fi
+    }
     rm -f "$tmp_json"
     chmod 600 "$output"
 
