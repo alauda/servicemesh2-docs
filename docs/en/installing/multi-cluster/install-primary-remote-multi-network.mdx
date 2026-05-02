@@ -313,19 +313,19 @@ This cluster will host the `v1` version of the `helloworld` service.
 
     a.  First, establish the `helloworld` service endpoint.
 
-        ```shell {name=primary-remote-multi-network:deploy-helloworld-svc-east}
-        kubectl --context="${CTX_CLUSTER1}" apply \
-          -l service=helloworld -n sample \
-          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
-        ```
+    ```shell {name=primary-remote-multi-network:deploy-helloworld-svc-east}
+    kubectl --context="${CTX_CLUSTER1}" apply \
+      -l service=helloworld -n sample \
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
+    ```
 
     b.  Then, deploy the `v1` instance of the `helloworld` application.
 
-        ```shell {name=primary-remote-multi-network:deploy-helloworld-v1-east}
-        kubectl --context="${CTX_CLUSTER1}" apply \
-          -l version=v1 -n sample \
-          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
-        ```
+    ```shell {name=primary-remote-multi-network:deploy-helloworld-v1-east}
+    kubectl --context="${CTX_CLUSTER1}" apply \
+      -l version=v1 -n sample \
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
+    ```
 
 4.  Deploy the `sleep` application, which will act as a client for sending test requests.
 
@@ -367,19 +367,19 @@ This cluster will host the `v2` version of the `helloworld` service.
 
     a.  Create the common `helloworld` service endpoint on the `West` cluster.
 
-        ```shell {name=primary-remote-multi-network:deploy-helloworld-svc-west}
-        kubectl --context="${CTX_CLUSTER2}" apply \
-          -l service=helloworld -n sample \
-          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
-        ```
+    ```shell {name=primary-remote-multi-network:deploy-helloworld-svc-west}
+    kubectl --context="${CTX_CLUSTER2}" apply \
+      -l service=helloworld -n sample \
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
+    ```
 
     b.  Deploy the `v2` instance of the `helloworld` application.
 
-        ```shell {name=primary-remote-multi-network:deploy-helloworld-v2-west}
-        kubectl --context="${CTX_CLUSTER2}" apply \
-          -l version=v2 -n sample \
-          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
-        ```
+    ```shell {name=primary-remote-multi-network:deploy-helloworld-v2-west}
+    kubectl --context="${CTX_CLUSTER2}" apply \
+      -l version=v2 -n sample \
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
+    ```
 
 4.  Deploy the client `sleep` application on the `West` cluster.
 
@@ -392,13 +392,13 @@ This cluster will host the `v2` version of the `helloworld` service.
 5.  Wait for the `helloworld-v2` deployment to become fully available.
 
     ```shell {name=primary-remote-multi-network:wait-helloworld-v2-west}
-    kubectl --context="${CTX_CLUSTER2}" wait --for condition=available -n sample deployment/helloworld-v2
+    kubectl --context="${CTX_CLUSTER2}" wait --for condition=available -n sample deployment/helloworld-v2 --timeout=3m
     ```
 
 6.  Finally, ensure the `sleep` deployment on the `West` cluster is ready.
 
     ```shell {name=primary-remote-multi-network:wait-sleep-west}
-    kubectl --context="${CTX_CLUSTER2}" wait --for condition=available -n sample deployment/sleep
+    kubectl --context="${CTX_CLUSTER2}" wait --for condition=available -n sample deployment/sleep --timeout=3m
     ```
 
 ### Verifying traffic flows between clusters
@@ -449,14 +449,14 @@ After completing your verification and experimentation, you should dismantle the
 
 **Procedure**
 
-1.  Execute a single command to remove all Istio components and the sample applications from the `East` cluster.
+1. Execute a single command to remove all Istio components and the sample applications from the `East` cluster.
 
-    ```shell {name=primary-remote-multi-network:cleanup-east}
-    kubectl --context="${CTX_CLUSTER1}" delete istio/default istiocni/default ns/sample ns/istio-system ns/istio-cni
-    ```
+   ```shell {name=primary-remote-multi-network:cleanup-east}
+   kubectl --context="${CTX_CLUSTER1}" delete istio/default istiocni/default ns/sample ns/istio-system ns/istio-cni
+   ```
 
-2.  Run the corresponding command to perform the same cleanup operation on the `West` cluster.
+2. Run the corresponding command to perform the same cleanup operation on the `West` cluster.
 
-    ```shell {name=primary-remote-multi-network:cleanup-west}
-    kubectl --context="${CTX_CLUSTER2}" delete istio/default istiocni/default ns/sample ns/istio-system ns/istio-cni
-    ```
+   ```shell {name=primary-remote-multi-network:cleanup-west}
+   kubectl --context="${CTX_CLUSTER2}" delete istio/default istiocni/default ns/sample ns/istio-system ns/istio-cni
+   ```

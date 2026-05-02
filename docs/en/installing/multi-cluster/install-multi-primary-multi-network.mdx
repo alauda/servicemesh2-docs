@@ -46,24 +46,24 @@ The gateway in each cluster must be reachable from the other cluster.
 
   Install the `IstioCNI` resource on the **East** cluster by running the following command:
 
-    ```bash {name=multi-primary-multi-network:install-istio-cni-east}
-    kubectl --context "${CTX_CLUSTER1}" create namespace istio-cni
-    cat <<EOF | kubectl --context "${CTX_CLUSTER1}" apply -f -
-    apiVersion: sailoperator.io/v1
-    kind: IstioCNI
-    metadata:
-      name: default
-    spec:
-      version: v${ISTIO_VERSION}
-      namespace: istio-cni
-      values:
-        cni:
-          cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
-          excludeNamespaces:
-            - istio-cni
-            - kube-system
-    EOF
-    ```
+  ```bash {name=multi-primary-multi-network:install-istio-cni-east}
+  kubectl --context "${CTX_CLUSTER1}" create namespace istio-cni
+  cat <<EOF | kubectl --context "${CTX_CLUSTER1}" apply -f -
+  apiVersion: sailoperator.io/v1
+  kind: IstioCNI
+  metadata:
+    name: default
+  spec:
+    version: v${ISTIO_VERSION}
+    namespace: istio-cni
+    values:
+      cni:
+        cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
+        excludeNamespaces:
+          - istio-cni
+          - kube-system
+  EOF
+  ```
 
   ### Install Istio on the **East** cluster
 
@@ -289,19 +289,19 @@ This cluster will host the `v1` version of the `helloworld` service.
 
     a.  First, establish the `helloworld` service endpoint.
 
-        ```shell {name=multi-primary-multi-network:deploy-helloworld-svc-east}
-        kubectl --context="${CTX_CLUSTER1}" apply \
-          -l service=helloworld -n sample \
-          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
-        ```
+    ```shell {name=multi-primary-multi-network:deploy-helloworld-svc-east}
+    kubectl --context="${CTX_CLUSTER1}" apply \
+      -l service=helloworld -n sample \
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
+    ```
 
     b.  Then, deploy the `v1` instance of the `helloworld` application.
 
-        ```shell {name=multi-primary-multi-network:deploy-helloworld-v1-east}
-        kubectl --context="${CTX_CLUSTER1}" apply \
-          -l version=v1 -n sample \
-          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
-        ```
+    ```shell {name=multi-primary-multi-network:deploy-helloworld-v1-east}
+    kubectl --context="${CTX_CLUSTER1}" apply \
+      -l version=v1 -n sample \
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
+    ```
 
 4.  Deploy the `sleep` application, which will act as a client for sending test requests.
 
@@ -314,13 +314,13 @@ This cluster will host the `v1` version of the `helloworld` service.
 5.  Pause the process until the `helloworld-v1` deployment is fully available and ready.
 
     ```shell {name=multi-primary-multi-network:wait-helloworld-v1-east}
-    kubectl --context="${CTX_CLUSTER1}" wait --for condition=available -n sample deployment/helloworld-v1
+    kubectl --context="${CTX_CLUSTER1}" wait --for condition=available -n sample deployment/helloworld-v1 --timeout=3m
     ```
 
 6.  Likewise, wait for the `sleep` deployment to report a `Ready` status.
 
     ```shell {name=multi-primary-multi-network:wait-sleep-east}
-    kubectl --context="${CTX_CLUSTER1}" wait --for condition=available -n sample deployment/sleep
+    kubectl --context="${CTX_CLUSTER1}" wait --for condition=available -n sample deployment/sleep --timeout=3m
     ```
 
 ### Replicate the setup on the `West` cluster.
@@ -343,19 +343,19 @@ This cluster will host the `v2` version of the `helloworld` service.
 
     a.  Create the common `helloworld` service endpoint on the `West` cluster.
 
-        ```shell {name=multi-primary-multi-network:deploy-helloworld-svc-west}
-        kubectl --context="${CTX_CLUSTER2}" apply \
-          -l service=helloworld -n sample \
-          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
-        ```
+    ```shell {name=multi-primary-multi-network:deploy-helloworld-svc-west}
+    kubectl --context="${CTX_CLUSTER2}" apply \
+      -l service=helloworld -n sample \
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
+    ```
 
     b.  Deploy the `v2` instance of the `helloworld` application.
 
-        ```shell {name=multi-primary-multi-network:deploy-helloworld-v2-west}
-        kubectl --context="${CTX_CLUSTER2}" apply \
-          -l version=v2 -n sample \
-          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
-        ```
+    ```shell {name=multi-primary-multi-network:deploy-helloworld-v2-west}
+    kubectl --context="${CTX_CLUSTER2}" apply \
+      -l version=v2 -n sample \
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
+    ```
 
 4.  Deploy the client `sleep` application on the `West` cluster.
 
@@ -425,14 +425,14 @@ After completing your verification and experimentation, you should dismantle the
 
 **Procedure**
 
-1.  Execute a single command to remove all Istio components and the sample applications from the `East` cluster.
+1. Execute a single command to remove all Istio components and the sample applications from the `East` cluster.
 
-    ```shell {name=multi-primary-multi-network:cleanup-east}
-    kubectl --context="${CTX_CLUSTER1}" delete istio/default istiocni/default ns/sample ns/istio-system ns/istio-cni
-    ```
+   ```shell {name=multi-primary-multi-network:cleanup-east}
+   kubectl --context="${CTX_CLUSTER1}" delete istio/default istiocni/default ns/sample ns/istio-system ns/istio-cni
+   ```
 
-2.  Run the corresponding command to perform the same cleanup operation on the `West` cluster.
+2. Run the corresponding command to perform the same cleanup operation on the `West` cluster.
 
-    ```shell {name=multi-primary-multi-network:cleanup-west}
-    kubectl --context="${CTX_CLUSTER2}" delete istio/default istiocni/default ns/sample ns/istio-system ns/istio-cni
-    ```
+   ```shell {name=multi-primary-multi-network:cleanup-west}
+   kubectl --context="${CTX_CLUSTER2}" delete istio/default istiocni/default ns/sample ns/istio-system ns/istio-cni
+   ```
