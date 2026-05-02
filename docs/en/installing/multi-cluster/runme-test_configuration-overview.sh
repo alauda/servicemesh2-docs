@@ -42,20 +42,6 @@ _run_block_in_workdir() {
     return $rc
 }
 
-# 容忍 AlreadyExists 错误的 namespace 创建
-_create_namespace_safe() {
-    local block_name="$1"
-    local context="$2"
-    local namespace="$3"
-
-    runme run "$block_name" 2>&1 || true
-    if ! kubectl --context "$context" get namespace "$namespace" >/dev/null 2>&1; then
-        log_error "$context 上的 $namespace 命名空间创建失败"
-        return 1
-    fi
-    return 0
-}
-
 test_configuration_overview() {
     log_info "=========================================="
     log_info "开始多集群通用 CA 证书测试"
@@ -133,13 +119,13 @@ test_configuration_overview() {
     log_info "=== Phase 2: 在两个集群上下发 cacerts ==="
 
     log_info "步骤 2.1: 在 East 创建 istio-system 命名空间"
-    _create_namespace_safe multi-cluster-config:create-east-ns "$CTX_CLUSTER1" istio-system || return 1
+    _create_namespace_safe multi-cluster-config:create-east-ns istio-system "$CTX_CLUSTER1" || return 1
 
     log_info "步骤 2.2: 在 East 下发 cacerts"
     _run_block_in_workdir multi-cluster-config:create-east-cacerts || return 1
 
     log_info "步骤 2.3: 在 West 创建 istio-system 命名空间"
-    _create_namespace_safe multi-cluster-config:create-west-ns "$CTX_CLUSTER2" istio-system || return 1
+    _create_namespace_safe multi-cluster-config:create-west-ns istio-system "$CTX_CLUSTER2" || return 1
 
     log_info "步骤 2.4: 在 West 下发 cacerts"
     _run_block_in_workdir multi-cluster-config:create-west-cacerts || return 1

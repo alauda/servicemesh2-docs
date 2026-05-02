@@ -132,7 +132,7 @@ test_install_multi_primary_multi_network() {
     log_info "=== Phase 2: 部署示例应用 ==="
 
     log_info "步骤 2.1: East 创建 sample 命名空间"
-    runme run multi-primary-multi-network:create-sample-ns-east || return 1
+    _create_namespace_safe multi-primary-multi-network:create-sample-ns-east sample "$CTX_CLUSTER1" || return 1
 
     log_info "步骤 2.2: East 启用 sidecar 注入"
     runme run multi-primary-multi-network:label-sample-ns-east || return 1
@@ -153,7 +153,7 @@ test_install_multi_primary_multi_network() {
     runme run multi-primary-multi-network:wait-sleep-east || return 1
 
     log_info "步骤 2.8: West 创建 sample 命名空间"
-    runme run multi-primary-multi-network:create-sample-ns-west || return 1
+    _create_namespace_safe multi-primary-multi-network:create-sample-ns-west sample "$CTX_CLUSTER2" || return 1
 
     log_info "步骤 2.9: West 启用 sidecar 注入"
     runme run multi-primary-multi-network:label-sample-ns-west || return 1

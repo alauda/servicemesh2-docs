@@ -19,7 +19,7 @@ test_update_inplace() {
 
     # 1. 创建命名空间
     log_info "步骤 1: 创建 istio-cni 和 istio-system 命名空间"
-    runme run update-inplace:create-namespaces || {
+    _create_namespace_safe update-inplace:create-namespaces "istio-cni istio-system" || {
         log_error "创建命名空间失败"
         return 1
     }

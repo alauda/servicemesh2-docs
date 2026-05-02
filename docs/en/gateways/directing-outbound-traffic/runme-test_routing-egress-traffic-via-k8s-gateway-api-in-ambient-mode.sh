@@ -19,7 +19,7 @@ test_ambient_egress_gateway() {
 
     # 步骤 1: 创建 egress-gateway 命名空间
     log_info "步骤 1: 创建 egress-gateway 命名空间"
-    runme run ambient-egress:create-namespace || {
+    _create_namespace_safe ambient-egress:create-namespace egress-gateway || {
         log_error "创建 egress-gateway 命名空间失败"
         return 1
     }
