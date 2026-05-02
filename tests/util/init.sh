@@ -310,11 +310,11 @@ install_all_servicemesh_operators() {
     fi
 
     for cluster in "${clusters[@]}"; do
-        # 设置 kubectl context
-        kubectl config use-context "$cluster"
-
         log_info "安装 servicemesh-operator2 到集群: $cluster"
-        install_operator \
+        # 通过临时覆盖 KUBECONFIG 指向单集群 kubeconfig (其 current-context 已是 $cluster)
+        # 避免 kubectl config use-context 持久化改写 merged.yaml 的 current-context,
+        # 否则循环结束时 merged.yaml 的 current-context 会停在最后一个集群
+        KUBECONFIG="$KUBECONFIG_DIR/${cluster}.yaml" install_operator \
             "servicemesh-operator2" \
             "sail-operator" \
             "$PKG_SERVICEMESH_OPERATOR2_URL" \

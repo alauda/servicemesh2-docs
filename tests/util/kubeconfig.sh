@@ -251,13 +251,24 @@ setup_kubeconfig() {
             return 1
         fi
     fi
-    chmod 600 "$KUBECONFIG_MERGED_FILE"
 
     # 设置默认 current-context 为第一个集群
-    if ! kubectl --kubeconfig="$KUBECONFIG_MERGED_FILE" config use-context "${clusters[0]}" > /dev/null 2>&1; then
-        log_error "设置 current-context 失败: ${clusters[0]}"
+    # 直接改写文件中顶层的 current-context 行 (相比 kubectl config use-context,
+    # 不需要启动 kubectl 进程,且 in-place 修改行为完全可控)
+    local target_ctx="${clusters[0]}"
+    local tmp
+    tmp=$(mktemp)
+    if ! awk -v target="$target_ctx" '
+        /^current-context:/ { print "current-context: " target; found=1; next }
+        { print }
+        END { if (!found) print "current-context: " target }
+    ' "$KUBECONFIG_MERGED_FILE" > "$tmp"; then
+        rm -f "$tmp"
+        log_error "设置 current-context 失败: $target_ctx"
         return 1
     fi
+    mv "$tmp" "$KUBECONFIG_MERGED_FILE"
+    chmod 600 "$KUBECONFIG_MERGED_FILE"
 
     # 写入 fingerprint
     _compute_kubeconfig_fingerprint "${clusters[@]}" > "$KUBECONFIG_FINGERPRINT_FILE"
