@@ -53,6 +53,7 @@ testing/allure-results/
 
 tests/bin/
 tests/package/
+tests/.kubeconfig/
 
 .DS_Store
 tmp

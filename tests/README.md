@@ -33,52 +33,60 @@ docs/en/installing/dual-stack/
 - `curl` - 用于下载工具和插件包
 - `jq` - JSON 处理工具
 
-### 2. 设置 kubectl 环境
-
-TODO: 后续优化 ACP 集群 kubeconfig 配置方式
-
-```bash
-# 从 ACP 平台下载集群 kubeconfig 文件
-
-# 修改 kubeconfig 文件中的 context 名称（必须和集群名称相同 ）
-kubectl --kubeconfig=/path/to/kubeconfig.yaml config rename-context proxy-connect <cluster-name>
-
-# 设置 Kubernetes 环境变量（多个文件以英文冒号分隔）
-export KUBECONFIG=/path/to/kubeconfig.yaml
-```
-
-### 3. 安装 `Multus` 集群插件
+### 2. 安装 `Multus` 集群插件
 
 TODO: 后续由脚本执行初始化时自动安装
 
-### 4. 设置环境变量
+### 3. 设置环境变量
 
 在执行测试前，需要设置以下环境变量：
 
 ```bash
-# 集群名称（根据实际情况设置，可选）
-export SINGLE_CLUSTER_NAME=my-cluster      # 单集群网格的集群名称
-export EAST_CLUSTER_NAME=east-cluster      # 多集群网格的 East 集群名称
-export WEST_CLUSTER_NAME=west-cluster      # 多集群网格的 West 集群名称
+# ──────────────────────────────────────────────────────────────────
+# 集群名称（按文档归属选择）
+# ──────────────────────────────────────────────────────────────────
+# 单集群（multi-cluster 文档以外的所有测试默认使用此集群）
+export SINGLE_CLUSTER_NAME=my-cluster
 
+# 仅 docs/en/installing/multi-cluster 下的文档使用以下两个变量
+export EAST_CLUSTER_NAME=east-cluster
+export WEST_CLUSTER_NAME=west-cluster
+
+# ──────────────────────────────────────────────────────────────────
 # 平台信息
+# ──────────────────────────────────────────────────────────────────
 export PLATFORM_ADDRESS=https://xxx
 export PLATFORM_USERNAME='your-username'
 export PLATFORM_PASSWORD='your-password'
+
+# ACP 平台 API token（用于自动获取集群 kubeconfig）
+# 获取方式：在 ACP UI 上为账号生成 API token，或参考 ACP 文档
+export ACP_API_TOKEN='your-acp-api-token'
+
+# 选择集群连接模式（可选，默认 proxy）
+# - proxy:  通过 ACP 平台代理访问 K8s API（默认，对网络隔离友好）
+# - direct: 直接访问 K8s API Server（要求测试机能直连 Master 节点）
+export ACP_KUBECONFIG_MODE=proxy
+
 # TODO: 后续会自动从 Global 集群获取 CA 证书
 # 获取方式: kubectl -ncpaas-system get secret dex.tls -o jsonpath='{.data.ca\.crt}'
 export PLATFORM_CA='base64-encoded-ca-certificate'
 
-# 双栈环境标识（可选，设置为 true 时才会执行双栈文档测试）
+# ──────────────────────────────────────────────────────────────────
+# 测试行为开关（可选）
+# ──────────────────────────────────────────────────────────────────
+# 双栈环境标识（设置为 true 时才会执行双栈文档测试）
 export IS_DUAL_STACK=false
-# Bookinfo 流量生成（可选，设置为 true 时，Bookinfo 部署完成后会自动生成访问流量）
+# Bookinfo 流量生成（设置为 true 时，Bookinfo 部署完成后会自动生成访问流量）
 export AUTO_GEN_BOOKINFO_TRAFFIC=true
 
-# 工具版本
-export RUNME_VERSION=3.16.4
+# ──────────────────────────────────────────────────────────────────
+# 工具与插件包
+# ──────────────────────────────────────────────────────────────────
+export RUNME_VERSION=3.16.11
 
-# 镜像加速地址（可选，用于替换默认镜像地址）
-export REGISTRY_MIRROR_ADDRESS=docker-mirrors.alauda.cn  # 留空表示不使用镜像加速
+# 镜像加速地址（可选，用于替换默认镜像地址；留空表示不使用）
+export REGISTRY_MIRROR_ADDRESS=docker-mirrors.alauda.cn
 
 # 插件包下载地址
 export PKG_SERVICEMESH_OPERATOR2_URL=xxx
@@ -87,6 +95,27 @@ export PKG_JAEGER_OPERATOR_URL=xxx
 export PKG_OPENTELEMETRY_OPERATOR_URL=xxx
 export PKG_METALLB_OPERATOR_URL=xxx
 ```
+
+### 4. kubeconfig 自动管理
+
+执行 `./run.sh --init-only` 时，框架会通过 ACP 平台 API 自动获取集群 kubeconfig，**无需手动下载**：
+
+- API 入口：`${PLATFORM_ADDRESS}/auth/v1/clusters/<cluster-name>/kubeconfig`
+- 认证：HTTP Header `Authorization: Bearer ${ACP_API_TOKEN}`
+- 处理后的 kubeconfig 缓存于 `tests/.kubeconfig/`（已加入 `.gitignore`）：
+  - `tests/.kubeconfig/<cluster-name>.yaml` — 单集群 kubeconfig
+  - `tests/.kubeconfig/merged.yaml` — 合并后的最终 KUBECONFIG
+  - `tests/.kubeconfig/.fingerprint` — 配置指纹（PLATFORM_ADDRESS / ACP_KUBECONFIG_MODE / ACP_API_TOKEN / 集群列表 的 sha256）
+- context 命名规则：每个集群的 context 名重命名为集群名本身（如 `my-cluster`），与 `SINGLE_CLUSTER_NAME` / `EAST_CLUSTER_NAME` / `WEST_CLUSTER_NAME` 保持一致
+- 多集群（multi-cluster 文档场景）需显式传入：
+
+  ```bash
+  ./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"
+  ```
+
+  合并后默认 `current-context` 为传入的第一个集群（即 `$EAST_CLUSTER_NAME`）。
+
+- 当 `ACP_API_TOKEN`、`PLATFORM_ADDRESS`、`ACP_KUBECONFIG_MODE` 或集群列表任一发生变更，再次执行 `--init-only` 会自动重新拉取。
 
 ## 使用方法
 
@@ -98,13 +127,19 @@ cd tests
 # 查看帮助信息
 ./run.sh --help
 
-# 只执行环境初始化（首次运行或环境变更时）
+# 只执行环境初始化（默认使用 SINGLE_CLUSTER_NAME）
 ./run.sh --init-only
+
+# 显式指定要初始化的集群（与上一条等价）
+./run.sh --init-only --cluster "$SINGLE_CLUSTER_NAME"
+
+# 多集群初始化（仅 multi-cluster 文档场景需要）
+./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"
 
 # 测试所有文档（自动执行初始化，按预定义顺序执行）
 ./run-all.sh
 
-# 测试指定文档（默认不执行初始化）
+# 测试指定文档（默认不执行初始化，复用现有 kubeconfig）
 ./run.sh --file install-mesh-in-dual-stack-mode
 
 # 测试指定文档并强制执行初始化
@@ -243,6 +278,27 @@ Skill 定义文件位于 `.claude/skills/auto-test-creator/SKILL.md`，其中包
 2. 验证 `PLATFORM_ADDRESS`、`PLATFORM_USERNAME`、`PLATFORM_PASSWORD` 环境变量
 3. 验证集群配置
 
+### 问题：kubeconfig 获取失败 / 401 Unauthorized
+
+**可能原因**：
+
+1. `ACP_API_TOKEN` 未设置或已过期
+2. `PLATFORM_ADDRESS` 不可访问
+3. 集群名称错误（需要与 ACP 平台中的集群名一致）
+4. `ACP_KUBECONFIG_MODE=direct` 但测试机无法直连 K8s API Server
+
+**解决方法**：
+
+1. 在 ACP UI 上重新生成 API token，更新 `ACP_API_TOKEN` 环境变量
+2. 验证 `curl -k -H "Authorization: Bearer $ACP_API_TOKEN" "$PLATFORM_ADDRESS/auth/v1/clusters/$SINGLE_CLUSTER_NAME/kubeconfig"` 是否能正常返回 JSON
+3. 切换到 `ACP_KUBECONFIG_MODE=proxy`（默认）重试
+
+### 问题：kubectl 找不到 context
+
+**可能原因**：集群名称变量（`SINGLE_CLUSTER_NAME` / `EAST_CLUSTER_NAME` / `WEST_CLUSTER_NAME`）变更后未重新初始化。
+
+**解决方法**：再次执行 `./run.sh --init-only`（或 `--cluster <name>`），框架会通过 fingerprint 检测到变更并自动重拉。
+
 ### 问题：测试执行失败
 
 **调试步骤**：
@@ -285,8 +341,9 @@ Skill 定义文件位于 `.claude/skills/auto-test-creator/SKILL.md`，其中包
 
 ## TODO
 
-- [ ] 多集群 kubecontext 管理
+- [x] 通过 ACP API 自动获取 kubeconfig（替代手动下载）
 - [ ] Multus 集群插件自动安装
 - [ ] MetalLB 集群插件自动安装
+- [ ] multi-cluster 文档自动化测试
 - [ ] 逐步补充其他测试文档
 - [ ] 优化测试 case 结果统计

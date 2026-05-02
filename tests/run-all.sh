@@ -19,9 +19,11 @@ trap print_test_summary EXIT
 log_header "开始执行所有测试任务"
 
 # ------------------------------------------------------------------
-# Case 1: 环境初始化
+# Case 1: 环境初始化（默认使用 SINGLE_CLUSTER_NAME）
+# 注：multi-cluster 文档测试需在对应 case 中再次执行
+#     ./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"
 # ------------------------------------------------------------------
-log_header "Case 1: 环境初始化"
+log_header "Case 1: 环境初始化（默认 SINGLE_CLUSTER_NAME）"
 
 if (
     set -e
