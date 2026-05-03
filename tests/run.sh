@@ -274,15 +274,27 @@ main() {
         # shellcheck disable=SC1091
         source "$UTIL_DIR/init.sh"
         main "${INIT_CLUSTERS[@]}"  # 调用 init.sh 的 main 函数
-
-        if [ "$INIT_ONLY" = true ]; then
-            log_success "环境初始化完成，退出（--init-only）"
-            exit 0
-        fi
     else
         # --file 模式：仅复用现有 kubeconfig
         log_info "跳过环境初始化（默认不执行，可使用 --force-init 强制执行）"
         load_kubeconfig || exit 1
+    fi
+
+    # 统一解析 PLATFORM_CA（init / load 两种模式下的合并入口）
+    # - 已通过环境变量设置: 直接使用
+    # - 未设置: 从 Global 集群独立 kubeconfig 自动获取（不污染当前 KUBECONFIG）
+    if [ -n "${PLATFORM_CA:-}" ]; then
+        log_info "使用环境变量中的 PLATFORM_CA"
+    else
+        log_info "PLATFORM_CA 未设置，从 Global 集群自动获取..."
+        PLATFORM_CA=$(fetch_platform_ca) || exit 1
+        export PLATFORM_CA
+        log_success "PLATFORM_CA 已从 Global 集群获取（长度: ${#PLATFORM_CA}）"
+    fi
+
+    if [ "$INIT_ONLY" = true ]; then
+        log_success "环境初始化完成，退出（--init-only）"
+        exit 0
     fi
 
     # 确定要运行的测试

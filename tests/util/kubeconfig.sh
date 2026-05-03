@@ -6,12 +6,14 @@
 #   - PLATFORM_ADDRESS         必填，ACP 平台地址
 #   - ACP_API_TOKEN            必填，ACP 平台 API token
 #   - ACP_KUBECONFIG_MODE      可选，direct(默认) | proxy，决定使用 proxy-connect 还是 direct-connect context
+#   - GLOBAL_CLUSTER_NAME      可选，ACP 控制面集群名（默认 'global'），用于获取平台级资源
 #
 # 暴露函数:
 #   - fetch_cluster_kubeconfig <cluster> <output>     拉取单集群 kubeconfig 并规整
 #   - setup_kubeconfig         <cluster>...           强制拉取多集群 kubeconfig，合并并 export KUBECONFIG
 #   - ensure_kubeconfig        <cluster>...           按 fingerprint 比对，必要时重新拉取
 #   - load_kubeconfig                                 仅复用已存在的合并 kubeconfig，找不到则报错
+#   - fetch_platform_ca                               通过 Global 集群独立 kubeconfig 获取平台 CA（base64）
 
 # 防止重复 source
 if [ -n "${__KUBECONFIG_SH_LOADED:-}" ]; then
@@ -24,6 +26,10 @@ __KUBECONFIG_SH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KUBECONFIG_DIR="${KUBECONFIG_DIR:-$(cd "$__KUBECONFIG_SH_DIR/.." && pwd)/.kubeconfig}"
 KUBECONFIG_MERGED_FILE="$KUBECONFIG_DIR/merged.yaml"
 KUBECONFIG_FINGERPRINT_FILE="$KUBECONFIG_DIR/.fingerprint"
+
+# Global 集群名（ACP 控制面集群，约定为 'global'）
+# 用于自动获取 PLATFORM_CA 等平台级资源；初始化时会自动追加到集群列表末尾
+GLOBAL_CLUSTER_NAME="${GLOBAL_CLUSTER_NAME:-global}"
 
 # 加载日志函数（如果尚未加载）
 if ! declare -f log_info > /dev/null 2>&1; then
@@ -326,4 +332,47 @@ load_kubeconfig() {
 
     export KUBECONFIG="$KUBECONFIG_MERGED_FILE"
     return 0
+}
+
+# 通过 Global 集群的独立 kubeconfig 拉取平台 CA 证书（base64 编码）
+# - 不污染当前 KUBECONFIG / merged.yaml：以 $KUBECONFIG_DIR/$GLOBAL_CLUSTER_NAME.yaml
+#   作为子 shell 的 KUBECONFIG，仅作用于 runme 子进程
+# - 优先 runme run config-kiali:get-ca-certificate（dex.tls 的 ca.crt 字段）
+# - 为空则 fallback 到 config-kiali:get-ca-certificate-alternative（dex.tls 的 tls.crt 字段）
+# - 仍为空则报错退出
+# 输出: 标准输出仅打印 base64 字符串（无尾随换行）
+# 用法: ca=$(fetch_platform_ca) || return 1
+fetch_platform_ca() {
+    local global_kc="$KUBECONFIG_DIR/${GLOBAL_CLUSTER_NAME}.yaml"
+    if [ ! -f "$global_kc" ]; then
+        log_error "fetch_platform_ca: 未找到 Global kubeconfig: $global_kc"
+        log_error "请重新执行 './run.sh --init-only' 让框架自动拉取 ${GLOBAL_CLUSTER_NAME} 集群的 kubeconfig"
+        return 1
+    fi
+
+    if ! command -v runme > /dev/null 2>&1; then
+        log_error "fetch_platform_ca: 缺少 runme 工具，请先执行 './run.sh --init-only' 安装"
+        return 1
+    fi
+
+    local ca
+    # 子 shell 隔离 KUBECONFIG 仅作用于 runme，不影响调用方上下文
+    ca=$(KUBECONFIG="$global_kc" runme run config-kiali:get-ca-certificate 2>/dev/null \
+        | tr -d '[:space:]')
+    if [ -n "$ca" ]; then
+        printf '%s' "$ca"
+        return 0
+    fi
+
+    log_warn "fetch_platform_ca: config-kiali:get-ca-certificate 返回空，回退到 alternative 块"
+    ca=$(KUBECONFIG="$global_kc" runme run config-kiali:get-ca-certificate-alternative 2>/dev/null \
+        | tr -d '[:space:]')
+    if [ -n "$ca" ]; then
+        printf '%s' "$ca"
+        return 0
+    fi
+
+    log_error "fetch_platform_ca: 两个 runme 块均返回空，无法获取 PLATFORM_CA"
+    log_error "请检查 ${GLOBAL_CLUSTER_NAME} 集群上 cpaas-system/dex.tls Secret 是否存在，或显式 export PLATFORM_CA"
+    return 1
 }

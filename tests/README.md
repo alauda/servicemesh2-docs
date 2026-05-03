@@ -69,9 +69,14 @@ export ACP_API_TOKEN='your-acp-api-token'
 # 注：多集群服务网格必须选择 `direct`
 export ACP_KUBECONFIG_MODE=direct
 
-# TODO: 后续会自动从 Global 集群获取 CA 证书
-# 获取方式: kubectl -ncpaas-system get secret dex.tls -o jsonpath='{.data.ca\.crt}'
-export PLATFORM_CA='base64-encoded-ca-certificate'
+# ACP 平台 CA 证书（base64 编码，可选）
+# - 已设置: 直接使用该值
+# - 未设置: 框架会在 kubeconfig 就绪后自动从 Global 集群拉取
+# export PLATFORM_CA='base64-encoded-ca-certificate'
+
+# Global 集群名（可选，默认 'global'）
+# 框架会在 init 时自动追加到集群列表末尾，用于获取 PLATFORM_CA 等平台资源
+# export GLOBAL_CLUSTER_NAME=global
 
 # ──────────────────────────────────────────────────────────────────
 # 测试行为开关（可选）
@@ -104,19 +109,39 @@ export PKG_METALLB_OPERATOR_URL=xxx
 - API 入口：`${PLATFORM_ADDRESS}/auth/v1/clusters/<cluster-name>/kubeconfig`
 - 认证：HTTP Header `Authorization: Bearer ${ACP_API_TOKEN}`
 - 处理后的 kubeconfig 缓存于 `tests/.kubeconfig/`（已加入 `.gitignore`）：
-  - `tests/.kubeconfig/<cluster-name>.yaml` — 单集群 kubeconfig
+  - `tests/.kubeconfig/<cluster-name>.yaml` — 单集群 kubeconfig（每个集群独立一份，便于子任务隔离使用）
   - `tests/.kubeconfig/merged.yaml` — 合并后的最终 KUBECONFIG
   - `tests/.kubeconfig/.fingerprint` — 配置指纹（PLATFORM_ADDRESS / ACP_KUBECONFIG_MODE / ACP_API_TOKEN / 集群列表 的 sha256）
 - context 命名规则：每个集群的 context 名重命名为集群名本身（如 `my-cluster`），与 `SINGLE_CLUSTER_NAME` / `EAST_CLUSTER_NAME` / `WEST_CLUSTER_NAME` 保持一致
+- **Global 集群自动追加**：无论用户传入什么集群列表，框架都会在末尾自动追加 Global 集群（默认名 `global`，可通过 `GLOBAL_CLUSTER_NAME` 覆盖）。该集群仅用于：
+  - 自动获取 `PLATFORM_CA`（执行 `config-kiali:get-ca-certificate` runme 块）
+  - 后续可能新增的其他平台级资源访问
+  - 不会被纳入 `upload_all_packages` / `install_all_servicemesh_operators` 等业务集群操作
 - 多集群（multi-cluster 文档场景）需显式传入：
 
   ```bash
   ./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"
   ```
 
-  合并后默认 `current-context` 为传入的第一个集群（即 `$EAST_CLUSTER_NAME`）。
+  合并后默认 `current-context` 为传入的第一个集群（即 `$EAST_CLUSTER_NAME`），Global 集群对应的 context 也会出现在 `merged.yaml` 中（名为 `global`），便于按需切换。
 
 - 当 `ACP_API_TOKEN`、`PLATFORM_ADDRESS`、`ACP_KUBECONFIG_MODE` 或集群列表任一发生变更，再次执行 `--init-only` 会自动重新拉取。
+
+### 5. PLATFORM_CA 自动获取
+
+`./run.sh` 在 kubeconfig 就绪后会统一解析 `PLATFORM_CA`：
+
+| 情况                             | 行为                                                                 |
+| -------------------------------- | -------------------------------------------------------------------- |
+| `PLATFORM_CA` 已通过环境变量设置 | 直接使用，不访问 Global 集群                                         |
+| `PLATFORM_CA` 为空               | 通过 Global 集群独立 kubeconfig 自动拉取，结果 export 给后续测试脚本 |
+
+自动获取流程：
+
+1. 使用 `$KUBECONFIG_DIR/global.yaml` 作为 runme 子进程的 KUBECONFIG（仅作用于子进程，**不污染调用方上下文**）
+2. 执行 `runme run config-kiali:get-ca-certificate`（来自 `docs/en/integration/observability/kiali.mdx`），结果非空则使用
+3. 否则回退 `runme run config-kiali:get-ca-certificate-alternative`
+4. 仍为空则报错退出，提示检查 `cpaas-system/dex.tls` Secret 或显式 `export PLATFORM_CA`
 
 ## 使用方法
 
@@ -348,7 +373,7 @@ Skill 定义文件位于 `.claude/skills/auto-test-creator/SKILL.md`，其中包
 ## TODO
 
 - [x] 通过 ACP API 自动获取 kubeconfig（替代手动下载）
-- [ ] PLATFORM_CA 自动获取
+- [x] PLATFORM_CA 自动获取（init 时从 Global 集群拉取 cpaas-system/dex.tls）
 - [ ] Multus 集群插件自动安装
 - [ ] MetalLB 集群插件自动安装
 - [x] multi-cluster 文档自动化测试
