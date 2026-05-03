@@ -218,6 +218,8 @@ test_exposing_a_service_via_k8s_gateway_api_in_ambient_mode() {
 
     # 步骤 22: 外部访问测试
     # 根据 INGRESS_HOST 是否为 IPv6 地址（含冒号）选择 IPv4 / IPv6 测试命令
+    # 文档示例由测试者本地终端执行，但本地终端可能存在代理等不稳定因素，
+    # 因此测试脚本改为通过 curl pod 在集群内部发起请求，避免环境干扰
     log_info "步骤 22: 外部访问测试"
     local external_cmd external_output external_expected
     if [[ "$INGRESS_HOST" == *:* ]]; then
@@ -227,8 +229,7 @@ test_exposing_a_service_via_k8s_gateway_api_in_ambient_mode() {
         log_info "检测到 IPv4 地址，使用 IPv4 测试命令"
         external_cmd=$(runme print ambient-gw-api:test-external)
     fi
-    # 注意：这里 http_proxy 环境变量置空，以确保访问 LB 的流量不被代理干扰
-    external_output=$(http_proxy= eval "$external_cmd" 2>&1) || {
+    external_output=$(eval "kubectl exec $CURL_POD -n curl -- $external_cmd" 2>&1) || {
         log_error "外部访问测试失败"
         log_error "输出: $external_output"
         return 1

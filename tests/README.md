@@ -377,5 +377,6 @@ Skill 定义文件位于 `.claude/skills/auto-test-creator/SKILL.md`，其中包
 - [ ] Multus 集群插件自动安装
 - [ ] MetalLB 集群插件自动安装
 - [x] multi-cluster 文档自动化测试
+- [ ] 出口网关的外部服务测试无法在离线环境执行
 - [ ] 逐步补充其他测试文档
 - [ ] 优化测试 case 结果统计
