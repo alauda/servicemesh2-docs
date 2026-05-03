@@ -310,7 +310,7 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
     :::info
     If `$INGRESS_HOST` is an IPv6 address, enclose it in square brackets when constructing the URL. For example:
 
-    ```shell
+    ```shell {name=ambient-gw-api:test-external-ipv6}
     curl -sS -g -I -H Host:httpbin.example.com http://[$INGRESS_HOST]:$INGRESS_PORT/headers
     ```
     :::
