@@ -327,7 +327,7 @@ install_all_servicemesh_operators() {
 # 主函数
 # 用法: main <cluster>...
 # 集群列表由调用方（通常是 run.sh 解析 --cluster / SINGLE_CLUSTER_NAME 后）传入
-# - setup_kubeconfig 时会在末尾追加 Global 集群（用于获取 PLATFORM_CA 等平台资源）
+# - kubeconfig 时会在末尾追加 Global 集群（用于获取 PLATFORM_CA 等平台资源）
 # - upload_all_packages / install_all_servicemesh_operators 仅针对业务集群，不操作 Global
 main() {
     if [ $# -eq 0 ]; then
@@ -344,8 +344,10 @@ main() {
     install_runme
     install_violet
     install_istioctl
-    # setup_kubeconfig 内部去重，业务集群恰好是 global 时不会重复
-    setup_kubeconfig "${clusters[@]}" "$global_cluster" || return 1
+    # ensure_kubeconfig: fingerprint (PLATFORM_ADDRESS/ACP_KUBECONFIG_MODE/
+    #   ACP_API_TOKEN/集群列表) 一致则复用 merged.yaml,变更时才重新拉取。
+    # 列表去重由内部处理，业务集群恰好是 global 时不会重复。
+    ensure_kubeconfig "${clusters[@]}" "$global_cluster" || return 1
     upload_all_packages "${clusters[@]}" || return 1
     install_all_servicemesh_operators "${clusters[@]}" || return 1
 

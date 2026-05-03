@@ -352,6 +352,8 @@ install_operator() {
         local versions_output
         versions_output=$(runme run "${prefix}:check-packagemanifest-versions" 2>/dev/null || echo "")
 
+        echo $versions_output
+
         if [ -n "$versions_output" ] && echo "$versions_output" | awk '$2 == "'"$target_csv"'" { found=1 } END { exit !found }'; then
             log_success "找到匹配的版本: $target_csv"
             echo "$versions_output"
