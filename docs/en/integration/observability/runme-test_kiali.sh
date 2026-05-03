@@ -106,7 +106,6 @@ test_kiali() {
 
     # 6. 应用 Kiali 配置
     log_info "步骤 6: 应用 Kiali 配置"
-    envsubst < /tmp/kiali.yaml
     kubectl_apply_runme_block "config-kiali:apply-kiali" "/tmp/" || {
         log_error "应用 Kiali 配置失败"
         return 1

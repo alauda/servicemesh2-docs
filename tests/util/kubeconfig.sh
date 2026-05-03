@@ -335,13 +335,31 @@ load_kubeconfig() {
 }
 
 # 通过 Global 集群的独立 kubeconfig 拉取平台 CA 证书（base64 编码）
-# - 不污染当前 KUBECONFIG / merged.yaml：以 $KUBECONFIG_DIR/$GLOBAL_CLUSTER_NAME.yaml
-#   作为子 shell 的 KUBECONFIG，仅作用于 runme 子进程
-# - 优先 runme run config-kiali:get-ca-certificate（dex.tls 的 ca.crt 字段）
-# - 为空则 fallback 到 config-kiali:get-ca-certificate-alternative（dex.tls 的 tls.crt 字段）
+# - 不污染当前 KUBECONFIG / merged.yaml：用 $KUBECONFIG_DIR/$GLOBAL_CLUSTER_NAME.yaml
+#   作为子 shell 的 KUBECONFIG，仅作用于本次执行
+# - 优先 config-kiali:get-ca-certificate（dex.tls 的 ca.crt 字段）
+# - 为空则 fallback config-kiali:get-ca-certificate-alternative（dex.tls 的 tls.crt 字段）
 # - 仍为空则报错退出
 # 输出: 标准输出仅打印 base64 字符串（无尾随换行）
 # 用法: ca=$(fetch_platform_ca) || return 1
+#
+# 实现说明:
+# 不直接用 `runme run`，因为它会在子进程上分配 PTY 并把 stdout 写成 CRLF，
+# 部分环境（PTY 检测/colored kubectl/CLICOLOR_FORCE 等）下还会注入 ANSI 转义码
+# (ESC=0x1B 等控制字节)，污染 base64 字符串后被 envsubst 注入到 kiali.yaml,
+# 触发 kubectl `yaml: control characters are not allowed`。
+# 改用 `runme print` 取出干净的脚本正文(纯 LF，无装饰)，再用 `bash -c` 直接执行,
+# 这样捕获到的就是 kubectl 真正的 jsonpath 输出，无任何运行期注入。
+_run_runme_block_isolated() {
+    local block="$1" kubeconfig_path="$2"
+    local cmd
+    cmd=$(runme print "$block" 2>/dev/null)
+    if [ -z "$cmd" ]; then
+        return 1
+    fi
+    KUBECONFIG="$kubeconfig_path" bash -c "$cmd" 2>/dev/null | tr -d '[:space:]'
+}
+
 fetch_platform_ca() {
     local global_kc="$KUBECONFIG_DIR/${GLOBAL_CLUSTER_NAME}.yaml"
     if [ ! -f "$global_kc" ]; then
@@ -356,17 +374,14 @@ fetch_platform_ca() {
     fi
 
     local ca
-    # 子 shell 隔离 KUBECONFIG 仅作用于 runme，不影响调用方上下文
-    ca=$(KUBECONFIG="$global_kc" runme run config-kiali:get-ca-certificate 2>/dev/null \
-        | tr -d '[:space:]')
+    ca=$(_run_runme_block_isolated config-kiali:get-ca-certificate "$global_kc")
     if [ -n "$ca" ]; then
         printf '%s' "$ca"
         return 0
     fi
 
     log_warn "fetch_platform_ca: config-kiali:get-ca-certificate 返回空，回退到 alternative 块"
-    ca=$(KUBECONFIG="$global_kc" runme run config-kiali:get-ca-certificate-alternative 2>/dev/null \
-        | tr -d '[:space:]')
+    ca=$(_run_runme_block_isolated config-kiali:get-ca-certificate-alternative "$global_kc")
     if [ -n "$ca" ]; then
         printf '%s' "$ca"
         return 0
