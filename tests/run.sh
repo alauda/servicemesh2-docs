@@ -85,7 +85,7 @@ usage() {
     WEST_CLUSTER_NAME                 仅 docs/en/installing/multi-cluster 下的文档使用
 
   可选环境变量:
-    ACP_KUBECONFIG_MODE               proxy(默认) | direct，决定使用 proxy-connect 还是 direct-connect context
+    ACP_KUBECONFIG_MODE               direct(默认) | proxy，决定使用 proxy-connect 还是 direct-connect context
     IS_DUAL_STACK                     true 表示双栈环境（默认 false）
     REGISTRY_MIRROR_ADDRESS           镜像加速地址
     AUTO_GEN_BOOKINFO_TRAFFIC         Bookinfo 部署完成后自动生成访问流量

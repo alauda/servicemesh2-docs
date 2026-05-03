@@ -5,7 +5,7 @@
 # 依赖环境变量:
 #   - PLATFORM_ADDRESS         必填，ACP 平台地址
 #   - ACP_API_TOKEN            必填，ACP 平台 API token
-#   - ACP_KUBECONFIG_MODE      可选，proxy(默认) | direct，决定使用 proxy-connect 还是 direct-connect context
+#   - ACP_KUBECONFIG_MODE      可选，direct(默认) | proxy，决定使用 proxy-connect 还是 direct-connect context
 #
 # 暴露函数:
 #   - fetch_cluster_kubeconfig <cluster> <output>     拉取单集群 kubeconfig 并规整
@@ -35,7 +35,7 @@ fi
 # 基于 PLATFORM_ADDRESS、ACP_KUBECONFIG_MODE、ACP_API_TOKEN、去重排序后的集群列表
 # 用法: _compute_kubeconfig_fingerprint <cluster>...
 _compute_kubeconfig_fingerprint() {
-    local mode="${ACP_KUBECONFIG_MODE:-proxy}"
+    local mode="${ACP_KUBECONFIG_MODE:-direct}"
     local sorted_clusters
     sorted_clusters=$(printf '%s\n' "$@" | sort -u | tr '\n' ',')
 
@@ -73,7 +73,7 @@ fetch_cluster_kubeconfig() {
 
     _check_kubeconfig_env || return 1
 
-    local mode="${ACP_KUBECONFIG_MODE:-proxy}"
+    local mode="${ACP_KUBECONFIG_MODE:-direct}"
     local target_context="${mode}-connect"
     local url="${PLATFORM_ADDRESS%/}/auth/v1/clusters/${cluster}/kubeconfig"
 

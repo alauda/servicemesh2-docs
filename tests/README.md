@@ -63,10 +63,11 @@ export PLATFORM_PASSWORD='your-password'
 # 获取方式：在 ACP UI （账号的 Profile 页面）上生成 API token
 export ACP_API_TOKEN='your-acp-api-token'
 
-# 选择集群连接模式（可选，默认 proxy）
+# 选择集群连接模式（可选，默认 direct）
 # - proxy:  通过 ACP 平台代理访问 K8s API（默认，对网络隔离友好）
 # - direct: 直接访问 K8s API Server（要求测试机能直连 Master 节点）
-export ACP_KUBECONFIG_MODE=proxy
+# 注：多集群服务网格必须选择 `direct`
+export ACP_KUBECONFIG_MODE=direct
 
 # TODO: 后续会自动从 Global 集群获取 CA 证书
 # 获取方式: kubectl -ncpaas-system get secret dex.tls -o jsonpath='{.data.ca\.crt}'
@@ -184,26 +185,26 @@ cd tests
 
 ## 当前已有的测试文档
 
-| 文档名称               | 测试脚本                                                                                                                                                                                            | 执行命令                                                                     |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| 双栈网格安装           | [runme-test_install-mesh-in-dual-stack-mode.sh](../docs/en/installing/dual-stack/runme-test_install-mesh-in-dual-stack-mode.sh)                                                                     | `./run.sh --file install-mesh-in-dual-stack-mode`                            |
-| 网格安装               | [runme-test_install-mesh.sh](../docs/en/installing/installing-service-mesh/runme-test_install-mesh.sh)                                                                                              | `./run.sh --file install-mesh`                                               |
-| 指标与服务网格集成     | [runme-test_metrics-and-mesh.sh](../docs/en/integration/observability/runme-test_metrics-and-mesh.sh)                                                                                               | `./run.sh --file metrics-and-mesh`                                           |
-| Kiali 安装与配置       | [runme-test_kiali.sh](../docs/en/integration/observability/runme-test_kiali.sh)                                                                                                                     | `./run.sh --file kiali`                                                      |
-| Bookinfo 应用部署      | [runme-test_deploying-the-bookinfo-application.sh](../docs/en/installing/installing-service-mesh/application-deployment/runme-test_deploying-the-bookinfo-application.sh)                           | `./run.sh --file deploying-the-bookinfo-application`                         |
-| Kiali 卸载             | [runme-test_uninstalling-alauda-build-of-kiali.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-build-of-kiali.sh)                                                                        | `./run.sh --file uninstalling-alauda-build-of-kiali`                         |
-| 网格卸载               | [runme-test_uninstalling-alauda-service-mesh.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-service-mesh.sh)                                                                            | `./run.sh --file uninstalling-alauda-service-mesh`                           |
-| InPlace 更新策略       | [runme-test_update-inplace.sh](../docs/en/updating/update-mesh/runme-test_update-inplace.sh)                                                                                                        | `./run.sh --file update-inplace`                                             |
-| Ambient Mode 安装      | [runme-test_installing-ambient-mode.sh](../docs/en/installing/ambient-mode/runme-test_installing-ambient-mode.sh)                                                                                   | `./run.sh --file installing-ambient-mode`                                    |
-| Ambient Bookinfo 部署  | [runme-test_deploying-ambient-bookinfo.sh](../docs/en/installing/ambient-mode/runme-test_deploying-ambient-bookinfo.sh)                                                                             | `./run.sh --file deploying-ambient-bookinfo`                                 |
-| Waypoint 代理部署      | [runme-test_waypoint-proxies.sh](../docs/en/installing/ambient-mode/runme-test_waypoint-proxies.sh)                                                                                                 | `./run.sh --file waypoint-proxies`                                           |
-| Ambient L7 特性        | [runme-test_ambient-l7-features.sh](../docs/en/installing/ambient-mode/runme-test_ambient-l7-features.sh)                                                                                           | `./run.sh --file ambient-l7-features`                                        |
-| Ambient Gateway API    | [runme-test_exposing-a-service-via-k8s-gateway-api-in-ambient-mode.sh](../docs/en/gateways/directing-traffic-into-the-mesh/runme-test_exposing-a-service-via-k8s-gateway-api-in-ambient-mode.sh)    | `./run.sh --file exposing-a-service-via-k8s-gateway-api-in-ambient-mode`     |
-| Ambient Egress Gateway | [runme-test_routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode.sh](../docs/en/gateways/directing-outbound-traffic/runme-test_routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode.sh) | `./run.sh --file routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode` |
-| Ambient 模式网格卸载   | [runme-test_uninstalling-alauda-service-mesh-in-ambient-mode.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-service-mesh-in-ambient-mode.sh)                                            | `./run.sh --file uninstalling-alauda-service-mesh-in-ambient-mode`           |
-| 多集群 - 配置概述（CA 证书） | [runme-test_configuration-overview.sh](../docs/en/installing/multi-cluster/runme-test_configuration-overview.sh)                                                                              | `./run.sh --file configuration-overview`                                     |
-| 多集群 - 多主多网络    | [runme-test_install-multi-primary-multi-network.sh](../docs/en/installing/multi-cluster/runme-test_install-multi-primary-multi-network.sh)                                                          | `./run.sh --file install-multi-primary-multi-network`                        |
-| 多集群 - 主-远多网络   | [runme-test_install-primary-remote-multi-network.sh](../docs/en/installing/multi-cluster/runme-test_install-primary-remote-multi-network.sh)                                                        | `./run.sh --file install-primary-remote-multi-network`                       |
+| 文档名称                     | 测试脚本                                                                                                                                                                                            | 执行命令                                                                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 双栈网格安装                 | [runme-test_install-mesh-in-dual-stack-mode.sh](../docs/en/installing/dual-stack/runme-test_install-mesh-in-dual-stack-mode.sh)                                                                     | `./run.sh --file install-mesh-in-dual-stack-mode`                            |
+| 网格安装                     | [runme-test_install-mesh.sh](../docs/en/installing/installing-service-mesh/runme-test_install-mesh.sh)                                                                                              | `./run.sh --file install-mesh`                                               |
+| 指标与服务网格集成           | [runme-test_metrics-and-mesh.sh](../docs/en/integration/observability/runme-test_metrics-and-mesh.sh)                                                                                               | `./run.sh --file metrics-and-mesh`                                           |
+| Kiali 安装与配置             | [runme-test_kiali.sh](../docs/en/integration/observability/runme-test_kiali.sh)                                                                                                                     | `./run.sh --file kiali`                                                      |
+| Bookinfo 应用部署            | [runme-test_deploying-the-bookinfo-application.sh](../docs/en/installing/installing-service-mesh/application-deployment/runme-test_deploying-the-bookinfo-application.sh)                           | `./run.sh --file deploying-the-bookinfo-application`                         |
+| Kiali 卸载                   | [runme-test_uninstalling-alauda-build-of-kiali.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-build-of-kiali.sh)                                                                        | `./run.sh --file uninstalling-alauda-build-of-kiali`                         |
+| 网格卸载                     | [runme-test_uninstalling-alauda-service-mesh.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-service-mesh.sh)                                                                            | `./run.sh --file uninstalling-alauda-service-mesh`                           |
+| InPlace 更新策略             | [runme-test_update-inplace.sh](../docs/en/updating/update-mesh/runme-test_update-inplace.sh)                                                                                                        | `./run.sh --file update-inplace`                                             |
+| Ambient Mode 安装            | [runme-test_installing-ambient-mode.sh](../docs/en/installing/ambient-mode/runme-test_installing-ambient-mode.sh)                                                                                   | `./run.sh --file installing-ambient-mode`                                    |
+| Ambient Bookinfo 部署        | [runme-test_deploying-ambient-bookinfo.sh](../docs/en/installing/ambient-mode/runme-test_deploying-ambient-bookinfo.sh)                                                                             | `./run.sh --file deploying-ambient-bookinfo`                                 |
+| Waypoint 代理部署            | [runme-test_waypoint-proxies.sh](../docs/en/installing/ambient-mode/runme-test_waypoint-proxies.sh)                                                                                                 | `./run.sh --file waypoint-proxies`                                           |
+| Ambient L7 特性              | [runme-test_ambient-l7-features.sh](../docs/en/installing/ambient-mode/runme-test_ambient-l7-features.sh)                                                                                           | `./run.sh --file ambient-l7-features`                                        |
+| Ambient Gateway API          | [runme-test_exposing-a-service-via-k8s-gateway-api-in-ambient-mode.sh](../docs/en/gateways/directing-traffic-into-the-mesh/runme-test_exposing-a-service-via-k8s-gateway-api-in-ambient-mode.sh)    | `./run.sh --file exposing-a-service-via-k8s-gateway-api-in-ambient-mode`     |
+| Ambient Egress Gateway       | [runme-test_routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode.sh](../docs/en/gateways/directing-outbound-traffic/runme-test_routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode.sh) | `./run.sh --file routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode` |
+| Ambient 模式网格卸载         | [runme-test_uninstalling-alauda-service-mesh-in-ambient-mode.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-service-mesh-in-ambient-mode.sh)                                            | `./run.sh --file uninstalling-alauda-service-mesh-in-ambient-mode`           |
+| 多集群 - 配置概述（CA 证书） | [runme-test_configuration-overview.sh](../docs/en/installing/multi-cluster/runme-test_configuration-overview.sh)                                                                                    | `./run.sh --file configuration-overview`                                     |
+| 多集群 - 多主多网络          | [runme-test_install-multi-primary-multi-network.sh](../docs/en/installing/multi-cluster/runme-test_install-multi-primary-multi-network.sh)                                                          | `./run.sh --file install-multi-primary-multi-network`                        |
+| 多集群 - 主-远多网络         | [runme-test_install-primary-remote-multi-network.sh](../docs/en/installing/multi-cluster/runme-test_install-primary-remote-multi-network.sh)                                                        | `./run.sh --file install-primary-remote-multi-network`                       |
 
 > **注意**：后续会逐步添加更多文档的自动化测试。
 >
@@ -296,7 +297,7 @@ Skill 定义文件位于 `.claude/skills/auto-test-creator/SKILL.md`，其中包
 
 1. 在 ACP UI 上重新生成 API token，更新 `ACP_API_TOKEN` 环境变量
 2. 验证 `curl -k -H "Authorization: Bearer $ACP_API_TOKEN" "$PLATFORM_ADDRESS/auth/v1/clusters/$SINGLE_CLUSTER_NAME/kubeconfig"` 是否能正常返回 JSON
-3. 切换到 `ACP_KUBECONFIG_MODE=proxy`（默认）重试
+3. 切换到 `ACP_KUBECONFIG_MODE=proxy` 重试
 
 ### 问题：kubectl 找不到 context
 
