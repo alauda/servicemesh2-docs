@@ -23,7 +23,7 @@ test_exposing_a_service_via_k8s_gateway_api_in_ambient_mode() {
 
     # 步骤 1: 创建 httpbin 命名空间
     log_info "步骤 1: 创建 httpbin 命名空间"
-    runme run ambient-gw-api:create-httpbin-ns || {
+    _create_namespace_safe ambient-gw-api:create-httpbin-ns httpbin || {
         log_error "创建 httpbin 命名空间失败"
         return 1
     }
@@ -121,7 +121,7 @@ test_exposing_a_service_via_k8s_gateway_api_in_ambient_mode() {
 
     # 步骤 12: 创建 curl 命名空间
     log_info "步骤 12: 创建 curl 命名空间"
-    runme run ambient-gw-api:create-curl-ns || {
+    _create_namespace_safe ambient-gw-api:create-curl-ns curl || {
         log_error "创建 curl 命名空间失败"
         return 1
     }
@@ -196,11 +196,7 @@ test_exposing_a_service_via_k8s_gateway_api_in_ambient_mode() {
         return 1
     }
     # 等待 svc 的 LoadBalancer 可用
-    kubectl wait --for=jsonpath='{.status.loadBalancer.ingress}' svc/httpbin-gateway-istio \
-        -n httpbin --timeout=2m || {
-        log_error "等待 LoadBalancer 获取外部地址失败"
-        return 1
-    }
+    _wait_for_ingress_lb httpbin httpbin-gateway-istio || return 1
 
     # 步骤 20: 获取 INGRESS_HOST
     log_info "步骤 20: 获取 INGRESS_HOST"
@@ -221,10 +217,19 @@ test_exposing_a_service_via_k8s_gateway_api_in_ambient_mode() {
     log_info "INGRESS_PORT=$INGRESS_PORT"
 
     # 步骤 22: 外部访问测试
+    # 根据 INGRESS_HOST 是否为 IPv6 地址（含冒号）选择 IPv4 / IPv6 测试命令
+    # 文档示例由测试者本地终端执行，但本地终端可能存在代理等不稳定因素，
+    # 因此测试脚本改为通过 curl pod 在集群内部发起请求，避免环境干扰
     log_info "步骤 22: 外部访问测试"
-    local external_output external_expected
-    # 注意：这里 http_proxy 环境变量置空，以确保访问 LB 的流量不被代理干扰
-    external_output=$(http_proxy= eval "$(runme print ambient-gw-api:test-external)" 2>&1) || {
+    local external_cmd external_output external_expected
+    if [[ "$INGRESS_HOST" == *:* ]]; then
+        log_info "检测到 IPv6 地址，使用 IPv6 测试命令"
+        external_cmd=$(runme print ambient-gw-api:test-external-ipv6)
+    else
+        log_info "检测到 IPv4 地址，使用 IPv4 测试命令"
+        external_cmd=$(runme print ambient-gw-api:test-external)
+    fi
+    external_output=$(eval "kubectl exec $CURL_POD -n curl -- $external_cmd" 2>&1) || {
         log_error "外部访问测试失败"
         log_error "输出: $external_output"
         return 1

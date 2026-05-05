@@ -28,7 +28,7 @@ Create the root and intermediate certificate authority (CA) certificates for two
 
   1. Create a key for the root certificate by running the following command:
 
-     ```bash
+     ```bash {name=multi-cluster-config:create-root-key}
      openssl genrsa -out root-key.pem 4096
      ```
 
@@ -37,7 +37,7 @@ Create the root and intermediate certificate authority (CA) certificates for two
      <details>
        <summary>Example root certificate configuration file</summary>
 
-       ```ini
+       ```ini {name=multi-cluster-config:root-ca-conf}
        encrypt_key = no
        prompt = no
        utf8 = yes
@@ -57,14 +57,14 @@ Create the root and intermediate certificate authority (CA) certificates for two
      </details>
 
   3. Create the certificate signing request by running the following command:
-     ```bash
+     ```bash {name=multi-cluster-config:create-root-csr}
      openssl req -sha256 -new -key root-key.pem \
          -config root-ca.conf \
          -out root-cert.csr
      ```
 
   4. Create a shared root certificate by running the following command:
-     ```bash
+     ```bash {name=multi-cluster-config:create-root-cert}
      openssl x509 -req -sha256 -days 3650 \
          -signkey root-key.pem \
          -extensions req_ext -extfile root-ca.conf \
@@ -75,13 +75,13 @@ Create the root and intermediate certificate authority (CA) certificates for two
   ### Create the intermediate CA certificate for the **East** cluster
 
   1. Create a directory named `east` by running the following command:
-     ```bash
+     ```bash {name=multi-cluster-config:mkdir-east}
      mkdir east
      ```
 
   2. Create a key for the intermediate certificate for the **East** cluster by running the following command:
 
-     ```bash
+     ```bash {name=multi-cluster-config:create-east-ca-key}
      openssl genrsa -out east/ca-key.pem 4096
      ```
 
@@ -90,7 +90,7 @@ Create the root and intermediate certificate authority (CA) certificates for two
      <details>
        <summary>Example configuration file</summary>
 
-       ```ini
+       ```ini {name=multi-cluster-config:east-intermediate-conf}
        [ req ]
        encrypt_key = no
        prompt = no
@@ -115,14 +115,14 @@ Create the root and intermediate certificate authority (CA) certificates for two
      </details>
 
   4. Create a certificate signing request by running the following command:
-     ```bash
+     ```bash {name=multi-cluster-config:create-east-csr}
      openssl req -new -config east/intermediate.conf \
        -key east/ca-key.pem \
        -out east/cluster-ca.csr
      ```
 
   5. Create the intermediate CA certificate for the **East** cluster by running the following command:
-     ```bash
+     ```bash {name=multi-cluster-config:create-east-cert}
      openssl x509 -req -sha256 -days 3650 \
        -CA root-cert.pem \
        -CAkey root-key.pem -CAcreateserial \
@@ -132,7 +132,7 @@ Create the root and intermediate certificate authority (CA) certificates for two
      ```
 
   6. Create a certificate chain from the intermediate and root CA certificate for the east cluster by running the following command:
-     ```bash
+     ```bash {name=multi-cluster-config:create-east-chain}
      cat east/ca-cert.pem root-cert.pem > east/cert-chain.pem && cp root-cert.pem east
      ```
 
@@ -140,13 +140,13 @@ Create the root and intermediate certificate authority (CA) certificates for two
 
   1. Create a directory named `west` by running the following command:
 
-     ```bash
+     ```bash {name=multi-cluster-config:mkdir-west}
      mkdir west
      ```
 
   2. Create a key for the intermediate certificate for the **West** cluster by running the following command:
 
-     ```bash
+     ```bash {name=multi-cluster-config:create-west-ca-key}
      openssl genrsa -out west/ca-key.pem 4096
      ```
 
@@ -155,7 +155,7 @@ Create the root and intermediate certificate authority (CA) certificates for two
      <details>
        <summary>Example configuration file</summary>
 
-       ```ini
+       ```ini {name=multi-cluster-config:west-intermediate-conf}
        [ req ]
        encrypt_key = no
        prompt = no
@@ -180,14 +180,14 @@ Create the root and intermediate certificate authority (CA) certificates for two
      </details>
 
   4. Create a certificate signing request by running the following command:
-     ```bash
+     ```bash {name=multi-cluster-config:create-west-csr}
      openssl req -new -config west/intermediate.conf \
        -key west/ca-key.pem \
        -out west/cluster-ca.csr
      ```
 
   5. Create the intermediate CA certificate for the **West** cluster by running the following command:
-     ```bash
+     ```bash {name=multi-cluster-config:create-west-cert}
      openssl x509 -req -sha256 -days 3650 \
        -CA root-cert.pem \
        -CAkey root-key.pem -CAcreateserial \
@@ -197,7 +197,7 @@ Create the root and intermediate certificate authority (CA) certificates for two
      ```
 
   6. Create a certificate chain from the intermediate and root CA certificate for the west cluster by running the following command:
-     ```bash
+     ```bash {name=multi-cluster-config:create-west-chain}
      cat west/ca-cert.pem root-cert.pem > west/cert-chain.pem && cp root-cert.pem west
      ```
 </Steps>
@@ -237,12 +237,12 @@ In this procedure, `CLUSTER1` is the **East** cluster and `CLUSTER2` is the **We
   ### Apply the certificates to the **East** cluster of the multi-cluster topology
 
   1. Create a namespace called `istio-system` by running the following command:
-     ```bash
+     ```bash {name=multi-cluster-config:create-east-ns}
      kubectl --context "${CTX_CLUSTER1}" create namespace istio-system
      ```
   2. Create the CA certificates, certificate chain, and the private key for Istio on the **East** cluster by running the following command:
 
-     ```bash
+     ```bash {name=multi-cluster-config:create-east-cacerts}
      kubectl get secret -n istio-system --context "${CTX_CLUSTER1}" cacerts || kubectl create secret generic cacerts -n istio-system --context "${CTX_CLUSTER1}" \
        --from-file=east/ca-cert.pem \
        --from-file=east/ca-key.pem \
@@ -258,12 +258,12 @@ In this procedure, `CLUSTER1` is the **East** cluster and `CLUSTER2` is the **We
   ### Apply the certificates to the **West** cluster of the multi-cluster topology
 
   1. Create a namespace called `istio-system` by running the following command:
-     ```bash
+     ```bash {name=multi-cluster-config:create-west-ns}
      kubectl --context "${CTX_CLUSTER2}" create namespace istio-system
      ```
-  2. Create the CA certificates, certificate chain, and the private key for Istio on the **East** cluster by running the following command:
+  2. Create the CA certificates, certificate chain, and the private key for Istio on the **West** cluster by running the following command:
 
-     ```bash
+     ```bash {name=multi-cluster-config:create-west-cacerts}
      kubectl get secret -n istio-system --context "${CTX_CLUSTER2}" cacerts || kubectl create secret generic cacerts -n istio-system --context "${CTX_CLUSTER2}" \
        --from-file=west/ca-cert.pem \
        --from-file=west/ca-key.pem \

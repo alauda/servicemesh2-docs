@@ -41,7 +41,7 @@ test_dual_stack() {
     
     # 4. 创建命名空间
     log_info "步骤 4: 创建测试命名空间"
-    runme run dual-stack:create-namespaces || {
+    _create_namespace_safe dual-stack:create-namespaces "dual-stack ipv4 ipv6 sleep" || {
         log_error "创建命名空间失败"
         return 1
     }

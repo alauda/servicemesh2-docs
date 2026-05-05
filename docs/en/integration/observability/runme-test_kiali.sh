@@ -32,12 +32,13 @@ test_kiali() {
     log_info "=========================================="
 
     # 检查 PLATFORM_CA 环境变量
-    # TODO: 后续会自动从 Global 集群获取 CA 证书
+    # 正常情况下由 run.sh 在 kubeconfig 就绪后从 Global 集群自动注入；
+    # 此处仍做一次防御性检查，避免直接 source 该脚本的场景下误报到下游。
     if [ -z "$PLATFORM_CA" ]; then
-        log_error "PLATFORM_CA 环境变量未设置"
+        log_error "PLATFORM_CA 未设置（应由 run.sh 自动获取或显式 export）"
         return 1
     fi
-    log_success "PLATFORM_CA 环境变量已设置"
+    log_success "PLATFORM_CA 已就绪"
 
     # 1. 获取平台配置
     log_info "步骤 1: 获取平台配置"

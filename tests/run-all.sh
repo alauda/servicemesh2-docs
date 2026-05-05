@@ -19,9 +19,11 @@ trap print_test_summary EXIT
 log_header "开始执行所有测试任务"
 
 # ------------------------------------------------------------------
-# Case 1: 环境初始化
+# Case 1: 环境初始化（默认使用 SINGLE_CLUSTER_NAME）
+# 注：multi-cluster 文档测试需在对应 case 中再次执行
+#     ./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"
 # ------------------------------------------------------------------
-log_header "Case 1: 环境初始化"
+log_header "Case 1: 环境初始化（默认 SINGLE_CLUSTER_NAME）"
 
 if (
     set -e
@@ -123,6 +125,53 @@ if (
 else
     record_test_result 1
     exit 1
+fi
+
+# ------------------------------------------------------------------
+# Case 6: 多集群 - 多主多网络拓扑 (Multi-Primary Multi-Network)
+# 注：会切换到双集群 kubeconfig，必须放在所有单集群 case 之后
+# ------------------------------------------------------------------
+if [ -z "${EAST_CLUSTER_NAME:-}" ] || [ -z "${WEST_CLUSTER_NAME:-}" ]; then
+    log_header "Case 6/7: 跳过多集群测试 (未设置 EAST_CLUSTER_NAME / WEST_CLUSTER_NAME)"
+else
+    log_header "Case 6: 多集群 - 多主多网络拓扑 (Multi-Primary Multi-Network)"
+
+    if (
+        set -e
+        # 切到双集群 kubeconfig
+        ./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"
+        # 公共前置: 生成 CA 证书并下发 cacerts 到两个集群
+        ./run.sh --file configuration-overview
+        # 多主多网络安装 + 验证 + 卸载
+        ./run.sh --file install-multi-primary-multi-network --no-cleanup
+        ./run.sh --file install-multi-primary-multi-network --cleanup-only
+    ); then
+        record_test_result 0
+    else
+        record_test_result 1
+        exit 1
+    fi
+
+    # ------------------------------------------------------------------
+    # Case 7: 多集群 - 主-远多网络拓扑 (Primary-Remote Multi-Network)
+    # ------------------------------------------------------------------
+    log_header "Case 7: 多集群 - 主-远多网络拓扑 (Primary-Remote Multi-Network)"
+
+    if (
+        set -e
+        # 重新初始化双集群 kubeconfig (Case 6 卸载后保险一步,确保上下文干净)
+        ./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"
+        # 重新下发 cacerts (Case 6 cleanup 已删除 istio-system,需要重建)
+        ./run.sh --file configuration-overview
+        # 主-远多网络安装 + 验证 + 卸载
+        ./run.sh --file install-primary-remote-multi-network --no-cleanup
+        ./run.sh --file install-primary-remote-multi-network --cleanup-only
+    ); then
+        record_test_result 0
+    else
+        record_test_result 1
+        exit 1
+    fi
 fi
 
 log_header "所有测试任务执行完成！"
