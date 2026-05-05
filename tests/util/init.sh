@@ -156,7 +156,8 @@ install_runme() {
 install_violet() {
     _detect_os_arch darwin linux amd64 arm64
     local url="http://package-minio.alauda.cn:9199/packages/violet/latest/violet_${DETECTED_OS}_${DETECTED_ARCH}"
-    _install_tool violet "version" "Version: latest" "$url" false
+    # violet 的版本输出不包含具体版本号,改为验证输出中包含 "Version: v" 来确认工具可用
+    _install_tool violet "version" "Version: v" "$url" false
 }
 
 # 安装 istioctl 工具
