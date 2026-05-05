@@ -58,3 +58,4 @@ tests/.kubeconfig/
 .DS_Store
 tmp
 .conductor
+*.tgz

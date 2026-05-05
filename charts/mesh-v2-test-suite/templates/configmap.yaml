@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mesh-v2-test-suite.name" . }}-manifest
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "mesh-v2-test-suite.labels" . | nindent 4 }}
+data:
+  description: |-
+    本 ConfigMap 由 mesh-v2-test-suite 集群插件创建，作为插件安装的占位资源。
+    随插件下发的测试镜像在插件安装时由 ACP 同步到平台内置镜像仓库。下方 images
+    字段列出了所有打包镜像的完整可拉取地址（registry 前缀已重写为当前集群的
+    ACP 内置镜像仓库），可直接在业务工作负载的 image 字段中引用。
+  images: |-
+{{ include "mesh-v2-test-suite.imageList" . | indent 4 }}
