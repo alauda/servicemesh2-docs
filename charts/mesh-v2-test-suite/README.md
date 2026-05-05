@@ -110,11 +110,32 @@ spec:
 ## 如何新增或更新镜像
 
 1. 编辑 [`values.yaml`](./values.yaml) 的 `global.images`，新增条目或调整 `repository`/`tag`。
-2. 在 [`Chart.yaml`](./Chart.yaml) 把 `version` 递增（遵循 semver）。
-3. 在 [`module-plugin.yaml`](./module-plugin.yaml) 同步 `spec.appReleases[0].chartVersions[0].version`。
-4. 重新执行打包流程（推 chart → violet create / package / push）。
+2. 按 [如何更新插件版本](#如何更新插件版本) 递增 chart 版本号。
+3. 重新执行打包流程（推 chart → violet create / package / push）。
 
 `templates/_helpers.tpl` 中的 `imageList` helper 会自动从 `values.yaml` 渲染清单到 ConfigMap，模板本身无需修改。
+
+## 如何更新插件版本
+
+chart 版本号同时记录在两个文件中，且必须保持一致：
+
+- [`Chart.yaml`](./Chart.yaml) 的 `version` 字段
+- [`module-plugin.yaml`](./module-plugin.yaml) 的 `spec.appReleases[0].chartVersions[0].version` 字段
+
+直接使用 [`hack/update-version.sh`](./hack/update-version.sh) 一次性同步这两处：
+
+```bash
+./hack/update-version.sh <NEW_VERSION>
+```
+
+示例：
+
+```bash
+./hack/update-version.sh v1.0.0-rc.2
+./hack/update-version.sh v1.0.0
+```
+
+脚本同时兼容 Linux（GNU sed）和 macOS（BSD sed），无需额外安装 `gnu-sed`。执行完成后请用 `git diff` 确认两个文件的 `version` 行都已更新，再继续打包流程。
 
 ## 约束
 
