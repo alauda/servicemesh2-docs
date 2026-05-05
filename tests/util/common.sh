@@ -54,45 +54,69 @@ check_required_tools() {
 
 # 使用镜像加速地址执行 kubectl apply
 # 用法: kubectl_apply_with_mirror <runme-block-name>
-# 说明: 
+# 说明:
 #   - 使用 runme print 获取代码块内容
-#   - 如果设置了 REGISTRY_MIRROR_ADDRESS，则替换默认镜像地址为镜像加速地址
-#   - 执行 kubectl apply
+#   - 按以下优先级选择镜像替换策略，命中后下载 YAML 并改写镜像后再 kubectl apply：
+#       1. USE_MESH_V2_TEST_SUITE_PLUGIN=true（已安装 mesh-v2-test-suite 集群插件）
+#          从 cpaas-system/mesh-v2-test-suite-manifest ConfigMap 的 data.registry
+#          读取 ACP 内置镜像仓库地址，将 docker.io / registry.istio.io/release
+#          改写到该仓库的 asm/ 命名空间下（所有镜像由插件预置）。
+#       2. 否则若设置了 REGISTRY_MIRROR_ADDRESS，使用通用镜像加速地址替换。
+#       3. 都未设置时，直接执行原命令。
 kubectl_apply_with_mirror() {
     local block_name="$1"
-    
+
     # 使用 runme print 获取命令内容
     local cmd_content
     cmd_content=$(runme print "$block_name" 2>/dev/null)
-    
+
     if [ -z "$cmd_content" ]; then
         log_error "无法获取代码块内容: $block_name"
         return 1
     fi
-    
-    # 如果设置了镜像加速地址，则替换镜像
-    if [ -n "$REGISTRY_MIRROR_ADDRESS" ]; then
-        log_info "使用镜像加速地址: $REGISTRY_MIRROR_ADDRESS"
-        
-        # 从命令中提取 URL
-        local url
-        url=$(echo "$cmd_content" | grep -oE 'https://[^ ]+\.yaml' | head -n 1)
-        
-        if [ -z "$url" ]; then
-            log_error "无法从命令中提取 YAML 文件 URL"
+
+    # 选择镜像替换目标：docker_io_target 替代 docker.io,
+    # istio_release_target 替代 registry.istio.io/release。
+    local docker_io_target=""
+    local istio_release_target=""
+
+    if [ "${USE_MESH_V2_TEST_SUITE_PLUGIN:-false}" = "true" ]; then
+        local registry
+        registry=$(kubectl -n cpaas-system get cm mesh-v2-test-suite-manifest \
+            -o jsonpath='{.data.registry}' 2>/dev/null)
+        if [ -z "$registry" ]; then
+            log_error "USE_MESH_V2_TEST_SUITE_PLUGIN=true 但未能从 cpaas-system/mesh-v2-test-suite-manifest 读取 data.registry"
+            log_error "请确认已在当前集群安装 mesh-v2-test-suite 集群插件 (charts/mesh-v2-test-suite/)"
             return 1
         fi
-        
-        # 下载 YAML 文件，替换镜像地址，然后应用
-        log_info "下载并替换镜像地址: $url"
-        curl -sSL "$url" \
-            | sed "s|docker\.io|${REGISTRY_MIRROR_ADDRESS}|g" \
-            | sed "s|registry\.istio\.io/release|${REGISTRY_MIRROR_ADDRESS}/istio|g" \
-            | eval "${cmd_content//-f $url/-f -}"
+        log_info "使用 mesh-v2-test-suite 集群插件镜像仓库: $registry"
+        docker_io_target="${registry}/asm"
+        istio_release_target="${registry}/asm/istio"
+    elif [ -n "${REGISTRY_MIRROR_ADDRESS:-}" ]; then
+        log_info "使用镜像加速地址: $REGISTRY_MIRROR_ADDRESS"
+        docker_io_target="${REGISTRY_MIRROR_ADDRESS}"
+        istio_release_target="${REGISTRY_MIRROR_ADDRESS}/istio"
     else
-        # 没有设置镜像加速，直接执行原命令
+        # 没有镜像替换策略，直接执行原命令
         eval "$cmd_content"
+        return $?
     fi
+
+    # 从命令中提取 URL
+    local url
+    url=$(echo "$cmd_content" | grep -oE 'https://[^ ]+\.yaml' | head -n 1)
+
+    if [ -z "$url" ]; then
+        log_error "无法从命令中提取 YAML 文件 URL"
+        return 1
+    fi
+
+    # 下载 YAML 文件，替换镜像地址，然后应用
+    log_info "下载并替换镜像地址: $url"
+    curl -sSL "$url" \
+        | sed "s|docker\.io|${docker_io_target}|g" \
+        | sed "s|registry\.istio\.io/release|${istio_release_target}|g" \
+        | eval "${cmd_content//-f $url/-f -}"
 }
 
 # 切换到指定目录执行 runme block，然后再切换回来

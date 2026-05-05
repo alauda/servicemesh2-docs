@@ -88,6 +88,7 @@ usage() {
     ACP_KUBECONFIG_MODE               direct(默认) | proxy，决定使用 proxy-connect 还是 direct-connect context
     IS_DUAL_STACK                     true 表示双栈环境（默认 false）
     REGISTRY_MIRROR_ADDRESS           镜像加速地址
+    USE_MESH_V2_TEST_SUITE_PLUGIN     true 时优先使用 mesh-v2-test-suite 集群插件镜像仓库（高于 REGISTRY_MIRROR_ADDRESS）
     AUTO_GEN_BOOKINFO_TRAFFIC         Bookinfo 部署完成后自动生成访问流量
 EOF
 }

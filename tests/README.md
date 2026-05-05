@@ -91,6 +91,14 @@ export AUTO_GEN_BOOKINFO_TRAFFIC=true
 # ──────────────────────────────────────────────────────────────────
 export RUNME_VERSION=3.16.11
 
+# 使用 mesh-v2-test-suite 集群插件作为镜像源（可选，默认 true）
+# - 设为 true 时，kubectl_apply_with_mirror 会从当前集群的
+#   cpaas-system/mesh-v2-test-suite-manifest ConfigMap 的 data.registry
+# - 该开关优先级高于 REGISTRY_MIRROR_ADDRESS（两者同时设置时以本开关为准）；
+# - 启用前需先在当前集群安装 mesh-v2-test-suite 集群插件，
+#   插件源码见 charts/mesh-v2-test-suite/。
+export USE_MESH_V2_TEST_SUITE_PLUGIN=true
+
 # 镜像加速地址（可选，用于替换默认镜像地址；留空表示不使用）
 export REGISTRY_MIRROR_ADDRESS=docker-mirrors.alauda.cn
 
