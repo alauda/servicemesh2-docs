@@ -2,7 +2,7 @@ supportedUpgradeVersions: ">= v1.0.0"
 mustUpgrade: false
 config: {}
 valuesTemplates:
-  build-harbor.alauda.cn/asm/mesh-v2-test-suite: |
+  asm/mesh-v2-test-suite: |
     global:
       registry:
         address: << .RegistryAddress >>
