@@ -1,0 +1,28 @@
+apiVersion: cluster.alauda.io/v1alpha1
+kind: ModulePlugin
+metadata:
+  annotations:
+    cpaas.io/built-in-plugin: "false"
+    cpaas.io/display-name: '{"en": "Mesh v2 Test Suite", "zh": "Mesh v2 测试套件"}'
+    cpaas.io/module-name: mesh-v2-test-suite
+  labels:
+    cpaas.io/module-catalog: servicemesh
+    cpaas.io/module-name: mesh-v2-test-suite
+    cpaas.io/module-type: plugin
+    cpaas.io/product: devops
+  name: mesh-v2-test-suite
+spec:
+  appReleases:
+  - chartVersions:
+    - name: asm/mesh-v2-test-suite
+      releaseName: mesh-v2-test-suite
+      version: v1.0.0
+    name: mesh-v2-test-suite
+  deleteable: true
+  description:
+    en: Bundles a fixed set of service-mesh test images so users can run ASM v2 sample workloads without external image pulls.
+    zh: 将一组服务网格测试镜像随插件下发到集群，用户安装后即可在业务工作负载中直接使用，无需访问外部镜像源。
+  logo: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTMyIDRMNTYgMThWNDZMMzIgNjBMOCA0NlYxOFoiIGZpbGw9IiMxOTc2RDIiLz48cGF0aCBkPSJNMTQgMjBMMTcgMjNMMjMgMTdNMTQgMzJMMTcgMzVMMjMgMjlNMTQgNDRMMTcgNDdMMjMgNDEiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIzIiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48cGF0aCBkPSJNMjcgMjBINTBNMjcgMzJINTBNMjcgNDRINTAiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiLz48L3N2Zz4=
+  mainChart: asm/mesh-v2-test-suite
+  name: mesh-v2-test-suite
+  upgradeRiskLevel: low
