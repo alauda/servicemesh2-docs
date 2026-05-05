@@ -64,7 +64,7 @@ export PLATFORM_PASSWORD='your-password'
 export ACP_API_TOKEN='your-acp-api-token'
 
 # 选择集群连接模式（可选，默认 direct）
-# - proxy:  通过 ACP 平台代理访问 K8s API（默认，对网络隔离友好）
+# - proxy:  通过 ACP 平台代理访问 K8s API（对网络隔离友好）
 # - direct: 直接访问 K8s API Server（要求测试机能直连 Master 节点）
 # 注：多集群服务网格必须选择 `direct`
 export ACP_KUBECONFIG_MODE=direct

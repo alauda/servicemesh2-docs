@@ -368,13 +368,13 @@ This cluster will host the `v2` version of the `helloworld` service.
 5.  Wait for the `helloworld-v2` deployment to become fully available.
 
     ```shell {name=multi-primary-multi-network:wait-helloworld-v2-west}
-    kubectl --context="${CTX_CLUSTER2}" wait --for condition=available -n sample deployment/helloworld-v2
+    kubectl --context="${CTX_CLUSTER2}" wait --for condition=available -n sample deployment/helloworld-v2 --timeout=3m
     ```
 
 6.  Finally, ensure the `sleep` deployment on the `West` cluster is ready.
 
     ```shell {name=multi-primary-multi-network:wait-sleep-west}
-    kubectl --context="${CTX_CLUSTER2}" wait --for condition=available -n sample deployment/sleep
+    kubectl --context="${CTX_CLUSTER2}" wait --for condition=available -n sample deployment/sleep --timeout=3m
     ```
 
 ### Verifying traffic flows between clusters
