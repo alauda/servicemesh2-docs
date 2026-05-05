@@ -78,7 +78,7 @@ violet package mesh-v2-test-suite \
 ### 3. 上架到 ACP
 
 ```bash
-violet push mesh-v2-test-suite-v1.0.0.tgz \
+violet push mesh-v2-test-suite-<chart-version>.tgz \
   --platform-address https://<acp-host> \
   --platform-username <acp-user> \
   --platform-password <acp-pass>
