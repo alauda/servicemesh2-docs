@@ -224,7 +224,7 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
   Run the following command in the **Global** cluster
   :::
 
-  ```bash
+  ```bash {name=config-kiali:get-ca-certificate}
   # CA certificate for ACP - base64-encoded
   kubectl -ncpaas-system get secret dex.tls -o jsonpath='{.data.ca\.crt}'
   ```
@@ -232,7 +232,11 @@ The following steps show how to integrate the Alauda Build of Kiali with user-wo
   The output is a base64-encoded certificate. Store this value for use in later steps.
 
   <Directive type="danger" title="CA certificate missing">
-  If the command returns an empty output, try using `kubectl -n cpaas-system get secret dex.tls -o jsonpath='{.data.tls\.crt}'` or contact your administrator to obtain the ACP CA certificate.
+  If the command returns an empty output, try using the following command or contact your administrator to obtain the ACP CA certificate.
+
+  ```bash {name=config-kiali:get-ca-certificate-alternative}
+  kubectl -n cpaas-system get secret dex.tls -o jsonpath='{.data.tls\.crt}'
+  ```
   </Directive>
 
   ### Retrieve platform configuration from the business cluster:

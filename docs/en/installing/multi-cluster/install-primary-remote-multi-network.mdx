@@ -31,7 +31,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
 - You have installed the Alauda Container Platform Networking for Multus plugin all of the clusters that comprise the mesh, and kube-ovn must be v4.1.5 or later.
 - You have access to two clusters with external load balancer support.
   :::warning
-   In primary-remote mode, if the external load balancer address is an IP and it is IPv6, primary-remote deployment is currently not supported.
+   **In primary-remote mode, if the external load balancer address is an IP and it is IPv6, primary-remote deployment is not supported in versions prior to Alauda Service Mesh v2.1.2**.
   :::
 - You have installed the Alauda Service Mesh v2 Operator on all of the clusters that comprise the mesh.
 - You have completed [Creating certificates for a multi-cluster mesh](./configuration-overview.mdx#creating-certificates-for-a-multi-cluster-mesh).
@@ -43,7 +43,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
 <Steps>
   ### Create an `ISTIO_VERSION` environment variable that defines the Istio version to install
 
-  ```bash
+  ```bash {name=primary-remote-multi-network:set-istio-version}
   export ISTIO_VERSION=1.28.6
   ```
 
@@ -51,7 +51,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
 
   Install the `IstioCNI` resource on the **East** cluster by running the following command:
 
-  ```bash
+  ```bash {name=primary-remote-multi-network:install-istio-cni-east}
   kubectl --context "${CTX_CLUSTER1}" create namespace istio-cni
   cat <<EOF | kubectl --context "${CTX_CLUSTER1}" apply -f -
   apiVersion: sailoperator.io/v1
@@ -76,7 +76,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
 
      Save the following `Istio` resource to `istio-external.yaml`:
 
-     ```yaml title="istio-external.yaml"
+     ```yaml title="istio-external.yaml" {name=primary-remote-multi-network:istio-external-yaml}
      apiVersion: sailoperator.io/v1
      kind: Istio
      metadata:
@@ -99,13 +99,13 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
 
      Using `kubectl` to apply the `Istio` resource:
 
-     ```bash
+     ```bash {name=primary-remote-multi-network:apply-istio-east}
      envsubst < istio-external.yaml | kubectl --context "${CTX_CLUSTER1}" apply -f -
      ```
 
   2. Wait for the control plane to return the "Ready" status condition by running the following command:
 
-     ```bash
+     ```bash {name=primary-remote-multi-network:wait-istio-east}
      kubectl --context "${CTX_CLUSTER1}" wait --for condition=Ready istio/default --timeout=3m
      ```
 
@@ -115,7 +115,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
      For nodes running Linux kernel versions earlier than 4.11 (e.g., CentOS 7), [additional configuration](../../gateways/gateway-installation/linux-kernel-compatibility-notice.mdx#linux-kernel-compatibility-notice) is required prior to gateway installation.
      :::
 
-     ```bash
+     ```bash {name=primary-remote-multi-network:create-eastwest-gw-east}
      kubectl --context "${CTX_CLUSTER1}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net1.yaml
      ```
 
@@ -153,13 +153,13 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
 
   4. Expose the control plane through the gateway so that services in the **West** cluster can access the control plane by running the following command:
 
-     ```bash
+     ```bash {name=primary-remote-multi-network:expose-istiod-east}
      kubectl --context "${CTX_CLUSTER1}" apply -n istio-system -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/expose-istiod.yaml
      ```
 
   5. Expose the application services through the gateway by running the following command:
 
-     ```bash
+     ```bash {name=primary-remote-multi-network:expose-services-east}
      kubectl --context "${CTX_CLUSTER1}" apply -n istio-system -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/expose-services.yaml
      ```
 
@@ -167,7 +167,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
 
   Install the `IstioCNI` resource on the **West** cluster by running the following command:
 
-  ```bash
+  ```bash {name=primary-remote-multi-network:install-istio-cni-west}
   kubectl --context "${CTX_CLUSTER2}" create namespace istio-cni
   cat <<EOF | kubectl --context "${CTX_CLUSTER2}" apply -f -
   apiVersion: sailoperator.io/v1
@@ -190,7 +190,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
 
   1. Save the IP address of the East-West gateway running in the **East** cluster by running the following command:
 
-     ```bash
+     ```bash {name=primary-remote-multi-network:get-discovery-address}
      export DISCOVERY_ADDRESS=$(kubectl --context="${CTX_CLUSTER1}" \
         -n istio-system get svc istio-eastwestgateway \
         -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
@@ -199,7 +199,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
 
   2. Create an `Istio` resource on the West cluster by running the following command:
 
-     ```bash
+     ```bash {name=primary-remote-multi-network:install-istio-west}
      cat <<EOF | kubectl --context "${CTX_CLUSTER2}" apply -f -
      apiVersion: sailoperator.io/v1
      kind: Istio
@@ -219,13 +219,13 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
 
   3. Annotate the `istio-system` namespace in the **West** cluster so that it is managed by the control plane in the **East** cluster by running the following command:
 
-     ```bash
+     ```bash {name=primary-remote-multi-network:annotate-istio-system-west}
      kubectl --context="${CTX_CLUSTER2}" annotate namespace istio-system topology.istio.io/controlPlaneClusters=cluster1
      ```
 
   4. Install a remote secret on the **East** cluster that provides access to the API server on the **West** cluster by running the following command:
 
-     ```bash
+     ```bash {name=primary-remote-multi-network:install-remote-secret-cluster2-on-east}
      istioctl create-remote-secret \
        --context="${CTX_CLUSTER2}" \
        --name=cluster2 | \
@@ -234,7 +234,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
 
   5. Wait for the `Istio` resource to return the "Ready" status condition by running the following command:
 
-     ```bash
+     ```bash {name=primary-remote-multi-network:wait-istio-west}
      kubectl --context "${CTX_CLUSTER2}" wait --for condition=Ready istio/default --timeout=3m
      ```
 
@@ -244,7 +244,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
      For nodes running Linux kernel versions earlier than 4.11 (e.g., CentOS 7), [additional configuration](../../gateways/gateway-installation/linux-kernel-compatibility-notice.mdx#linux-kernel-compatibility-notice) is required prior to gateway installation.
      :::
 
-     ```bash
+     ```bash {name=primary-remote-multi-network:create-eastwest-gw-west}
      kubectl --context "${CTX_CLUSTER2}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net2.yaml
      ```
 
@@ -299,13 +299,13 @@ This cluster will host the `v1` version of the `helloworld` service.
 
 1.  Create a dedicated namespace for the applications on the `East` cluster.
 
-    ```shell
+    ```shell {name=primary-remote-multi-network:create-sample-ns-east}
     kubectl --context="${CTX_CLUSTER1}" create namespace sample
     ```
 
 2.  Enable automatic Istio sidecar injection for the `sample` namespace by applying the required label.
 
-    ```shell
+    ```shell {name=primary-remote-multi-network:label-sample-ns-east}
     kubectl --context="${CTX_CLUSTER1}" label namespace sample istio-injection=enabled
     ```
 
@@ -313,23 +313,23 @@ This cluster will host the `v1` version of the `helloworld` service.
 
     a.  First, establish the `helloworld` service endpoint.
 
-        ```shell
-        kubectl --context="${CTX_CLUSTER1}" apply \
-          -l service=helloworld -n sample \
-          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
-        ```
+    ```shell {name=primary-remote-multi-network:deploy-helloworld-svc-east}
+    kubectl --context="${CTX_CLUSTER1}" apply \
+      -l service=helloworld -n sample \
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
+    ```
 
     b.  Then, deploy the `v1` instance of the `helloworld` application.
 
-        ```shell
-        kubectl --context="${CTX_CLUSTER1}" apply \
-          -l version=v1 -n sample \
-          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
-        ```
+    ```shell {name=primary-remote-multi-network:deploy-helloworld-v1-east}
+    kubectl --context="${CTX_CLUSTER1}" apply \
+      -l version=v1 -n sample \
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
+    ```
 
 4.  Deploy the `sleep` application, which will act as a client for sending test requests.
 
-    ```shell
+    ```shell {name=primary-remote-multi-network:deploy-sleep-east}
     kubectl --context="${CTX_CLUSTER1}" apply \
       -n sample \
       -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/sleep/sleep.yaml
@@ -337,13 +337,13 @@ This cluster will host the `v1` version of the `helloworld` service.
 
 5.  Pause the process until the `helloworld-v1` deployment is fully available and ready.
 
-    ```shell
+    ```shell {name=primary-remote-multi-network:wait-helloworld-v1-east}
     kubectl --context="${CTX_CLUSTER1}" wait --for condition=available -n sample deployment/helloworld-v1
     ```
 
 6.  Likewise, wait for the `sleep` deployment to report a `Ready` status.
 
-    ```shell
+    ```shell {name=primary-remote-multi-network:wait-sleep-east}
     kubectl --context="${CTX_CLUSTER1}" wait --for condition=available -n sample deployment/sleep
     ```
 
@@ -353,13 +353,13 @@ This cluster will host the `v2` version of the `helloworld` service.
 
 1.  Create the `sample` namespace on the `West` cluster.
 
-    ```shell
+    ```shell {name=primary-remote-multi-network:create-sample-ns-west}
     kubectl --context="${CTX_CLUSTER2}" create namespace sample
     ```
 
 2.  Enable Istio sidecar injection for this namespace as well.
 
-    ```shell
+    ```shell {name=primary-remote-multi-network:label-sample-ns-west}
     kubectl --context="${CTX_CLUSTER2}" label namespace sample istio-injection=enabled
     ```
 
@@ -367,23 +367,23 @@ This cluster will host the `v2` version of the `helloworld` service.
 
     a.  Create the common `helloworld` service endpoint on the `West` cluster.
 
-        ```shell
-        kubectl --context="${CTX_CLUSTER2}" apply \
-          -l service=helloworld -n sample \
-          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
-        ```
+    ```shell {name=primary-remote-multi-network:deploy-helloworld-svc-west}
+    kubectl --context="${CTX_CLUSTER2}" apply \
+      -l service=helloworld -n sample \
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
+    ```
 
     b.  Deploy the `v2` instance of the `helloworld` application.
 
-        ```shell
-        kubectl --context="${CTX_CLUSTER2}" apply \
-          -l version=v2 -n sample \
-          -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
-        ```
+    ```shell {name=primary-remote-multi-network:deploy-helloworld-v2-west}
+    kubectl --context="${CTX_CLUSTER2}" apply \
+      -l version=v2 -n sample \
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
+    ```
 
 4.  Deploy the client `sleep` application on the `West` cluster.
 
-    ```shell
+    ```shell {name=primary-remote-multi-network:deploy-sleep-west}
     kubectl --context="${CTX_CLUSTER2}" apply \
       -n sample \
       -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/sleep/sleep.yaml
@@ -391,14 +391,14 @@ This cluster will host the `v2` version of the `helloworld` service.
 
 5.  Wait for the `helloworld-v2` deployment to become fully available.
 
-    ```shell
-    kubectl --context="${CTX_CLUSTER2}" wait --for condition=available -n sample deployment/helloworld-v2
+    ```shell {name=primary-remote-multi-network:wait-helloworld-v2-west}
+    kubectl --context="${CTX_CLUSTER2}" wait --for condition=available -n sample deployment/helloworld-v2 --timeout=3m
     ```
 
 6.  Finally, ensure the `sleep` deployment on the `West` cluster is ready.
 
-    ```shell
-    kubectl --context="${CTX_CLUSTER2}" wait --for condition=available -n sample deployment/sleep
+    ```shell {name=primary-remote-multi-network:wait-sleep-west}
+    kubectl --context="${CTX_CLUSTER2}" wait --for condition=available -n sample deployment/sleep --timeout=3m
     ```
 
 ### Verifying traffic flows between clusters
@@ -407,7 +407,7 @@ With the applications deployed and running on both clusters, the next step is to
 
 1.  From a pod within the `East` cluster, send a series of 10 requests to the `helloworld` service.
 
-    ```shell
+    ```shell {name=primary-remote-multi-network:test-traffic-east}
     for i in {0..9}; do \
       kubectl --context="${CTX_CLUSTER1}" exec -n sample deploy/sleep -c sleep -- curl -sS helloworld.sample:5000/hello; \
     done
@@ -417,7 +417,7 @@ With the applications deployed and running on both clusters, the next step is to
 
     <details>
     <summary>**Example output**</summary>
-    ```shell
+    ```shell {name=primary-remote-multi-network:test-traffic-east-output}
     Hello version: v1, instance: helloworld-v1-644474db4b-7cwhz
     Hello version: v2, instance: helloworld-v2-645cb7fc46-lnbb7
     Hello version: v1, instance: helloworld-v1-644474db4b-7cwhz
@@ -433,7 +433,7 @@ With the applications deployed and running on both clusters, the next step is to
 
 2.  Perform the same test from the `West` cluster.
 
-    ```shell
+    ```shell {name=primary-remote-multi-network:test-traffic-west}
     for i in {0..9}; do \
       kubectl --context="${CTX_CLUSTER2}" exec -n sample deploy/sleep -c sleep -- curl -sS helloworld.sample:5000/hello; \
     done
@@ -449,14 +449,14 @@ After completing your verification and experimentation, you should dismantle the
 
 **Procedure**
 
-1.  Execute a single command to remove all Istio components and the sample applications from the `East` cluster.
+1. Execute a single command to remove all Istio components and the sample applications from the `East` cluster.
 
-    ```shell
-    kubectl --context="${CTX_CLUSTER1}" delete istio/default istiocni/default ns/sample ns/istio-system ns/istio-cni
-    ```
+   ```shell {name=primary-remote-multi-network:cleanup-east}
+   kubectl --context="${CTX_CLUSTER1}" delete istio/default istiocni/default ns/sample ns/istio-system ns/istio-cni
+   ```
 
-2.  Run the corresponding command to perform the same cleanup operation on the `West` cluster.
+2. Run the corresponding command to perform the same cleanup operation on the `West` cluster.
 
-    ```shell
-    kubectl --context="${CTX_CLUSTER2}" delete istio/default istiocni/default ns/sample ns/istio-system ns/istio-cni
-    ```
+   ```shell {name=primary-remote-multi-network:cleanup-west}
+   kubectl --context="${CTX_CLUSTER2}" delete istio/default istiocni/default ns/sample ns/istio-system ns/istio-cni
+   ```

@@ -20,7 +20,7 @@ test_install_mesh() {
     
     # 1. 创建 IstioCNI 命名空间
     log_info "步骤 1: 创建 IstioCNI 命名空间"
-    runme run install-mesh:create-namespace-istio-cni || {
+    _create_namespace_safe install-mesh:create-namespace-istio-cni istio-cni || {
         log_error "创建 IstioCNI 命名空间失败"
         return 1
     }
@@ -41,7 +41,7 @@ test_install_mesh() {
     
     # 4. 创建 Istio 命名空间
     log_info "步骤 4: 创建 Istio 命名空间"
-    runme run install-mesh:create-namespace-istio-system || {
+    _create_namespace_safe install-mesh:create-namespace-istio-system istio-system || {
         log_error "创建 Istio 命名空间失败"
         return 1
     }

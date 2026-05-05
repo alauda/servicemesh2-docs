@@ -212,6 +212,73 @@ _wait_for_deployment() {
     return 0
 }
 
+# 等待 Service 的 LoadBalancer ingress (IP 或 hostname) 就绪
+# 用法: _wait_for_ingress_lb <namespace> <service> [context] [timeout]
+# 说明:
+#   - 通过 kubectl wait --for=jsonpath='{.status.loadBalancer.ingress}' 等待
+#     ingress 字段被填充 (IP 或 hostname 均可,无需关心具体类型)
+#   - context 可选,留空时使用 kubectl 当前默认 context
+#   - timeout 默认 2m,可传入 30s / 5m 等 kubectl 接受的时长格式
+_wait_for_ingress_lb() {
+    local namespace="$1"
+    local service="$2"
+    local context="${3:-}"
+    local timeout="${4:-2m}"
+
+    if [ -n "$context" ]; then
+        log_info "等待 LoadBalancer ingress 就绪: ns=$namespace svc=$service context=$context (timeout=$timeout)"
+    else
+        log_info "等待 LoadBalancer ingress 就绪: ns=$namespace svc=$service (timeout=$timeout)"
+    fi
+
+    if ! kubectl --context "$context" -n "$namespace" wait \
+            --for=jsonpath='{.status.loadBalancer.ingress}' \
+            "svc/$service" --timeout="$timeout"; then
+        log_error "等待 LoadBalancer ingress 超时: ns=$namespace svc=$service"
+        return 1
+    fi
+    log_success "LoadBalancer ingress 就绪: ns=$namespace svc=$service"
+    return 0
+}
+
+# 创建命名空间 (容忍 AlreadyExists),并验证命名空间已就绪
+# 用法: _create_namespace_safe <runme_block_name> <namespace_list> [context]
+# 参数:
+#   - runme_block_name: 文档中执行 `kubectl create namespace ...` 的代码块名
+#   - namespace_list:   要验证的命名空间(空格分隔可传多个,如 "ns1 ns2 ns3")
+#   - context:          可选,留空时使用 kubectl 当前默认 context
+# 说明:
+#   - 适用于"重复执行可能遇到 AlreadyExists"的场景 (如多集群多次重建)
+#   - 命令本身的失败被忽略,以最终 `kubectl get ns` 是否成功作为判定依据
+_create_namespace_safe() {
+    local block_name="$1"
+    local ns_list="$2"
+    local context="${3:-}"
+
+    if [ -z "$block_name" ] || [ -z "$ns_list" ]; then
+        log_error "_create_namespace_safe: 缺少必要参数"
+        log_error "用法: _create_namespace_safe <block_name> <namespace_list> [context]"
+        return 1
+    fi
+
+    # 执行 runme 块,容忍 AlreadyExists 等错误
+    runme run "$block_name" 2>&1 || true
+
+    # 验证每个命名空间已存在
+    local ns
+    for ns in $ns_list; do
+        if ! kubectl --context "$context" get namespace "$ns" >/dev/null 2>&1; then
+            if [ -n "$context" ]; then
+                log_error "命名空间创建失败: ns=$ns context=$context"
+            else
+                log_error "命名空间创建失败: ns=$ns"
+            fi
+            return 1
+        fi
+    done
+    return 0
+}
+
 # 重试执行命令
 # 用法: retry_command <command> [max_retries] [interval]
 retry_command() {
@@ -285,6 +352,8 @@ install_operator() {
         local versions_output
         versions_output=$(runme run "${prefix}:check-packagemanifest-versions" 2>/dev/null || echo "")
 
+        echo "$versions_output"
+
         if [ -n "$versions_output" ] && echo "$versions_output" | awk '$2 == "'"$target_csv"'" { found=1 } END { exit !found }'; then
             log_success "找到匹配的版本: $target_csv"
             echo "$versions_output"
@@ -313,7 +382,7 @@ install_operator() {
 
     # 1. 创建命名空间
     log_info "步骤 1: 创建 $namespace 命名空间"
-    runme run "${runme_prefix}:create-namespace-${namespace}" || {
+    _create_namespace_safe "${runme_prefix}:create-namespace-${namespace}" "$namespace" || {
         log_error "创建命名空间失败"
         return 1
     }

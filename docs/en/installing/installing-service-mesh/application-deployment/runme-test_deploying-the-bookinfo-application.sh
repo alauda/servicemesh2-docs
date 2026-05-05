@@ -20,7 +20,7 @@ test_deploying_bookinfo() {
     
     # 1. 创建 bookinfo 命名空间
     log_info "步骤 1: 创建 bookinfo 命名空间"
-    runme run bookinfo:create-namespace || {
+    _create_namespace_safe bookinfo:create-namespace bookinfo || {
         log_error "创建 bookinfo 命名空间失败"
         return 1
     }

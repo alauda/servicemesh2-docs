@@ -33,52 +33,66 @@ docs/en/installing/dual-stack/
 - `curl` - 用于下载工具和插件包
 - `jq` - JSON 处理工具
 
-### 2. 设置 kubectl 环境
-
-TODO: 后续优化 ACP 集群 kubeconfig 配置方式
-
-```bash
-# 从 ACP 平台下载集群 kubeconfig 文件
-
-# 修改 kubeconfig 文件中的 context 名称（必须和集群名称相同 ）
-kubectl --kubeconfig=/path/to/kubeconfig.yaml config rename-context proxy-connect <cluster-name>
-
-# 设置 Kubernetes 环境变量（多个文件以英文冒号分隔）
-export KUBECONFIG=/path/to/kubeconfig.yaml
-```
-
-### 3. 安装 `Multus` 集群插件
+### 2. 安装 `Multus` 集群插件
 
 TODO: 后续由脚本执行初始化时自动安装
 
-### 4. 设置环境变量
+### 3. 设置环境变量
 
 在执行测试前，需要设置以下环境变量：
 
 ```bash
-# 集群名称（根据实际情况设置，可选）
-export SINGLE_CLUSTER_NAME=my-cluster      # 单集群网格的集群名称
-export EAST_CLUSTER_NAME=east-cluster      # 多集群网格的 East 集群名称
-export WEST_CLUSTER_NAME=west-cluster      # 多集群网格的 West 集群名称
+# ──────────────────────────────────────────────────────────────────
+# 集群名称（按文档归属选择）
+# ──────────────────────────────────────────────────────────────────
+# 单集群（multi-cluster 文档以外的所有测试默认使用此集群）
+export SINGLE_CLUSTER_NAME=my-cluster
 
+# 仅 docs/en/installing/multi-cluster 下的文档使用以下两个变量
+export EAST_CLUSTER_NAME=east-cluster
+export WEST_CLUSTER_NAME=west-cluster
+
+# ──────────────────────────────────────────────────────────────────
 # 平台信息
+# ──────────────────────────────────────────────────────────────────
 export PLATFORM_ADDRESS=https://xxx
 export PLATFORM_USERNAME='your-username'
 export PLATFORM_PASSWORD='your-password'
-# TODO: 后续会自动从 Global 集群获取 CA 证书
-# 获取方式: kubectl -ncpaas-system get secret dex.tls -o jsonpath='{.data.ca\.crt}'
-export PLATFORM_CA='base64-encoded-ca-certificate'
 
-# 双栈环境标识（可选，设置为 true 时才会执行双栈文档测试）
+# ACP 平台 API token（用于自动获取集群 kubeconfig）
+# 获取方式：在 ACP UI （账号的 Profile 页面）上生成 API token
+export ACP_API_TOKEN='your-acp-api-token'
+
+# 选择集群连接模式（可选，默认 direct）
+# - proxy:  通过 ACP 平台代理访问 K8s API（对网络隔离友好）
+# - direct: 直接访问 K8s API Server（要求测试机能直连 Master 节点）
+# 注：多集群服务网格必须选择 `direct`
+export ACP_KUBECONFIG_MODE=direct
+
+# ACP 平台 CA 证书（base64 编码，可选）
+# - 已设置: 直接使用该值
+# - 未设置: 框架会在 kubeconfig 就绪后自动从 Global 集群拉取
+# export PLATFORM_CA='base64-encoded-ca-certificate'
+
+# Global 集群名（可选，默认 'global'）
+# 框架会在 init 时自动追加到集群列表末尾，用于获取 PLATFORM_CA 等平台资源
+# export GLOBAL_CLUSTER_NAME=global
+
+# ──────────────────────────────────────────────────────────────────
+# 测试行为开关（可选）
+# ──────────────────────────────────────────────────────────────────
+# 双栈环境标识（设置为 true 时才会执行双栈文档测试）
 export IS_DUAL_STACK=false
-# Bookinfo 流量生成（可选，设置为 true 时，Bookinfo 部署完成后会自动生成访问流量）
+# Bookinfo 流量生成（设置为 true 时，Bookinfo 部署完成后会自动生成访问流量）
 export AUTO_GEN_BOOKINFO_TRAFFIC=true
 
-# 工具版本
-export RUNME_VERSION=3.16.4
+# ──────────────────────────────────────────────────────────────────
+# 工具与插件包
+# ──────────────────────────────────────────────────────────────────
+export RUNME_VERSION=3.16.11
 
-# 镜像加速地址（可选，用于替换默认镜像地址）
-export REGISTRY_MIRROR_ADDRESS=docker-mirrors.alauda.cn  # 留空表示不使用镜像加速
+# 镜像加速地址（可选，用于替换默认镜像地址；留空表示不使用）
+export REGISTRY_MIRROR_ADDRESS=docker-mirrors.alauda.cn
 
 # 插件包下载地址
 export PKG_SERVICEMESH_OPERATOR2_URL=xxx
@@ -87,6 +101,47 @@ export PKG_JAEGER_OPERATOR_URL=xxx
 export PKG_OPENTELEMETRY_OPERATOR_URL=xxx
 export PKG_METALLB_OPERATOR_URL=xxx
 ```
+
+### 4. kubeconfig 自动管理
+
+执行 `./run.sh --init-only` 时，框架会通过 ACP 平台 API 自动获取集群 kubeconfig，**无需手动下载**：
+
+- API 入口：`${PLATFORM_ADDRESS}/auth/v1/clusters/<cluster-name>/kubeconfig`
+- 认证：HTTP Header `Authorization: Bearer ${ACP_API_TOKEN}`
+- 处理后的 kubeconfig 缓存于 `tests/.kubeconfig/`（已加入 `.gitignore`）：
+  - `tests/.kubeconfig/<cluster-name>.yaml` — 单集群 kubeconfig（每个集群独立一份，便于子任务隔离使用）
+  - `tests/.kubeconfig/merged.yaml` — 合并后的最终 KUBECONFIG
+  - `tests/.kubeconfig/.fingerprint` — 配置指纹（PLATFORM_ADDRESS / ACP_KUBECONFIG_MODE / ACP_API_TOKEN / 集群列表 的 sha256）
+- context 命名规则：每个集群的 context 名重命名为集群名本身（如 `my-cluster`），与 `SINGLE_CLUSTER_NAME` / `EAST_CLUSTER_NAME` / `WEST_CLUSTER_NAME` 保持一致
+- **Global 集群自动追加**：无论用户传入什么集群列表，框架都会在末尾自动追加 Global 集群（默认名 `global`，可通过 `GLOBAL_CLUSTER_NAME` 覆盖）。该集群仅用于：
+  - 自动获取 `PLATFORM_CA`（执行 `config-kiali:get-ca-certificate` runme 块）
+  - 后续可能新增的其他平台级资源访问
+  - 不会被纳入 `upload_all_packages` / `install_all_servicemesh_operators` 等业务集群操作
+- 多集群（multi-cluster 文档场景）需显式传入：
+
+  ```bash
+  ./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"
+  ```
+
+  合并后默认 `current-context` 为传入的第一个集群（即 `$EAST_CLUSTER_NAME`），Global 集群对应的 context 也会出现在 `merged.yaml` 中（名为 `global`），便于按需切换。
+
+- 当 `ACP_API_TOKEN`、`PLATFORM_ADDRESS`、`ACP_KUBECONFIG_MODE` 或集群列表任一发生变更，再次执行 `--init-only` 会自动重新拉取。
+
+### 5. PLATFORM_CA 自动获取
+
+`./run.sh` 在 kubeconfig 就绪后会统一解析 `PLATFORM_CA`：
+
+| 情况                             | 行为                                                                 |
+| -------------------------------- | -------------------------------------------------------------------- |
+| `PLATFORM_CA` 已通过环境变量设置 | 直接使用，不访问 Global 集群                                         |
+| `PLATFORM_CA` 为空               | 通过 Global 集群独立 kubeconfig 自动拉取，结果 export 给后续测试脚本 |
+
+自动获取流程：
+
+1. 使用 `$KUBECONFIG_DIR/global.yaml` 作为 runme 子进程的 KUBECONFIG（仅作用于子进程，**不污染调用方上下文**）
+2. 执行 `runme run config-kiali:get-ca-certificate`（来自 `docs/en/integration/observability/kiali.mdx`），结果非空则使用
+3. 否则回退 `runme run config-kiali:get-ca-certificate-alternative`
+4. 仍为空则报错退出，提示检查 `cpaas-system/dex.tls` Secret 或显式 `export PLATFORM_CA`
 
 ## 使用方法
 
@@ -98,13 +153,19 @@ cd tests
 # 查看帮助信息
 ./run.sh --help
 
-# 只执行环境初始化（首次运行或环境变更时）
+# 只执行环境初始化（默认使用 SINGLE_CLUSTER_NAME）
 ./run.sh --init-only
+
+# 显式指定要初始化的集群（与上一条等价）
+./run.sh --init-only --cluster "$SINGLE_CLUSTER_NAME"
+
+# 多集群初始化（仅 multi-cluster 文档场景需要）
+./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"
 
 # 测试所有文档（自动执行初始化，按预定义顺序执行）
 ./run-all.sh
 
-# 测试指定文档（默认不执行初始化）
+# 测试指定文档（默认不执行初始化，复用现有 kubeconfig）
 ./run.sh --file install-mesh-in-dual-stack-mode
 
 # 测试指定文档并强制执行初始化
@@ -149,27 +210,32 @@ cd tests
 
 ## 当前已有的测试文档
 
-| 文档名称               | 测试脚本                                                                                                                                                                                            | 执行命令                                                                     |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| 双栈网格安装           | [runme-test_install-mesh-in-dual-stack-mode.sh](../docs/en/installing/dual-stack/runme-test_install-mesh-in-dual-stack-mode.sh)                                                                     | `./run.sh --file install-mesh-in-dual-stack-mode`                            |
-| 网格安装               | [runme-test_install-mesh.sh](../docs/en/installing/installing-service-mesh/runme-test_install-mesh.sh)                                                                                              | `./run.sh --file install-mesh`                                               |
-| 指标与服务网格集成     | [runme-test_metrics-and-mesh.sh](../docs/en/integration/observability/runme-test_metrics-and-mesh.sh)                                                                                               | `./run.sh --file metrics-and-mesh`                                           |
-| Kiali 安装与配置       | [runme-test_kiali.sh](../docs/en/integration/observability/runme-test_kiali.sh)                                                                                                                     | `./run.sh --file kiali`                                                      |
-| Bookinfo 应用部署      | [runme-test_deploying-the-bookinfo-application.sh](../docs/en/installing/installing-service-mesh/application-deployment/runme-test_deploying-the-bookinfo-application.sh)                           | `./run.sh --file deploying-the-bookinfo-application`                         |
-| Kiali 卸载             | [runme-test_uninstalling-alauda-build-of-kiali.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-build-of-kiali.sh)                                                                        | `./run.sh --file uninstalling-alauda-build-of-kiali`                         |
-| 网格卸载               | [runme-test_uninstalling-alauda-service-mesh.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-service-mesh.sh)                                                                            | `./run.sh --file uninstalling-alauda-service-mesh`                           |
-| InPlace 更新策略       | [runme-test_update-inplace.sh](../docs/en/updating/update-mesh/runme-test_update-inplace.sh)                                                                                                        | `./run.sh --file update-inplace`                                             |
-| Ambient Mode 安装      | [runme-test_installing-ambient-mode.sh](../docs/en/installing/ambient-mode/runme-test_installing-ambient-mode.sh)                                                                                   | `./run.sh --file installing-ambient-mode`                                    |
-| Ambient Bookinfo 部署  | [runme-test_deploying-ambient-bookinfo.sh](../docs/en/installing/ambient-mode/runme-test_deploying-ambient-bookinfo.sh)                                                                             | `./run.sh --file deploying-ambient-bookinfo`                                 |
-| Waypoint 代理部署      | [runme-test_waypoint-proxies.sh](../docs/en/installing/ambient-mode/runme-test_waypoint-proxies.sh)                                                                                                 | `./run.sh --file waypoint-proxies`                                           |
-| Ambient L7 特性        | [runme-test_ambient-l7-features.sh](../docs/en/installing/ambient-mode/runme-test_ambient-l7-features.sh)                                                                                           | `./run.sh --file ambient-l7-features`                                        |
-| Ambient Gateway API    | [runme-test_exposing-a-service-via-k8s-gateway-api-in-ambient-mode.sh](../docs/en/gateways/directing-traffic-into-the-mesh/runme-test_exposing-a-service-via-k8s-gateway-api-in-ambient-mode.sh)    | `./run.sh --file exposing-a-service-via-k8s-gateway-api-in-ambient-mode`     |
-| Ambient Egress Gateway | [runme-test_routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode.sh](../docs/en/gateways/directing-outbound-traffic/runme-test_routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode.sh) | `./run.sh --file routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode` |
-| Ambient 模式网格卸载   | [runme-test_uninstalling-alauda-service-mesh-in-ambient-mode.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-service-mesh-in-ambient-mode.sh)                                            | `./run.sh --file uninstalling-alauda-service-mesh-in-ambient-mode`           |
+| 文档名称                     | 测试脚本                                                                                                                                                                                            | 执行命令                                                                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 双栈网格安装                 | [runme-test_install-mesh-in-dual-stack-mode.sh](../docs/en/installing/dual-stack/runme-test_install-mesh-in-dual-stack-mode.sh)                                                                     | `./run.sh --file install-mesh-in-dual-stack-mode`                            |
+| 网格安装                     | [runme-test_install-mesh.sh](../docs/en/installing/installing-service-mesh/runme-test_install-mesh.sh)                                                                                              | `./run.sh --file install-mesh`                                               |
+| 指标与服务网格集成           | [runme-test_metrics-and-mesh.sh](../docs/en/integration/observability/runme-test_metrics-and-mesh.sh)                                                                                               | `./run.sh --file metrics-and-mesh`                                           |
+| Kiali 安装与配置             | [runme-test_kiali.sh](../docs/en/integration/observability/runme-test_kiali.sh)                                                                                                                     | `./run.sh --file kiali`                                                      |
+| Bookinfo 应用部署            | [runme-test_deploying-the-bookinfo-application.sh](../docs/en/installing/installing-service-mesh/application-deployment/runme-test_deploying-the-bookinfo-application.sh)                           | `./run.sh --file deploying-the-bookinfo-application`                         |
+| Kiali 卸载                   | [runme-test_uninstalling-alauda-build-of-kiali.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-build-of-kiali.sh)                                                                        | `./run.sh --file uninstalling-alauda-build-of-kiali`                         |
+| 网格卸载                     | [runme-test_uninstalling-alauda-service-mesh.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-service-mesh.sh)                                                                            | `./run.sh --file uninstalling-alauda-service-mesh`                           |
+| InPlace 更新策略             | [runme-test_update-inplace.sh](../docs/en/updating/update-mesh/runme-test_update-inplace.sh)                                                                                                        | `./run.sh --file update-inplace`                                             |
+| Ambient Mode 安装            | [runme-test_installing-ambient-mode.sh](../docs/en/installing/ambient-mode/runme-test_installing-ambient-mode.sh)                                                                                   | `./run.sh --file installing-ambient-mode`                                    |
+| Ambient Bookinfo 部署        | [runme-test_deploying-ambient-bookinfo.sh](../docs/en/installing/ambient-mode/runme-test_deploying-ambient-bookinfo.sh)                                                                             | `./run.sh --file deploying-ambient-bookinfo`                                 |
+| Waypoint 代理部署            | [runme-test_waypoint-proxies.sh](../docs/en/installing/ambient-mode/runme-test_waypoint-proxies.sh)                                                                                                 | `./run.sh --file waypoint-proxies`                                           |
+| Ambient L7 特性              | [runme-test_ambient-l7-features.sh](../docs/en/installing/ambient-mode/runme-test_ambient-l7-features.sh)                                                                                           | `./run.sh --file ambient-l7-features`                                        |
+| Ambient Gateway API          | [runme-test_exposing-a-service-via-k8s-gateway-api-in-ambient-mode.sh](../docs/en/gateways/directing-traffic-into-the-mesh/runme-test_exposing-a-service-via-k8s-gateway-api-in-ambient-mode.sh)    | `./run.sh --file exposing-a-service-via-k8s-gateway-api-in-ambient-mode`     |
+| Ambient Egress Gateway       | [runme-test_routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode.sh](../docs/en/gateways/directing-outbound-traffic/runme-test_routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode.sh) | `./run.sh --file routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode` |
+| Ambient 模式网格卸载         | [runme-test_uninstalling-alauda-service-mesh-in-ambient-mode.sh](../docs/en/uninstalling/runme-test_uninstalling-alauda-service-mesh-in-ambient-mode.sh)                                            | `./run.sh --file uninstalling-alauda-service-mesh-in-ambient-mode`           |
+| 多集群 - 配置概述（CA 证书） | [runme-test_configuration-overview.sh](../docs/en/installing/multi-cluster/runme-test_configuration-overview.sh)                                                                                    | `./run.sh --file configuration-overview`                                     |
+| 多集群 - 多主多网络          | [runme-test_install-multi-primary-multi-network.sh](../docs/en/installing/multi-cluster/runme-test_install-multi-primary-multi-network.sh)                                                          | `./run.sh --file install-multi-primary-multi-network`                        |
+| 多集群 - 主-远多网络         | [runme-test_install-primary-remote-multi-network.sh](../docs/en/installing/multi-cluster/runme-test_install-primary-remote-multi-network.sh)                                                        | `./run.sh --file install-primary-remote-multi-network`                       |
 
 > **注意**：后续会逐步添加更多文档的自动化测试。
 >
 > **Waypoint 代理部署**测试暂未覆盖 "Enabling cross-namespace waypoint usage" 部分，后续补充。
+>
+> **多集群 multi-cluster 测试** 需要 `EAST_CLUSTER_NAME` 与 `WEST_CLUSTER_NAME` 双集群环境。运行前需先用 `./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"` 初始化双集群 kubeconfig；并需先执行 `./run.sh --file configuration-overview` 完成两个集群上的 cacerts 下发，然后才能运行 `install-multi-primary-multi-network` 或 `install-primary-remote-multi-network`。
 
 ## 工作原理
 
@@ -243,6 +309,27 @@ Skill 定义文件位于 `.claude/skills/auto-test-creator/SKILL.md`，其中包
 2. 验证 `PLATFORM_ADDRESS`、`PLATFORM_USERNAME`、`PLATFORM_PASSWORD` 环境变量
 3. 验证集群配置
 
+### 问题：kubeconfig 获取失败 / 401 Unauthorized
+
+**可能原因**：
+
+1. `ACP_API_TOKEN` 未设置或已过期
+2. `PLATFORM_ADDRESS` 不可访问
+3. 集群名称错误（需要与 ACP 平台中的集群名一致）
+4. `ACP_KUBECONFIG_MODE=direct` 但测试机无法直连 K8s API Server
+
+**解决方法**：
+
+1. 在 ACP UI 上重新生成 API token，更新 `ACP_API_TOKEN` 环境变量
+2. 验证 `curl -k -H "Authorization: Bearer $ACP_API_TOKEN" "$PLATFORM_ADDRESS/auth/v1/clusters/$SINGLE_CLUSTER_NAME/kubeconfig"` 是否能正常返回 JSON
+3. 切换到 `ACP_KUBECONFIG_MODE=proxy` 重试
+
+### 问题：kubectl 找不到 context
+
+**可能原因**：集群名称变量（`SINGLE_CLUSTER_NAME` / `EAST_CLUSTER_NAME` / `WEST_CLUSTER_NAME`）变更后未重新初始化。
+
+**解决方法**：再次执行 `./run.sh --init-only`（或 `--cluster <name>`），框架会通过 fingerprint 检测到变更并自动重拉。
+
 ### 问题：测试执行失败
 
 **调试步骤**：
@@ -285,8 +372,11 @@ Skill 定义文件位于 `.claude/skills/auto-test-creator/SKILL.md`，其中包
 
 ## TODO
 
-- [ ] 多集群 kubecontext 管理
+- [x] 通过 ACP API 自动获取 kubeconfig（替代手动下载）
+- [x] PLATFORM_CA 自动获取（init 时从 Global 集群拉取 cpaas-system/dex.tls）
 - [ ] Multus 集群插件自动安装
 - [ ] MetalLB 集群插件自动安装
+- [x] multi-cluster 文档自动化测试
+- [ ] 出口网关的外部服务测试无法在离线环境执行
 - [ ] 逐步补充其他测试文档
 - [ ] 优化测试 case 结果统计
