@@ -67,9 +67,14 @@ global:
       tag: "v4.0.1"
       support_arm: true
       thirdparty: false
-    # OpenTelemetry Auto-instrumentation Images
+    # OpenTelemetry Images
     autoinstrumentation-java:
-      repository: asm/autoinstrumentation-java
+      repository: asm/opentelemetry-operator/autoinstrumentation-java
       tag: "2.26.1"
+      support_arm: true
+      thirdparty: true
+    telemetrygen:
+      repository: asm/opentelemetry-collector-contrib/telemetrygen
+      tag: "latest"
       support_arm: true
       thirdparty: true
