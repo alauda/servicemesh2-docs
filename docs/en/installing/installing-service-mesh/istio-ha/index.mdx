@@ -1,0 +1,35 @@
+---
+weight: 300
+---
+
+# About Istio High Availability
+
+Operating the Istio control plane in High Availability (HA) mode eliminates single points of failure and keeps the mesh running uninterrupted when an `istiod` pod becomes unhealthy.
+
+When HA is enabled, the failure of an individual `istiod` pod does not interrupt traffic management or data plane configuration: a remaining replica continues to serve the mesh, avoiding outages and reducing user-facing disruption. HA also distributes the control plane workload across multiple replicas, enables smoother control plane upgrades, supports disaster recovery scenarios, and provides protection against zone-level failures.
+
+A cluster administrator can enable HA for an Istio deployment using either of the following approaches:
+
+- **Static replica count**: Pin the deployment to a fixed number of `istiod` pods to maintain a predictable level of redundancy.
+- **Autoscaling**: Let the Horizontal Pod Autoscaler (HPA) adjust the number of `istiod` pods automatically in response to resource usage or custom metrics, which suits workloads with variable load.
+
+## Considerations for Single-Node Clusters
+
+For single-node clusters, it is crucial to disable the default Pod Disruption Budget (PDB) to prevent issues during node operations (e.g., draining) or scaling in HA mode. You can do this by adding the following configuration to your Istio resource:
+
+```yaml
+apiVersion: sailoperator.io/v1
+kind: Istio
+metadata:
+  name: default
+spec:
+  namespace: istio-system
+  values:
+    global:
+      defaultPodDisruptionBudget:
+        enabled: false # <-- disable default Pod Disruption Budget
+```
+
+`spec.values.global.defaultPodDisruptionBudget.enabled: false` disables the default Pod Disruption Budget for Istiod. In single-node clusters, a PDB can block operations such as node drains or pod evictions, as it prevents the number of available Istiod replicas from falling below the PDB's minimum desired count. Disabling it ensures smooth operations in this specific topology.
+
+<Overview overviewHeaders={[]} />

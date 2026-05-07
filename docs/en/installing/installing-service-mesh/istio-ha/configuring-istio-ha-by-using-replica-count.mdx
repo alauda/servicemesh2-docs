@@ -1,0 +1,104 @@
+---
+weight: 20
+---
+
+# Configuring Istio HA by using replica count
+
+Enable High Availability (HA) for the Istio control plane by pinning a static replica count, which keeps the mesh available and provides a fixed level of redundancy across the `istiod` pods.
+
+:::note
+A static replica count fixes the size of the Istio control plane. This approach is appropriate when control plane load is steady or predictable, or when you would rather scale `istiod` manually instead of relying on autoscaling.
+:::
+
+**Prerequisites**
+
+- You are logged in to the Alauda Container Platform web console as a user with the `cluster-admin` role, or you have an active ACP CLI (`kubectl`) session as a cluster administrator.
+- The Alauda Service Mesh v2 Operator is installed.
+- The `Istio` resource has been deployed.
+
+## Configuring via the web console
+
+**Procedure**
+
+1. In the Alauda Container Platform web console, navigate to **Administrator**.
+2. Select **Marketplace** > **OperatorHub**.
+3. Locate the Alauda Service Mesh v2 and click to select it.
+4. Click the **All Instances** tab.
+5. Click **Istio**.
+6. Click the name of the Istio installation, for example `default`.
+7. Click the **YAML** tab.
+8. Update the `Istio` custom resource (CR) so it resembles the following example:
+
+    ```yaml
+    apiVersion: sailoperator.io/v1
+    kind: Istio
+    metadata:
+      name: default
+    spec:
+      namespace: istio-system
+      values:
+        pilot:
+          autoscaleEnabled: false
+          replicaCount: 2
+    ```
+
+    **Field explanations**
+
+    - `spec.values.pilot.autoscaleEnabled`: Setting this to `false` turns off autoscaling so the replica count stays fixed at the value you define.
+    - `spec.values.pilot.replicaCount`: Sets the fixed number of Istio control plane replicas. To meet HA requirements, this value must be at least `2`.
+
+9. Click **Save** to apply the changes.
+
+## Configuring via the CLI
+
+**Procedure**
+
+1. Retrieve the name of the `Istio` resource:
+
+    ```bash
+    kubectl get istio -n istio-system
+    ```
+
+    **Example output**
+
+    ```bash
+    NAME      REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
+    default   1           1       0        default           Healthy   v1.24.6   24m
+    ```
+
+    The `Istio` resource is named `default`.
+
+2. Patch the `Istio` custom resource (CR) to disable autoscaling and set a fixed replica count:
+
+    ```bash
+    kubectl patch istio default -n istio-system --type merge -p '
+    spec:
+      values:
+        pilot:
+          autoscaleEnabled: false
+          replicaCount: 2
+    '
+    ```
+
+    **Field explanations**
+
+    - `spec.values.pilot.autoscaleEnabled`: Setting this to `false` turns off autoscaling so the replica count stays fixed at the value you define.
+    - `spec.values.pilot.replicaCount`: Sets the fixed number of Istio control plane replicas. To meet HA requirements, this value must be at least `2`.
+
+## Verification
+
+Check the status of the Istio control plane pods:
+
+```bash
+kubectl get pods -n istio-system -l app=istiod
+```
+
+**Example output**
+
+```bash
+NAME                      READY   STATUS    RESTARTS   AGE
+istiod-7c7b6564c9-nwhsg   1/1     Running   0          70s
+istiod-7c7b6564c9-xkmsl   1/1     Running   0          85s
+```
+
+Two `istiod` pods are running, which is the minimum required for an HA Istio control plane and indicates that a basic HA setup is in place.
