@@ -16,18 +16,19 @@ A static replica count fixes the size of the Istio control plane. This approach 
 - The Alauda Service Mesh v2 Operator is installed.
 - The `Istio` resource has been deployed.
 
-## Configuring via the web console
+## Configuring via the web console \{#configuring-via-the-web-console}
 
 **Procedure**
 
 1. In the Alauda Container Platform web console, navigate to **Administrator**.
 2. Select **Marketplace** > **OperatorHub**.
-3. Locate the Alauda Service Mesh v2 and click to select it.
-4. Click the **All Instances** tab.
-5. Click **Istio**.
-6. Click the name of the Istio installation, for example `default`.
-7. Click the **YAML** tab.
-8. Update the `Istio` custom resource (CR) so it resembles the following example:
+3. Search for the `Alauda Service Mesh v2`.
+4. Locate the `Alauda Service Mesh v2` and click to select it.
+5. Click the **All Instances** tab.
+6. From the **Filter by instance type** dropdown, select `Istio`.
+7. Click the name of the Istio installation, for example `default`.
+8. Click the **YAML** tab.
+9. Update the `Istio` custom resource (CR) so it resembles the following example:
 
     ```yaml
     apiVersion: sailoperator.io/v1
@@ -38,16 +39,14 @@ A static replica count fixes the size of the Istio control plane. This approach 
       namespace: istio-system
       values:
         pilot:
-          autoscaleEnabled: false
-          replicaCount: 2
+          autoscaleEnabled: false  # [!code callout]
+          replicaCount: 2  # [!code callout]
     ```
 
-    **Field explanations**
-
-    - `spec.values.pilot.autoscaleEnabled`: Setting this to `false` turns off autoscaling so the replica count stays fixed at the value you define.
-    - `spec.values.pilot.replicaCount`: Sets the fixed number of Istio control plane replicas. To meet HA requirements, this value must be at least `2`.
-
-9. Click **Save** to apply the changes.
+    <Callouts>
+      1. `spec.values.pilot.autoscaleEnabled` set to `false` turns off autoscaling so the replica count stays fixed at the value you define.
+      2. `spec.values.pilot.replicaCount` sets the fixed number of Istio control plane replicas. To meet HA requirements, this value must be at least `2`.
+    </Callouts>
 
 ## Configuring via the CLI
 
@@ -80,10 +79,7 @@ A static replica count fixes the size of the Istio control plane. This approach 
     '
     ```
 
-    **Field explanations**
-
-    - `spec.values.pilot.autoscaleEnabled`: Setting this to `false` turns off autoscaling so the replica count stays fixed at the value you define.
-    - `spec.values.pilot.replicaCount`: Sets the fixed number of Istio control plane replicas. To meet HA requirements, this value must be at least `2`.
+    For field explanations of these settings, see [Configuring via the web console](#configuring-via-the-web-console).
 
 ## Verification
 

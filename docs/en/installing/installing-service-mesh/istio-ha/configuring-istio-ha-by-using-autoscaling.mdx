@@ -16,18 +16,19 @@ With autoscaling, you specify the minimum and maximum number of Istio control pl
 - The Alauda Service Mesh v2 Operator is installed.
 - The `Istio` resource has been deployed.
 
-## Configuring via the web console
+## Configuring via the web console \{#configuring-via-the-web-console}
 
 **Procedure**
 
 1. In the Alauda Container Platform web console, navigate to **Administrator**.
 2. Select **Marketplace** > **OperatorHub**.
-3. Locate the Alauda Service Mesh v2 and click to select it.
-4. Click the **All Instances** tab.
-5. Click **Istio**.
-6. Click the name of the Istio installation, for example `default`.
-7. Click the **YAML** tab.
-8. Update the `Istio` custom resource (CR) so it resembles the following example:
+3. Search for the `Alauda Service Mesh v2`.
+4. Locate the `Alauda Service Mesh v2` and click to select it.
+5. Click the **All Instances** tab.
+6. From the **Filter by instance type** dropdown, select `Istio`.
+7. Click the name of the Istio installation, for example `default`.
+8. Click the **YAML** tab.
+9. Update the `Istio` custom resource (CR) so it resembles the following example:
 
     ```yaml
     apiVersion: sailoperator.io/v1
@@ -38,22 +39,20 @@ With autoscaling, you specify the minimum and maximum number of Istio control pl
       namespace: istio-system
       values:
         pilot:
-          autoscaleMin: 2
-          autoscaleMax: 5
+          autoscaleMin: 2  # [!code callout]
+          autoscaleMax: 5  # [!code callout]
           cpu:
-            targetAverageUtilization: 80
+            targetAverageUtilization: 80  # [!code callout]
           memory:
-            targetAverageUtilization: 80
+            targetAverageUtilization: 80  # [!code callout]
     ```
 
-    **Field explanations**
-
-    - `spec.values.pilot.autoscaleMin`: Sets the minimum number of Istio control plane replicas that are always running. To meet HA requirements, this value must be at least `2`.
-    - `spec.values.pilot.autoscaleMax`: Sets the maximum number of Istio control plane replicas the autoscaler can scale up to under load.
-    - `spec.values.pilot.cpu.targetAverageUtilization`: Sets the target average CPU utilization (as a percentage). When the observed CPU usage rises above this target, the Horizontal Pod Autoscaler (HPA) adds replicas.
-    - `spec.values.pilot.memory.targetAverageUtilization`: Sets the target average memory utilization (as a percentage). When the observed memory usage rises above this target, the HPA adds replicas.
-
-9. Click **Save** to apply the changes.
+    <Callouts>
+      1. `spec.values.pilot.autoscaleMin` sets the minimum number of Istio control plane replicas that are always running. To meet HA requirements, this value must be at least `2`.
+      2. `spec.values.pilot.autoscaleMax` sets the maximum number of Istio control plane replicas the autoscaler can scale up to under load.
+      3. `spec.values.pilot.cpu.targetAverageUtilization` sets the target average CPU utilization as a percentage. When the observed CPU usage rises above this target, the Horizontal Pod Autoscaler (HPA) adds replicas.
+      4. `spec.values.pilot.memory.targetAverageUtilization` sets the target average memory utilization as a percentage. When the observed memory usage rises above this target, the HPA adds replicas.
+    </Callouts>
 
 ## Configuring via the CLI
 
@@ -90,12 +89,7 @@ With autoscaling, you specify the minimum and maximum number of Istio control pl
     '
     ```
 
-    **Field explanations**
-
-    - `spec.values.pilot.autoscaleMin`: Sets the minimum number of Istio control plane replicas that are always running. To meet HA requirements, this value must be at least `2`.
-    - `spec.values.pilot.autoscaleMax`: Sets the maximum number of Istio control plane replicas the autoscaler can scale up to under load.
-    - `spec.values.pilot.cpu.targetAverageUtilization`: Sets the target average CPU utilization (as a percentage). When the observed CPU usage rises above this target, the HPA adds replicas.
-    - `spec.values.pilot.memory.targetAverageUtilization`: Sets the target average memory utilization (as a percentage). When the observed memory usage rises above this target, the HPA adds replicas.
+    For field explanations of these settings, see [Configuring via the web console](#configuring-via-the-web-console).
 
 ## Verification
 

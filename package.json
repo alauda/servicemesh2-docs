@@ -9,7 +9,7 @@
     "typescript": "^5.9.2"
   },
   "scripts": {
-    "dev": "doom dev",
+    "dev": "doom dev --port 2222",
     "build": "doom build",
     "lint": "doom lint",
     "serve": "doom serve",
