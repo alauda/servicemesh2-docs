@@ -12,31 +12,6 @@ source "$REPO_ROOT/tests/util/verify.sh"
 
 # runme 命令可以在项目的任意目录中执行
 
-_wait_for_istiod_pods_ready() {
-    local block_name="$1"
-    local min_pod_count="$2"
-    local max_retries="${3:-18}"
-    local interval="${4:-10}"
-    local attempt output pod_count running_count
-
-    for ((attempt=1; attempt<=max_retries; attempt++)); do
-        output=$(runme run "$block_name" 2>&1 || true)
-        pod_count=$(printf '%s\n' "$output" | awk '/^istiod-/{count++} END{print count+0}')
-        running_count=$(printf '%s\n' "$output" | awk '/^istiod-/ && /Running/{count++} END{print count+0}')
-
-        if [ "$pod_count" -ge "$min_pod_count" ] && [ "$running_count" -ge "$min_pod_count" ]; then
-            return 0
-        fi
-
-        if [ "$attempt" -lt "$max_retries" ]; then
-            log_warn "istiod Pod 尚未全部就绪，${interval} 秒后重试 (${attempt}/${max_retries})"
-            sleep "$interval"
-        fi
-    done
-
-    return 1
-}
-
 test_configuring_istio_ha_by_using_autoscaling() {
     log_info "=========================================="
     log_info "开始使用自动伸缩配置 Istio 高可用测试"
@@ -127,7 +102,7 @@ EOF
         return 1
     fi
 
-    if ! _wait_for_istiod_pods_ready "istio-ha-autoscaling:verify-istiod-pods" "$expected_pod_count"; then
+    if ! _wait_for_pod_count "istio-system" "app=istiod" "$expected_pod_count"; then
         log_error "等待 istiod Pod 就绪超时"
         return 1
     fi
