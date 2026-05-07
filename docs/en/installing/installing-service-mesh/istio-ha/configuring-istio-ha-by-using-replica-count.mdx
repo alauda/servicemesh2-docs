@@ -62,8 +62,8 @@ A static replica count fixes the size of the Istio control plane. This approach 
     **Example output**
 
     ```bash
-    NAME      REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
-    default   1           1       0        default           Healthy   v1.24.6   24m
+    NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
+    default   istio-system             1           1       1        default           Healthy   v1.28.6   24m
     ```
 
     The `Istio` resource is named `default`.
@@ -97,8 +97,8 @@ kubectl get pods -n istio-system -l app=istiod
 
 ```bash
 NAME                      READY   STATUS    RESTARTS   AGE
-istiod-7c7b6564c9-nwhsg   1/1     Running   0          70s
-istiod-7c7b6564c9-xkmsl   1/1     Running   0          85s
+istiod-6b8d64c946-2dq2k   1/1     Running   0          28m
+istiod-6b8d64c946-skg4v   1/1     Running   0          35s
 ```
 
 Two `istiod` pods are running, which is the minimum required for an HA Istio control plane and indicates that a basic HA setup is in place.
