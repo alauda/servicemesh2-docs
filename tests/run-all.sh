@@ -81,9 +81,29 @@ else
 fi
 
 # ------------------------------------------------------------------
-# Case 4: InPlace 更新策略测试
+# Case 4: Istio HA 配置测试
 # ------------------------------------------------------------------
-log_header "Case 4: InPlace 更新策略测试 (Update InPlace)"
+log_header "Case 4: Istio HA 配置测试"
+
+if (
+    set -e
+    ./run.sh --file install-mesh --force-init
+    ./run.sh --file configuring-istio-ha-by-using-autoscaling
+    ./run.sh --file uninstalling-alauda-service-mesh --skip-operator-and-crds
+    ./run.sh --file install-mesh
+    ./run.sh --file configuring-istio-ha-by-using-replica-count
+    ./run.sh --file uninstalling-alauda-service-mesh --skip-operator-and-crds
+); then
+    record_test_result 0
+else
+    record_test_result 1
+    exit 1
+fi
+
+# ------------------------------------------------------------------
+# Case 5: InPlace 更新策略测试
+# ------------------------------------------------------------------
+log_header "Case 5: InPlace 更新策略测试 (Update InPlace)"
 
 if (
     set -e
@@ -97,9 +117,9 @@ else
 fi
 
 # ------------------------------------------------------------------
-# Case 5: Ambient Mode 安装测试
+# Case 6: Ambient Mode 安装测试
 # ------------------------------------------------------------------
-log_header "Case 5: Ambient Mode 安装测试"
+log_header "Case 6: Ambient Mode 安装测试"
 
 if (
     set -e
@@ -128,13 +148,13 @@ else
 fi
 
 # ------------------------------------------------------------------
-# Case 6: 多集群 - 多主多网络拓扑 (Multi-Primary Multi-Network)
+# Case 7: 多集群 - 多主多网络拓扑 (Multi-Primary Multi-Network)
 # 注：会切换到双集群 kubeconfig，必须放在所有单集群 case 之后
 # ------------------------------------------------------------------
 if [ -z "${EAST_CLUSTER_NAME:-}" ] || [ -z "${WEST_CLUSTER_NAME:-}" ]; then
-    log_header "Case 6/7: 跳过多集群测试 (未设置 EAST_CLUSTER_NAME / WEST_CLUSTER_NAME)"
+    log_header "Case 7/8: 跳过多集群测试 (未设置 EAST_CLUSTER_NAME / WEST_CLUSTER_NAME)"
 else
-    log_header "Case 6: 多集群 - 多主多网络拓扑 (Multi-Primary Multi-Network)"
+    log_header "Case 7: 多集群 - 多主多网络拓扑 (Multi-Primary Multi-Network)"
 
     if (
         set -e
@@ -153,15 +173,15 @@ else
     fi
 
     # ------------------------------------------------------------------
-    # Case 7: 多集群 - 主-远多网络拓扑 (Primary-Remote Multi-Network)
+    # Case 8: 多集群 - 主-远多网络拓扑 (Primary-Remote Multi-Network)
     # ------------------------------------------------------------------
-    log_header "Case 7: 多集群 - 主-远多网络拓扑 (Primary-Remote Multi-Network)"
+    log_header "Case 8: 多集群 - 主-远多网络拓扑 (Primary-Remote Multi-Network)"
 
     if (
         set -e
-        # 重新初始化双集群 kubeconfig (Case 6 卸载后保险一步,确保上下文干净)
+        # 重新初始化双集群 kubeconfig (Case 7 卸载后保险一步,确保上下文干净)
         ./run.sh --init-only --cluster "$EAST_CLUSTER_NAME" --cluster "$WEST_CLUSTER_NAME"
-        # 重新下发 cacerts (Case 6 cleanup 已删除 istio-system,需要重建)
+        # 重新下发 cacerts (Case 7 cleanup 已删除 istio-system,需要重建)
         ./run.sh --file configuration-overview
         # 主-远多网络安装 + 验证 + 卸载
         ./run.sh --file install-primary-remote-multi-network --no-cleanup

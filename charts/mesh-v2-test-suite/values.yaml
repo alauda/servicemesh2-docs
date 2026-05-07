@@ -50,6 +50,16 @@ global:
       tag: "1.3"
       support_arm: true
       thirdparty: true
+    examples-helloworld-v1:
+      repository: asm/istio/examples-helloworld-v1
+      tag: "1.0"
+      support_arm: true
+      thirdparty: true
+    examples-helloworld-v2:
+      repository: asm/istio/examples-helloworld-v2
+      tag: "1.0"
+      support_arm: true
+      thirdparty: true
     # ASM Test Images
     asm-test-image:
       repository: asm/asm-test-image

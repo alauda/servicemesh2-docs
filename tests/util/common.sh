@@ -303,6 +303,43 @@ _create_namespace_safe() {
     return 0
 }
 
+# 等待指定标签选择器匹配的 Pod 数达到期望值
+# 用法: _wait_for_pod_count <namespace> <label_selector> <expected_count> [context] [phase] [max_retries] [interval]
+_wait_for_pod_count() {
+    local namespace="$1"
+    local label_selector="$2"
+    local expected_count="$3"
+    local context="${4:-}"
+    local phase="${5:-Running}"
+    local max_retries="${6:-20}"
+    local interval="${7:-5}"
+    local kubectl_args=(kubectl)
+    local attempt count
+
+    if [ -z "$namespace" ] || [ -z "$label_selector" ] || [ -z "$expected_count" ]; then
+        log_error "_wait_for_pod_count: 缺少必要参数"
+        log_error "用法: _wait_for_pod_count <namespace> <label_selector> <expected_count> [context] [phase] [max_retries] [interval]"
+        return 1
+    fi
+
+    [ -n "$context" ] && kubectl_args+=(--context "$context")
+    kubectl_args+=(-n "$namespace" get pods -l "$label_selector")
+    [ -n "$phase" ] && kubectl_args+=(--field-selector "status.phase=$phase")
+    kubectl_args+=(-o name)
+
+    for ((attempt=1; attempt<=max_retries; attempt++)); do
+        count=$("${kubectl_args[@]}" 2>/dev/null | wc -l | tr -d ' ')
+        if [ "$count" -ge "$expected_count" ]; then
+            return 0
+        fi
+
+        log_warn "等待 Pod 数达到期望值: ns=$namespace selector=$label_selector expected=$expected_count actual=$count phase=${phase:-all} (${attempt}/${max_retries})"
+        [ "$attempt" -lt "$max_retries" ] && sleep "$interval"
+    done
+
+    return 1
+}
+
 # 重试执行命令
 # 用法: retry_command <command> [max_retries] [interval]
 retry_command() {

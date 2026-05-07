@@ -1,0 +1,110 @@
+---
+weight: 10
+---
+
+# Configuring Istio HA by using autoscaling
+
+Enable High Availability (HA) for the Istio control plane through autoscaling so that the mesh remains operational even when an `istiod` pod fails.
+
+:::note
+With autoscaling, you specify the minimum and maximum number of Istio control plane pods that may run at any time. Alauda Container Platform then scales the actual replica count between those bounds based on resource consumption — for example, CPU or memory utilization — so the control plane can absorb shifts in workload volume and traffic patterns within the mesh.
+:::
+
+**Prerequisites**
+
+- You are logged in to the Alauda Container Platform web console as a user with the `cluster-admin` role, or you have an active ACP CLI (`kubectl`) session as a cluster administrator.
+- The Alauda Service Mesh v2 Operator is installed.
+- The `Istio` resource has been deployed.
+
+## Configuring via the web console \{#configuring-via-the-web-console}
+
+**Procedure**
+
+1. In the Alauda Container Platform web console, navigate to **Administrator**.
+2. Select **Marketplace** > **OperatorHub**.
+3. Search for the `Alauda Service Mesh v2`.
+4. Locate the `Alauda Service Mesh v2` and click to select it.
+5. Click the **All Instances** tab.
+6. From the **Filter by instance type** dropdown, select `Istio`.
+7. Click the name of the Istio installation, for example `default`.
+8. Click the **YAML** tab.
+9. Update the `Istio` custom resource (CR) so it resembles the following example:
+
+    ```yaml {name=istio-ha-autoscaling:console-yaml}
+    apiVersion: sailoperator.io/v1
+    kind: Istio
+    metadata:
+      name: default
+    spec:
+      namespace: istio-system
+      values:
+        pilot:
+          autoscaleMin: 2  # [!code callout]
+          autoscaleMax: 5  # [!code callout]
+          cpu:
+            targetAverageUtilization: 80  # [!code callout]
+          memory:
+            targetAverageUtilization: 80  # [!code callout]
+    ```
+
+    <Callouts>
+      1. `spec.values.pilot.autoscaleMin` sets the minimum number of Istio control plane replicas that are always running. To meet HA requirements, this value must be at least `2`.
+      2. `spec.values.pilot.autoscaleMax` sets the maximum number of Istio control plane replicas the autoscaler can scale up to under load.
+      3. `spec.values.pilot.cpu.targetAverageUtilization` sets the target average CPU utilization as a percentage. When the observed CPU usage rises above this target, the Horizontal Pod Autoscaler (HPA) adds replicas.
+      4. `spec.values.pilot.memory.targetAverageUtilization` sets the target average memory utilization as a percentage. When the observed memory usage rises above this target, the HPA adds replicas.
+    </Callouts>
+
+## Configuring via the CLI
+
+**Procedure**
+
+1. Retrieve the name of the `Istio` resource:
+
+    ```bash {name=istio-ha-autoscaling:get-istio}
+    kubectl get istio -n istio-system
+    ```
+
+    **Example output**
+
+    ```bash {name=istio-ha-autoscaling:get-istio-output}
+    NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
+    default   istio-system             1           1       1        default           Healthy   v1.28.6   24m
+    ```
+
+    The `Istio` resource is named `default`.
+
+2. Patch the `Istio` custom resource (CR) to enable autoscaling for the control plane:
+
+    ```bash {name=istio-ha-autoscaling:patch-istio}
+    kubectl patch istio default -n istio-system --type merge -p '
+    spec:
+      values:
+        pilot:
+          autoscaleMin: 2
+          autoscaleMax: 5
+          cpu:
+            targetAverageUtilization: 80
+          memory:
+            targetAverageUtilization: 80
+    '
+    ```
+
+    For field explanations of these settings, see [Configuring via the web console](#configuring-via-the-web-console).
+
+## Verification
+
+Check the status of the Istio control plane pods:
+
+```bash {name=istio-ha-autoscaling:verify-istiod-pods}
+kubectl get pods -n istio-system -l app=istiod
+```
+
+**Example output**
+
+```bash {name=istio-ha-autoscaling:verify-istiod-pods-output}
+NAME                      READY   STATUS    RESTARTS   AGE
+istiod-6b8d64c946-2dq2k   1/1     Running   0          28m
+istiod-6b8d64c946-skg4v   1/1     Running   0          35s
+```
+
+Two `istiod` pods are running. Two pods is the minimum required for an HA Istio control plane and indicates that a basic HA setup is in place.
