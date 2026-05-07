@@ -91,7 +91,7 @@ EOF
         log_error "Istio 资源输出校验失败"
         log_error "实际输出: $istio_output"
         return 1
-    }
+    fi
 
     istio_name=$(echo "$istio_output" | awk 'NR==2 {print $1}')
     if [ -z "$istio_name" ]; then
