@@ -30,7 +30,7 @@ With autoscaling, you specify the minimum and maximum number of Istio control pl
 8. Click the **YAML** tab.
 9. Update the `Istio` custom resource (CR) so it resembles the following example:
 
-    ```yaml
+    ```yaml {name=istio-ha-autoscaling:console-yaml}
     apiVersion: sailoperator.io/v1
     kind: Istio
     metadata:
@@ -60,13 +60,13 @@ With autoscaling, you specify the minimum and maximum number of Istio control pl
 
 1. Retrieve the name of the `Istio` resource:
 
-    ```bash
+    ```bash {name=istio-ha-autoscaling:get-istio}
     kubectl get istio -n istio-system
     ```
 
     **Example output**
 
-    ```bash
+    ```bash {name=istio-ha-autoscaling:get-istio-output}
     NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
     default   istio-system             1           1       1        default           Healthy   v1.28.6   24m
     ```
@@ -75,7 +75,7 @@ With autoscaling, you specify the minimum and maximum number of Istio control pl
 
 2. Patch the `Istio` custom resource (CR) to enable autoscaling for the control plane:
 
-    ```bash
+    ```bash {name=istio-ha-autoscaling:patch-istio}
     kubectl patch istio default -n istio-system --type merge -p '
     spec:
       values:
@@ -95,13 +95,13 @@ With autoscaling, you specify the minimum and maximum number of Istio control pl
 
 Check the status of the Istio control plane pods:
 
-```bash
+```bash {name=istio-ha-autoscaling:verify-istiod-pods}
 kubectl get pods -n istio-system -l app=istiod
 ```
 
 **Example output**
 
-```bash
+```bash {name=istio-ha-autoscaling:verify-istiod-pods-output}
 NAME                      READY   STATUS    RESTARTS   AGE
 istiod-6b8d64c946-2dq2k   1/1     Running   0          28m
 istiod-6b8d64c946-skg4v   1/1     Running   0          35s

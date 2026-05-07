@@ -18,6 +18,10 @@ test_uninstalling_alauda_service_mesh() {
     log_info "开始网格卸载测试 (CLI 方式)"
     log_info "=========================================="
 
+    if [ "${SKIP_OPERATOR_AND_CRDS:-false}" = "true" ]; then
+        log_info "启用轻量清理模式：跳过卸载 operator 和删除 Istio CRDs"
+    fi
+
     # 1. 获取 Istio 资源名称
     log_info "步骤 1: 获取 Istio 资源名称"
     local istio_output
@@ -140,35 +144,39 @@ test_uninstalling_alauda_service_mesh() {
     fi
     log_success "删除 istio-cni 命名空间成功"
 
-    # 7. 删除 servicemesh-operator2 subscription
-    log_info "步骤 7: 删除 servicemesh-operator2 subscription"
-    local delete_subscription_output
-    delete_subscription_output=$(runme run uninstall-mesh:delete-subscription 2>&1) || {
-        log_error "删除 subscription 失败"
-        log_error "输出: $delete_subscription_output"
-        return 1
-    }
+    if [ "${SKIP_OPERATOR_AND_CRDS:-false}" = "true" ]; then
+        log_info "步骤 7-8: 跳过卸载 servicemesh-operator2 subscription 和删除 Istio CRDs"
+    else
+        # 7. 删除 servicemesh-operator2 subscription
+        log_info "步骤 7: 删除 servicemesh-operator2 subscription"
+        local delete_subscription_output
+        delete_subscription_output=$(runme run uninstall-mesh:delete-subscription 2>&1) || {
+            log_error "删除 subscription 失败"
+            log_error "输出: $delete_subscription_output"
+            return 1
+        }
 
-    # 验证删除输出
-    local expected_subscription_output
-    expected_subscription_output=$(runme print uninstall-mesh:delete-subscription-output)
-    if ! __cmp_contains "$delete_subscription_output" "$expected_subscription_output"; then
-        log_error "删除 subscription 验证失败"
-        log_error "期待输出: $expected_subscription_output"
-        log_error "实际输出: $delete_subscription_output"
-        return 1
+        # 验证删除输出
+        local expected_subscription_output
+        expected_subscription_output=$(runme print uninstall-mesh:delete-subscription-output)
+        if ! __cmp_contains "$delete_subscription_output" "$expected_subscription_output"; then
+            log_error "删除 subscription 验证失败"
+            log_error "期待输出: $expected_subscription_output"
+            log_error "实际输出: $delete_subscription_output"
+            return 1
+        fi
+        log_success "删除 subscription 成功"
+
+        # 8. 删除 Istio CRDs
+        log_info "步骤 8: 删除 Istio CRDs"
+        local delete_crds_output
+        delete_crds_output=$(runme run uninstall-mesh:delete-crds 2>&1) || {
+            log_error "删除 Istio CRDs 失败"
+            log_error "输出: $delete_crds_output"
+            return 1
+        }
+        log_success "删除 Istio CRDs 成功"
     fi
-    log_success "删除 subscription 成功"
-
-    # 8. 删除 Istio CRDs
-    log_info "步骤 8: 删除 Istio CRDs"
-    local delete_crds_output
-    delete_crds_output=$(runme run uninstall-mesh:delete-crds 2>&1) || {
-        log_error "删除 Istio CRDs 失败"
-        log_error "输出: $delete_crds_output"
-        return 1
-    }
-    log_success "删除 Istio CRDs 成功"
 
     log_success "=========================================="
     log_success "网格卸载测试完成，所有验证通过！"

@@ -184,6 +184,9 @@ cd tests
 
 # 只执行 cleanup（清理之前的测试资源）
 ./run.sh --file install-mesh-in-dual-stack-mode --cleanup-only
+
+# 轻量卸载网格（保留 operator 和 CRDs）
+./run.sh --file uninstalling-alauda-service-mesh --skip-operator-and-crds
 ```
 
 ### 测试多个文档
@@ -205,7 +208,11 @@ cd tests
    - 安装网格：`./run.sh --file install-mesh`
    - 部署 Bookinfo：`./run.sh --file deploying-the-bookinfo-application --no-cleanup`
    - 指标验证：`./run.sh --file metrics-and-mesh`
-4. **其他测试**：预留位置，后续可添加更多测试任务
+4. **Istio HA 配置测试**：
+   - 自动伸缩方式：`./run.sh --file configuring-istio-ha-by-using-autoscaling`
+   - 固定副本方式：`./run.sh --file configuring-istio-ha-by-using-replica-count`
+   - 每轮结束后执行轻量卸载：`./run.sh --file uninstalling-alauda-service-mesh --skip-operator-and-crds`
+5. **其他测试**：预留位置，后续可添加更多测试任务
 
 **添加新的测试任务**：
 
@@ -222,6 +229,8 @@ cd tests
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | 双栈网格安装                 | [runme-test_install-mesh-in-dual-stack-mode.sh](../docs/en/installing/dual-stack/runme-test_install-mesh-in-dual-stack-mode.sh)                                                                     | `./run.sh --file install-mesh-in-dual-stack-mode`                            |
 | 网格安装                     | [runme-test_install-mesh.sh](../docs/en/installing/installing-service-mesh/runme-test_install-mesh.sh)                                                                                              | `./run.sh --file install-mesh`                                               |
+| Istio HA - 自动伸缩          | [runme-test_configuring-istio-ha-by-using-autoscaling.sh](../docs/en/installing/installing-service-mesh/istio-high-availability/runme-test_configuring-istio-ha-by-using-autoscaling.sh)             | `./run.sh --file configuring-istio-ha-by-using-autoscaling`                  |
+| Istio HA - 固定副本数        | [runme-test_configuring-istio-ha-by-using-replica-count.sh](../docs/en/installing/installing-service-mesh/istio-high-availability/runme-test_configuring-istio-ha-by-using-replica-count.sh)           | `./run.sh --file configuring-istio-ha-by-using-replica-count`                |
 | 指标与服务网格集成           | [runme-test_metrics-and-mesh.sh](../docs/en/integration/observability/runme-test_metrics-and-mesh.sh)                                                                                               | `./run.sh --file metrics-and-mesh`                                           |
 | Kiali 安装与配置             | [runme-test_kiali.sh](../docs/en/integration/observability/runme-test_kiali.sh)                                                                                                                     | `./run.sh --file kiali`                                                      |
 | Bookinfo 应用部署            | [runme-test_deploying-the-bookinfo-application.sh](../docs/en/installing/installing-service-mesh/application-deployment/runme-test_deploying-the-bookinfo-application.sh)                           | `./run.sh --file deploying-the-bookinfo-application`                         |

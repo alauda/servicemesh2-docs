@@ -22,6 +22,7 @@ NO_CLEANUP=false
 CLEANUP_ONLY=false
 INIT_ONLY=false
 FORCE_INIT=false
+SKIP_OPERATOR_AND_CRDS=false
 
 # 双栈环境标识，默认为 false
 IS_DUAL_STACK=${IS_DUAL_STACK:-false}
@@ -42,6 +43,9 @@ usage() {
   --cleanup-only        只执行 cleanup 操作
   --init-only           只执行环境初始化，不运行测试
   --force-init          强制执行环境初始化（用于 --file 模式）
+  --skip-operator-and-crds
+                        轻量清理模式：仅对 uninstalling-alauda-service-mesh 生效，
+                        跳过卸载 operator 和删除 CRDs
   -h, --help            显示此帮助信息
 
 示例:
@@ -65,6 +69,9 @@ usage() {
 
   # 只执行 cleanup
   $0 --file install-mesh --cleanup-only
+
+  # 轻量卸载网格（保留 operator 和 CRDs）
+  $0 --file uninstalling-alauda-service-mesh --skip-operator-and-crds
 
 环境变量:
   必须设置以下环境变量:
@@ -119,6 +126,10 @@ parse_args() {
                 ;;
             --force-init)
                 FORCE_INIT=true
+                shift
+                ;;
+            --skip-operator-and-crds)
+                SKIP_OPERATOR_AND_CRDS=true
                 shift
                 ;;
             -h|--help)
