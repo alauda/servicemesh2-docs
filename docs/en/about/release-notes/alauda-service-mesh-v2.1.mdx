@@ -19,6 +19,8 @@ Alauda Service Mesh v2.1 is built on the [Istio](https://istio.io/) project and 
 
 - Updated Istio to version 1.28.6.
 - Fixed Common Vulnerabilities and Exposures (CVEs).
+- Fixed Istio ambient mode incompatibility on FIPS-enabled clusters, allowing ambient mode to be deployed in FIPS-compliant environments.
+- Fixed multi-cluster `global.remotePilotAddress` rendering failure when configured with an IPv6 address, restoring IPv6 load balancer support for primary/remote deployments.
 
 ### Kiali Features
 
