@@ -28,11 +28,11 @@ Alauda Service Mesh v2.1 is built on the [Istio](https://istio.io/) project and 
     - **AI integration**: AI Chatbot Widget and MCP integration delivered as a developer preview, introducing AI-assisted operations alongside community AI and Agent contribution guidelines.
     - **Performance**: Pre-computed health status with a configurable cache (5 minutes by default) for faster Overview and List pages; background traffic-graph refresh and caching for quicker re-renders, plus improved client-side rendering for graphs with many service nodes.
     - **Authentication & SSO**: Explicit OIDC configuration when `.well-known/openid-configuration` endpoints are restricted, OpenID Authorization Code Flow with PKCE support, and SPIRE integration in the UI.
-    - **TLS & certificates**: Auto-rotated certificates for external service connectivity (Prometheus, tracing) and platform TLS profile enforcement via OpenShift-aware auto mode.
-    - **UI modernization**: Upgraded to TypeScript 5, migrated to PatternFly 6 (including OSSMC, Wizard, and date-picker components), and replaced the legacy message center with a modern notification center.
+    - **TLS & certificates**: Auto-rotated certificates for external service connectivity (Prometheus, tracing).
+    - **UI modernization**: Upgraded to TypeScript 5, migrated to PatternFly 6 (including Wizard and date-picker components), and replaced the legacy message center with a modern notification center.
     - **Mesh page**: Improved topology visualization for environments with many control planes, refined data-plane side-panel validations, and enhanced masthead status with better multi-mesh handling.
     - **Gateway API**: Added support for Kubernetes Gateway API v1.4.0.
-    - **Tracing & observability**: Perses Dashboard `openshift` URL format support, Netobserv navigation integrated into the OSSMC traffic-graph side-panel, and a `use_waypoint_name` option to correct service names in Jaeger links.
+    - **Tracing & observability**: Added a `use_waypoint_name` configuration option under `external_services.tracing` to correct service names in Jaeger links for ambient mode.
     - **Operator & deployment**: Custom `initContainers` in the Kiali CR, Helm chart support for `cluster_wide_access=false`, operator sidecar usage extension, and NetworkPolicies for OLM-installed operators.
 - References
     - [Kiali 2.18.0 Release Notes](https://kiali.io/news/release-notes/#2180)
