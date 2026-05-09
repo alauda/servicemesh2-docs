@@ -34,9 +34,9 @@ If the update strategy of the `Istio` resource is set to `RevisionBased`, the Op
 - You are logged in to the Alauda Container Platform web console as **cluster-admin**.
 - The Alauda Container Platform Networking for Multus plugin must be installed, and kube-ovn must be v4.1.5 or later.
 
-:::warning
-The Alauda Container Platform Networking for Multus plugin must be installed **before** installing the Alauda Service Mesh v2 Operator. If the Operator is installed first, it must be uninstalled and reinstalled after the Multus plugin is in place.
-:::
+  :::danger The Multus plugin must be installed before installing the Alauda Service Mesh v2 Operator.
+  If the Operator is installed first, it must be uninstalled and reinstalled after the Multus plugin is in place.
+  :::
 
 **Procedure**
 
@@ -63,9 +63,9 @@ Verify that the Operator installation status is reported as `Succeeded` in the *
 - An active ACP CLI (`kubectl`) session by a cluster administrator with the `cluster-admin` role.
 - The Alauda Container Platform Networking for Multus plugin must be installed, and kube-ovn must be v4.1.5 or later.
 
-:::warning
-The Alauda Container Platform Networking for Multus plugin must be installed **before** installing the Alauda Service Mesh v2 Operator. If the Operator is installed first, it must be uninstalled and reinstalled after the Multus plugin is in place.
-:::
+  :::danger The Multus plugin must be installed before installing the Alauda Service Mesh v2 Operator.
+  If the Operator is installed first, it must be uninstalled and reinstalled after the Multus plugin is in place.
+  :::
 
 **Procedure**
 
