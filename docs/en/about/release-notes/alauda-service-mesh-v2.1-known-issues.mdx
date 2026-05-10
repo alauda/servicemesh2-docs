@@ -8,9 +8,17 @@ This section documents known issues and limitations that affect Alauda Service M
 
 ## Ambient mode is not supported on FIPS-enabled clusters
 
+:::info
+This issue has been resolved in Alauda Service Mesh v2.1.2. Upgrade Istio to v1.28.6 to apply the fix.
+:::
+
 Clusters configured to enforce Federal Information Processing Standards (FIPS) are currently incompatible with Istio ambient mode. If your environment requires FIPS compliance, you should continue to deploy the service mesh using sidecar mode. Ambient mode support for FIPS-enabled clusters is expected to be addressed in a future release.
 
 ## Kiali tracing integration is not functional in ambient mode
+
+:::info
+This issue has been resolved in Alauda Service Mesh v2.1.2. Upgrade Kiali to v2.22 to apply the fix.
+:::
 
 When using Istio ambient mode, Kiali may fail to query distributed traces and generate incorrect links to the tracing backend (such as Jaeger). This occurs because the service name used for trace lookup does not match the actual service name recorded by the tracing collector in ambient mode deployments.
 
@@ -23,6 +31,10 @@ The root cause is a change in how Istio ambient mode generates traces. In ambien
 **Reference:** [kiali/kiali#9158](https://github.com/kiali/kiali/issues/9158)
 
 ## Multi-cluster service mesh does not support IPv6 load balancer IP
+
+:::info
+This issue has been resolved in Alauda Service Mesh v2.1.2. Upgrade Istio to v1.28.6 to apply the fix.
+:::
 
 In multi-cluster (primary/remote) deployments, the Istio Helm chart only recognizes IPv4 addresses for the `global.remotePilotAddress` configuration parameter. If an IPv6 address is provided (such as `2001:db8::1`), the `EndpointSlice` template in `istio-discovery` fails to render correctly, causing the Istio installation to fail.
 
