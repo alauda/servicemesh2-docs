@@ -119,6 +119,20 @@ EOF
     fi
     log_success "ZTunnel 代理验证通过"
 
+    # 10. (可选) 生成请求流量
+    if [ "${AUTO_GEN_BOOKINFO_TRAFFIC:-false}" == "true" ]; then
+        log_info "步骤 10: 生成请求流量"
+        local ratings_pod
+        ratings_pod=$(kubectl get pod -l app=ratings -n bookinfo -o jsonpath='{.items[0].metadata.name}')
+        if [ -n "$ratings_pod" ]; then
+            log_info "在 ratings pod ($ratings_pod) 中启动流量生成..."
+            kubectl exec "$ratings_pod" -c ratings -n bookinfo -- bash -lc "(while true; do curl -sS productpage:9080/productpage >/dev/null; sleep 9.9; done) >/dev/null 2>&1 & disown"
+            log_success "流量生成已启动"
+        else
+            log_warn "未找到 ratings pod, 跳过流量生成"
+        fi
+    fi
+
     log_success "=========================================="
     log_success "Ambient 模式 Bookinfo 应用部署测试完成，所有验证通过！"
     log_success "=========================================="
