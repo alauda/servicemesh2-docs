@@ -6,11 +6,47 @@ weight: 9000
 
 Alauda Service Mesh v2.1 is built on the [Istio](https://istio.io/) project and is installed using a new Istio Operator derived from the [Sail Operator](https://github.com/istio-ecosystem/sail-operator) (hosted in the **istio-ecosystem** GitHub organization). The Operator provides an expanded set of custom resource definitions (CRDs) to manage Istio components.
 
+## Alauda Service Mesh v2.1.2
+
+### Supported component versions
+
+- `Istio` version: v1.26.3, v1.28.1 , v1.28.3 and v1.28.6
+    - Istio 1.28 [supports Kubernetes](https://istio.io/latest/docs/releases/supported-releases/#support-status-of-istio-releases) 1.30, 1.31, 1.32, 1.33, 1.34
+    - Istio 1.26 [supports Kubernetes](https://istio.io/latest/docs/releases/supported-releases/#support-status-of-istio-releases) 1.29, 1.30, 1.31, 1.32, 1.33
+- `Kiali operator` version: v2.22.2
+
+### Istio Features
+
+- Updated Istio to version 1.28.6.
+- Fixed Istio ambient mode incompatibility on FIPS-enabled clusters, allowing ambient mode to be deployed in FIPS-compliant environments.
+- Fixed multi-cluster `global.remotePilotAddress` rendering failure when configured with an IPv6 address, restoring IPv6 load balancer support for primary/remote deployments.
+- Fixed Common Vulnerabilities and Exposures (CVEs).
+
+### Kiali Features
+
+- Fixed Common Vulnerabilities and Exposures (CVEs).
+- Updated Kiali to version 2.22.
+    - **AI integration**: AI Chatbot Widget and MCP integration delivered as a developer preview, introducing AI-assisted operations alongside community AI and Agent contribution guidelines.
+    - **Performance**: Pre-computed health status with a configurable cache (5 minutes by default) for faster Overview and List pages; background traffic-graph refresh and caching for quicker re-renders, plus improved client-side rendering for graphs with many service nodes.
+    - **Authentication & SSO**: Explicit OIDC configuration when `.well-known/openid-configuration` endpoints are restricted, OpenID Authorization Code Flow with PKCE support, and SPIRE integration in the UI.
+    - **TLS & certificates**: Auto-rotated certificates for external service connectivity (Prometheus, tracing).
+    - **UI modernization**: Upgraded to TypeScript 5, migrated to PatternFly 6 (including Wizard and date-picker components), and replaced the legacy message center with a modern notification center.
+    - **Mesh page**: Improved topology visualization for environments with many control planes, refined data-plane side-panel validations, and enhanced masthead status with better multi-mesh handling.
+    - **Gateway API**: Added support for Kubernetes Gateway API v1.4.0.
+    - **Tracing & observability**: Added a `use_waypoint_name` configuration option under `external_services.tracing` to correct service names in Jaeger links for ambient mode.
+    - **Operator & deployment**: Custom `initContainers` in the Kiali CR, Helm chart support for `cluster_wide_access=false`, operator sidecar usage extension, and NetworkPolicies for OLM-installed operators.
+- References
+    - [Kiali 2.18.0 Release Notes](https://kiali.io/news/release-notes/#2180)
+    - [Kiali 2.19.0 Release Notes](https://kiali.io/news/release-notes/#2190)
+    - [Kiali 2.20.0 Release Notes](https://kiali.io/news/release-notes/#2200)
+    - [Kiali 2.21.0 Release Notes](https://kiali.io/news/release-notes/#2210)
+    - [Kiali 2.22.0 Release Notes](https://kiali.io/news/release-notes/#2220)
+
 ## Alauda Service Mesh v2.1.1
 
 ### Supported component versions
 
-- `Istio` version: v1.26.3, v1.28.1 and v1.28.1
+- `Istio` version: v1.26.3, v1.28.1 and v1.28.3
     - Istio 1.28 [supports Kubernetes](https://istio.io/latest/docs/releases/supported-releases/#support-status-of-istio-releases) 1.30, 1.31, 1.32, 1.33, 1.34
     - Istio 1.26 [supports Kubernetes](https://istio.io/latest/docs/releases/supported-releases/#support-status-of-istio-releases) 1.29, 1.30, 1.31, 1.32, 1.33
 - `Kiali operator` version: v2.17.1
