@@ -1,0 +1,28 @@
+project_name: "Alauda Service Mesh v2 Documentation"
+summary: "User-facing documentation for Alauda Service Mesh v2 — installation, configuration, gateways, ambient mode, multi-cluster, upgrades, integrations, and APIs."
+body: |
+  Documentation for installing, operating, and integrating with Alauda Service Mesh v2.
+  Content is organized into about, installing, gateways, updating, integration, apis, and uninstalling sections,
+  with coverage of sidecar mode, ambient mode, multi-cluster, high availability, observability (Kiali), and Kubernetes APIs.
+
+include_patterns:
+  - "docs/**/*.md"
+  - "docs/**/*.mdx"
+
+exclude_patterns:
+  - "node_modules/**"
+  - "**/node_modules/**"
+  - ".git/**"
+  - "**/.git/**"
+  - ".llmstxt-cache/**"
+  - "**/.llmstxt-cache/**"
+  - "llms.txt"
+  - "**/llms.txt"
+  - "llmstxt-state.json"
+  - "**/llmstxt-state.json"
+  - "**/.DS_Store"
+
+grouping_base_path: "docs/en"
+
+batch_size: 15
+description_max_words: 150
