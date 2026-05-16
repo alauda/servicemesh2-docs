@@ -1,0 +1,602 @@
+{
+  "version": 1,
+  "generator_version": 3,
+  "project_name": "Alauda Service Mesh v2 Documentation",
+  "summary": "User-facing documentation for Alauda Service Mesh v2 — installation, configuration, gateways, ambient mode, multi-cluster, upgrades, integrations, and APIs.",
+  "generated_at": "2026-05-16T09:39:26Z",
+  "include_patterns": [
+    "docs/**/*.md",
+    "docs/**/*.mdx"
+  ],
+  "exclude_patterns": [
+    "node_modules/**",
+    "**/node_modules/**",
+    ".git/**",
+    "**/.git/**",
+    ".llmstxt-cache/**",
+    "**/.llmstxt-cache/**",
+    "llms.txt",
+    "**/llms.txt",
+    "llmstxt-state.json",
+    "**/llmstxt-state.json",
+    "**/.DS_Store"
+  ],
+  "grouping_base_path": "docs/en",
+  "description_max_words": 150,
+  "files": {
+    "docs/en/about/about/about-service-mesh.mdx": {
+      "sha256": "fd15680c54d8bcb72d6fde43b77074ef168256d5c901e5df2dd08440390eb7da",
+      "size": 2558,
+      "description": "Introduces Alauda Service Mesh as an Istio-based control plane for microservices, summarizing the four core capability areas: traffic management (routing, retries, failover, fault injection), service identity and security via mutual TLS, policy enforcement (access control, rate limiting, quotas), and telemetry/observability through metrics, logs, and traces.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/about/about/index.mdx": {
+      "sha256": "2a893b6815ed4787e581bbd94b9a73316736638a27deba4af69e761388410fa6",
+      "size": 132,
+      "description": "Landing page for the About section, surfacing the overview of Alauda Service Mesh features via the `<Overview>` component.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/about/about/understanding-service-mesh.mdx": {
+      "sha256": "73632214f4b264eda6c6775315b41edfc67665a37c2eab00f47f5da1844baf78",
+      "size": 9863,
+      "description": "Catalogs the components shipped by Alauda Service Mesh and Alauda Build of Kiali, then explains each CRD exposed by the v2 Operator (`Istio`, `IstioRevision`, `IstioRevisionTag`, `IstioCNI`) with example YAML, the `InPlace` vs `RevisionBased` update strategies, the `spec.values` passthrough to Istio Helm chart options, and the Kiali architecture plus integrations with Prometheus/VictoriaMetrics, Alauda Build of Jaeger, Alauda Build of OpenTelemetry, cert-manager, Flagger, and ArgoCD.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/about/index.mdx": {
+      "sha256": "32135b5d0326b32d1fa3c82d8616699c1c980db0cc16e3f5971b0787c3b144b3",
+      "size": 63,
+      "description": "Top-level About section index, rendering an overview of conceptual material covering Alauda Service Mesh features, lifecycle policies, and release notes.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/about/lifecycle-policy/alauda-build-of-kiali.mdx": {
+      "sha256": "a89b12549f42563653caa5e6ba4c6e0b730c0cdc53b3a80f6d99a1c7e92677bb",
+      "size": 999,
+      "description": "Tabulates release dates and end-of-support windows for the Alauda Build of Kiali operator (v2.11.z, v2.17.z, v2.22.z), and states the 4-month release cadence plus the 18-month maintenance commitment covering patches, security updates, and upgrade assistance.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/about/lifecycle-policy/alauda-service-mesh.mdx": {
+      "sha256": "5ca3ddf146d0bc75365f9e964078cb08a0b342e4afeb07530ad38bb2bcce5e28",
+      "size": 957,
+      "description": "Tabulates release dates and end-of-support windows for the Alauda Service Mesh v2 operator (v2.0.z, v2.1.z), and states the 4-month release cadence plus the 24-month maintenance commitment covering patches, security updates, and upgrade assistance.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/about/lifecycle-policy/index.mdx": {
+      "sha256": "b5b8cb22343ad480b4cea3f329e7d1c78c1f6f7bfb73a2c3b3dd72d1a1ce485d",
+      "size": 139,
+      "description": "Section landing page for lifecycle policies, surfacing entries that document support windows and release cadence for the Alauda Service Mesh and Alauda Build of Kiali operators.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/about/release-notes/alauda-service-mesh-v2.0.mdx": {
+      "sha256": "8432ceec7758831fe60f4e594539029952e5cd3e14ec591824bb06b64d92a7eb",
+      "size": 1901,
+      "description": "Announces Alauda Service Mesh v2.0 built on a Sail-Operator-derived Istio Operator, lists supported component versions (Istio v1.24.6 and v1.26.3, Kiali operator v2.11.0), and highlights `istioctl` support, multi-cluster (multi-primary and primary-remote) deployments, canary control-plane upgrades via revisions, the `IstioRevisionTag` stable alias, the `IstioCNI` CRD, and Prometheus/VictoriaMetrics/Jaeger/OpenTelemetry/Kiali integrations.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/about/release-notes/alauda-service-mesh-v2.1-known-issues.mdx": {
+      "sha256": "e8a2cf75257a7c8b12534ee41dfe9edac5e2e7d7d51bf40b48133efb59498277",
+      "size": 2911,
+      "description": "Documents three known v2.1 limitations and their fixes in v2.1.2: ambient mode incompatibility on FIPS-enabled clusters (resolved by upgrading Istio to v1.28.6), Kiali tracing integration failing in ambient mode due to waypoint service-name mismatch (resolved by upgrading Kiali to v2.22 with the new `use_waypoint_name` option under `external_services.tracing`), and multi-cluster `global.remotePilotAddress` rejecting IPv6 literals (resolved upstream and in v1.28.6).",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/about/release-notes/alauda-service-mesh-v2.1.mdx": {
+      "sha256": "0cd6c3b5d42b579f578878e83cedbe0a04da2888c66b06aa5790a3abc1ca5d28",
+      "size": 7863,
+      "description": "Release notes for Alauda Service Mesh v2.1.0 through v2.1.2, listing supported Istio versions (v1.26.3, v1.28.1, v1.28.3, v1.28.6) and Kiali operator versions (v2.17.1, v2.22.2), plus headline features including Istio 1.28 inference extension and InferencePool, ambient multicluster with Waypoint cross-network routing, nftables, dual-stack IPv4/IPv6 Beta, CRL/JWT/seccomp security hardening, Gateway API ListenerSets and BackendTLSPolicy, persona-based installs, and Kiali 2.17–2.22 enhancements such as AI Chatbot/MCP developer preview, OIDC PKCE, SPIRE UI integration, PatternFly 6 modernization, and Gateway API v1.4.0 support.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/about/release-notes/index.mdx": {
+      "sha256": "40a11d6f22c712bd6a3f3fa65e70ef8d665eb481fac6b1240a4210bed61c434b",
+      "size": 152,
+      "description": "Section landing page for Alauda Service Mesh release notes, surfacing per-release entries (v2.0, v2.1, and v2.1 known issues) via the `<Overview>` component.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/apis/index.mdx": {
+      "sha256": "a725fd79bf8b97bc44666418106b23f32fd5021499831444eea4dac4ef6c2823",
+      "size": 73,
+      "description": "Landing page for the API Reference section, rendering the overview that links into the Kubernetes APIs catalog for Alauda Service Mesh CRDs.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/apis/intro.mdx": {
+      "sha256": "bb5e16059a9680677f3335eda6a5886f08fc1f5694b0234e5e201cc524325820",
+      "size": 56,
+      "description": "Hosts the `<AcpApisOverview />` component, providing the introductory page for the Alauda Container Platform / Service Mesh API reference.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/apis/kubernetes_apis/index.mdx": {
+      "sha256": "ae560d45e95367fef0ff8e47c8e3a9a20e6b37df7f7eaa85af24e873bd42e657",
+      "size": 73,
+      "description": "Landing page for the Kubernetes APIs subsection, rendering an overview that links to the per-resource reference pages for `Istio`, `IstioRevision`, `IstioRevisionTag`, `IstioCNI`, and related Sail Operator CRDs.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/apis/kubernetes_apis/servicemesh-operator.mdx": {
+      "sha256": "5e8144b8c821ecc36d865e226001810b6fceb9663f303764b59d5579c9dff04d",
+      "size": 935,
+      "description": "Lists the sail-operator CRDs that make up the Service Mesh Operator API surface: `Istio`, `IstioCNI`, `IstioRevision`, `IstioRevisionTag`, and `ZTunnel`, each linking to the upstream `sailoperator.io/v1` reference in the `alauda-mesh/sail-operator` release-2.1 branch.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/gateways/directing-outbound-traffic/index.mdx": {
+      "sha256": "d952a2602d8bce3dedf266c2cd31f891ef3b9556c5167307366d6b104b0cd09b",
+      "size": 2792,
+      "description": "Introduces egress gateways as dedicated forward proxies on designated egress nodes for centralizing outbound mesh traffic, covering use cases like traffic restrictions and network policy enforcement. Explains that egress routing combines `ServiceEntry`, `Gateway`, `VirtualService`, and `DestinationRule` resources in sidecar mode, while ambient mode must instead use Kubernetes Gateway API `Gateway` and `HTTPRoute`/`GRPCRoute` resources.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/gateways/directing-outbound-traffic/routing-egress-traffic-via-istio-apis.mdx": {
+      "sha256": "f044bd78b4566b7a83f4316b5f1e9b225ff0ec5d4c044f16fa0699f35ac86c97",
+      "size": 7051,
+      "description": "Step-by-step procedure for routing outbound HTTP traffic through an injected egress gateway using Istio APIs, registering an external host (`docs.alauda.io`) via a `MESH_EXTERNAL` `ServiceEntry` and then routing `curl` traffic through an egress `Gateway`, `DestinationRule` subset, and `VirtualService` that binds the `mesh` and gateway selectors. Includes namespace sidecar-injection labeling for both `InPlace` and `RevisionBased` upgrade strategies (using `istio.io/rev` from `istiorevisions.sailoperator.io`) and verification via a `Telemetry` resource enabling Envoy access logs.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/gateways/directing-outbound-traffic/routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode.mdx": {
+      "sha256": "27854b2c5dbd52040395b31768ee1a4305e1446527dff0e6435d82c22ce29f2c",
+      "size": 6360,
+      "description": "Walks through ambient-mode egress routing by deploying a waypoint proxy with `gatewayClassName: istio-waypoint` and the `istio.io/waypoint-for: service` label on an HBONE listener (port 15008), then tying a `ServiceEntry` for `httpbin.org` to it via `istio.io/use-waypoint`. Prerequisites include ambient-profile `Istio` and `IstioCNI`, a `Ztunnel` resource, and kernel compatibility; verification uses a `curl` pod plus ztunnel access logs showing HBONE flows through the waypoint, with an `istioctl waypoint apply --enroll-namespace` shortcut.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/gateways/directing-outbound-traffic/routing-egress-traffic-via-k8s-gateway-api.mdx": {
+      "sha256": "78bbfae11f1a6a55d20155b8e8ff0e9ac9c10fd46b728d2a0815dc04ba41a7f6",
+      "size": 7699,
+      "description": "Configures sidecar-mode egress routing with the Kubernetes Gateway API by deploying a `Gateway` (class `istio`, `ClusterIP` service type) plus two `HTTPRoute`s — one with `parentRef` to a `ServiceEntry` to redirect sidecar traffic to the egress gateway, and another with `parentRef` to the gateway to forward to the `httpbin.org` Hostname backend. Includes verification via a `curl` pod with sidecar injection labels for both `InPlace` and `RevisionBased` upgrade strategies, and an optional `asm-kube-gateway-options` ConfigMap (`infrastructure.parametersRef`) for scheduling onto ACP Infra Nodes.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/gateways/directing-traffic-into-the-mesh/configuring-an-injected-gateway.mdx": {
+      "sha256": "5a1468ef3bcbd351d5cd743215e4e32f46414537ef6fb8a688d746328d2be20f",
+      "size": 2304,
+      "description": "Shows how the Istio `Gateway` and `VirtualService` resources together configure an injected gateway for ingress, using a sample `bookinfo-gateway` that exposes HTTPS port 443 on `bookinfo.com` with `tls.mode: SIMPLE` and `credentialName: bookinfo-credential`, paired with a `VirtualService` that routes the `/reviews/` URI prefix to the `reviews.bookinfo.svc.cluster.local` service on port 9080.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/gateways/directing-traffic-into-the-mesh/exposing-a-service-via-istio-gateway.mdx": {
+      "sha256": "602446664f69fb46dd7ae7e3c0d005db9ef6f84a4bd34121e37d4643c10a55db",
+      "size": 8230,
+      "description": "End-to-end task that exposes the `httpbin` sample service via an injected gateway using an Istio `Gateway` (port 80, host `httpbin.example.com`, `selector: istio: <gateway_name>`) and a `VirtualService` with URI prefix matches on `/status` and `/headers`. Verifies success with `curl` returning 200 on matched paths and 404 on `/get`, then patches the gateway `Service` to type `LoadBalancer` and resolves `INGRESS_HOST` from `status.loadBalancer.ingress[].ip` or `.hostname`.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/gateways/directing-traffic-into-the-mesh/exposing-a-service-via-k8s-gateway-api-in-ambient-mode.mdx": {
+      "sha256": "30384a77c946aada9966eb57e55c14e8205a8884472196ee5062b956c7d9c3d7",
+      "size": 12512,
+      "description": "Exposes `httpbin` in ambient mode by combining an ingress `Gateway` (class `istio`) and an `HTTPRoute` with a waypoint proxy (`istio.io/waypoint-for: service`, HBONE listener on 15008) that enforces L7 path-prefix routing. Uses `istio.io/dataplane-mode=ambient`, `istio-discovery=enabled`, `istio.io/ingress-use-waypoint=true` on the service, and `istio.io/use-waypoint=httpbin-waypoint` on the namespace; warns that `VirtualService` should not be mixed with Gateway API in ambient and verifies with `curl` plus `networking.istio.io/service-type` annotation removal to switch to `LoadBalancer`.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/gateways/directing-traffic-into-the-mesh/exposing-a-service-via-k8s-gateway-api.mdx": {
+      "sha256": "08d8ddff6346b9dd94137680bb4eafd5b9bb4b88ebfed8655433b9d2009eca76",
+      "size": 9765,
+      "description": "Exposes the `httpbin` service through an injected gateway using a Kubernetes `Gateway` (class `istio`, `networking.istio.io/service-type: ClusterIP`, `istio.io/rev` label) and an `HTTPRoute` with `parentRefs` and path-prefix matches on `/status` and `/headers`. Includes `kubectl wait --for=condition=programmed`, switching to `LoadBalancer` by removing the service-type annotation, deriving `INGRESS_HOST`/`INGRESS_PORT` from `gtw.status.addresses` and listeners, and an optional `asm-kube-gateway-options` ConfigMap for placing the gateway on ACP Infra Nodes.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/gateways/directing-traffic-into-the-mesh/index.mdx": {
+      "sha256": "3203cb5ee3bf1450296245fd11c419c10b83536f436f4d38014f6119696ed7d1",
+      "size": 1134,
+      "description": "Landing page for ingress traffic management with gateways installed via gateway injection, noting that internal services can be inside or outside the Istio mesh and that gateway proxies are exposed to external clients by setting the gateway `Service` to type `LoadBalancer`. Links to upstream Istio `Gateway`/`VirtualService` references and the Kubernetes Gateway API concept page.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/gateways/gateway-installation/about-gateway-injection.mdx": {
+      "sha256": "c3a26d95d176415810de38fbc5cd86c1fffc52a90ae282c17bf5674d824ab234",
+      "size": 506,
+      "description": "Explains that gateway injection reuses the sidecar-injection mechanism to deploy Envoy as a gateway proxy, summarizing the three-step pattern: create a `Deployment` and `Service` in a namespace visible to the Istio control plane, annotate and label the deployment so the control plane injects an Envoy gateway, then apply `Gateway` and `VirtualService` resources to control ingress or egress traffic.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/gateways/gateway-installation/index.mdx": {
+      "sha256": "be6bec66d7faff6d243e79dcc58ddf9e9a0780c0191ffc72d0ba0df2882b2dc4",
+      "size": 153,
+      "description": "Section landing for gateway installation in Alauda Service Mesh, stating that gateways are installed via **gateway injection** and routing readers to the about, installation, and Linux kernel compatibility subtopics.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/gateways/gateway-installation/installing-a-gateway-via-injection.mdx": {
+      "sha256": "d522fe95dacf3807cf881691c14ec65a63e954170ffd62627ae62913b4305e8b",
+      "size": 9290,
+      "description": "Full procedure for installing an ingress or egress gateway via gateway injection: create the gateway namespace, define a `secret-reader` `ServiceAccount`/`Role`/`RoleBinding` for TLS secret access, apply a `Deployment` annotated with `inject.istio.io/templates: gateway` and labeled `sidecar.istio.io/inject: \"true\"` (or `istio.io/rev` for non-default revisions) using `image: auto`, then create a `Service` (ClusterIP or LoadBalancer) selecting the same `istio: <gateway_name>` label. Includes optional `HorizontalPodAutoscaler` (CPU 80% target, min 2/max 5) and `PodDisruptionBudget` (minAvailable: 1) examples and ACP Infra-Node `nodeSelector`/`tolerations`.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/gateways/gateway-installation/linux-kernel-compatibility-notice.mdx": {
+      "sha256": "4d262e27554e095e86df53abfcb72f9e2c4572ba9195bd29990bef2b02cbf1c3",
+      "size": 17398,
+      "description": "Configuration workaround for nodes running Linux kernels older than 4.11 (e.g., CentOS 7), where the default `net.ipv4.ip_unprivileged_port_start` sysctl is unavailable. Provides two scenarios — gateways listening on ports >= 1024 (set `sysctls: []`) and ports < 1024 (also add the `NET_BIND_SERVICE` capability, or optionally run as root) — for both Istio Gateway (patching the `sidecarInjectorWebhook.templates.gateway` injection template on the `Istio` CR with `jq`) and Kubernetes Gateway API (via an `asm-kube-gateway-options` ConfigMap referenced through `infrastructure.parametersRef`).",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/gateways/index.mdx": {
+      "sha256": "50a81cfd1304be62365de81e7daa6e051c21ee87f16d65ef49be83633f9a89d8",
+      "size": 361,
+      "description": "Top-level Gateways section landing that defines a gateway as a dedicated Envoy proxy `Deployment` paired with a Kubernetes `Service` operating at the mesh edge to provide fine-grained control over traffic entering or leaving the mesh, with an overview of the child topics covering installation, directing inbound traffic, and directing outbound traffic.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/index.mdx": {
+      "sha256": "ea8d719fb06b69c8f8fa90c79d3ec2a67457c854f2c664fb78f523febe3f6960",
+      "size": 48,
+      "description": "Top-level documentation entry point that renders the navigation overview for the Alauda Service Mesh v2 docs site via the `<Overview>` component.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/ambient-mode/ambient-discovery-selectors.mdx": {
+      "sha256": "5c549a4965c87c3089dcb337306cbbac6b58099c8fbcf1c2708b8eb1ce903965",
+      "size": 2425,
+      "description": "Restricts ambient-mode mesh scope by configuring `discoverySelectors` under `meshConfig` in the `Istio` resource so the control plane only monitors namespaces carrying a matching label (for example, `istio-discovery=enabled`). Walks through labeling the `istio-cni`, `istio-system`, and `ztunnel` namespaces, then applying an `Istio` CR with `profile: ambient` and `trustedZtunnelNamespace` to reduce per-proxy config overhead and allow multiple meshes to coexist on one cluster.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/ambient-mode/ambient-l7-features.mdx": {
+      "sha256": "9d2834eec98accc4c6bae65e576d530dbb16cdd11db516843a84f6a6a3f8178e",
+      "size": 7406,
+      "description": "Demonstrates Layer 7 features available in ambient mode via Gateway API `HTTPRoute` and Istio `AuthorizationPolicy` resources. Walks through an 80/20 traffic split between `reviews-v1` and `reviews-v2` using a waypoint proxy, then enforces a waypoint-attached `AuthorizationPolicy` that allows only GET requests from the `curl` service account to `productpage` while denying POSTs (`HTTP 403`) and unauthenticated callers (`RBAC: access denied`), and notes that `ZTunnel` ignores `PeerAuthentication` policies set to `DISABLE` because HBONE always enforces mTLS.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/ambient-mode/deploying-ambient-bookinfo.mdx": {
+      "sha256": "aafad5d903737f27e6f0fcebeea7cc1c0f2bf11aa506733bfa944d98460f4eb4",
+      "size": 5533,
+      "description": "Deploys the Bookinfo sample application in ambient mode without sidecar injection, relying on the `ZTunnel` proxy via the `IstioCNI` and `Istio` resources. Covers creating the `bookinfo` namespace, labeling it with `istio-discovery=enabled` and `istio.io/dataplane-mode=ambient`, deploying the standard and versioned Bookinfo manifests, and verifying enrollment with `istioctl -n ztunnel ztunnel-config workloads` showing the HBONE protocol on each pod.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/ambient-mode/index.mdx": {
+      "sha256": "4eb2bd28152b8a54662637750ed66692340f5fd2d5dafe6325bf7eefe50128e4",
+      "size": 2602,
+      "description": "Introduces Istio ambient mode as a sidecar-less architecture in Alauda Service Mesh, built on a per-node `ZTunnel` proxy for L4/mTLS, optional per-namespace or per-service-account waypoint proxies for L7, and the Istio CNI plugin for transparent traffic capture. Notes benefits such as simplified operations, lower per-pod overhead, incremental adoption, and zero-trust mTLS by default, and flags ambient mode as Technology Preview that should only be installed on clusters without an existing sidecar-mode mesh.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/ambient-mode/installing-ambient-mode.mdx": {
+      "sha256": "4f48865935fa6dd6854545fe7a3a8cb25b9e353f8efa2211f7513ee7d826429b",
+      "size": 4692,
+      "description": "Installs Istio in ambient mode on Alauda Container Platform with Alauda Service Mesh Operator 2.1.1+ by creating `IstioCNI`, `Istio`, and `ZTunnel` custom resources, all with `profile: ambient`. Sets `reconcileIptablesOnStartup: true` on `IstioCNI` to repair drifted iptables rules, configures `pilot.trustedZtunnelNamespace` and `discoverySelectors` on `Istio`, requires the Multus CNI plugin and kube-ovn v4.1.5+, and uses `kubectl wait` to confirm each resource reaches the Ready condition.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/ambient-mode/waypoint-proxies.mdx": {
+      "sha256": "7caa71eb40930f50ccd7a927966770157c473a9b873469151b6b881fec5eba8d",
+      "size": 7011,
+      "description": "Deploys Envoy-based waypoint proxies as Gateway API `Gateway` resources (gatewayClassName `istio-waypoint`, HBONE listener on port 15008) to add L7 features such as HTTP routing, retries, rate limiting, authorization, and tracing on top of the L4 `ZTunnel` overlay. Covers per-namespace enrollment via the `istio.io/use-waypoint` label, the `istio.io/waypoint-for: service|workload` selector, and cross-namespace waypoints using `allowedRoutes` and the `istio.io/use-waypoint-namespace` label, verified with `istioctl ztunnel-config services`.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/dual-stack/index.mdx": {
+      "sha256": "588f70880da096debebdec207b807ea5b24a158c455d377deb1bbd47ab49aa04",
+      "size": 1936,
+      "description": "Introduces Istio dual-stack networking support, tracing it from experimental in Istio 1.17 to Alpha in 1.24 and Beta in 1.28, so meshed services can communicate over both IPv4 and IPv6 endpoints. Explains how Kubernetes assigns both address families per pod and how `Service.spec.ipFamilyPolicy` values `SingleStack`, `PreferDualStack`, and `RequireDualStack` control which families a Service exposes.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/dual-stack/install-mesh-in-dual-stack-mode.mdx": {
+      "sha256": "a77706087ca15649f5cbcf85f393258099bfe87fcd4a20cc7b961c6eff98cd67",
+      "size": 6731,
+      "description": "Installs Istio with dual-stack networking by creating `IstioCNI` and an `Istio` resource that sets `pilot.ipFamilyPolicy: RequireDualStack` and `ISTIO_DUAL_STACK=\"true\"` in both `proxyMetadata` and Pilot env. Verifies the configuration by deploying `tcp-echo` sample apps in `dual-stack`, `ipv4`, and `ipv6` namespaces (each with sidecar injection enabled) plus a `sleep` client, then runs `nc tcp-echo.<ns> 9000` from the sleep pod to confirm connectivity across all three IP-family policies.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/index.mdx": {
+      "sha256": "4634171797e3f3c128472f9656a23bf45d3671d55906f50a21847903499b6c68",
+      "size": 154,
+      "description": "Landing page for the Installing section of the Alauda Service Mesh v2 documentation, linking to subsections that cover installing the service mesh, application deployment, dual-stack mode, and ambient mode.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/installing-service-mesh/application-deployment/application-requirements.mdx": {
+      "sha256": "1f0d00a1878216a35c6968540dca18fd3558310974e8aaa7ac60836f6d2dc396",
+      "size": 3095,
+      "description": "Lists Istio sidecar requirements for application pods: avoid running containers as UID `1337` (reserved for the sidecar proxy), set the recommended `app`/`version` (or `service.istio.io/canonical-name`/`canonical-revision`) labels that Kiali uses for telemetry, and name service ports for protocol selection. Tabulates the Envoy ports applications must avoid, including 15000 (admin), 15001/15006 (outbound/inbound), 15008 (HBONE mTLS), 15020/15090 (Prometheus telemetry), and 15021 (health checks).",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/installing-service-mesh/application-deployment/deploying-the-bookinfo-application.mdx": {
+      "sha256": "76cf55866c27522bdaad20fb243f3cca6760e01a6618aea574ccb090d270028c",
+      "size": 12790,
+      "description": "Deploys the Bookinfo sample (`productpage`, `details`, `ratings`, `reviews-v1/v2/v3`) under sidecar mode by creating the `bookinfo` namespace and enabling injection with either `istio-injection=enabled` (InPlace upgrade) or `istio.io/rev=<revision>` after listing `istiorevisions.sailoperator.io` (RevisionBased upgrade). Then exposes the app via two paths: gateway injection (`istio-ingressgateway` Deployment/Service with optional HorizontalPodAutoscaler and PodDisruptionBudget) and the Kubernetes Gateway API (`Gateway` plus `HTTPRoute`), verified by `curl`ing `/productpage` and observing round-robin reviews.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/installing-service-mesh/application-deployment/index.mdx": {
+      "sha256": "ad1f3bc18f8b825896ec1d4ef9c9532ab4754229c6775a5905b64a803990a5be",
+      "size": 199,
+      "description": "Landing page for the Application Deployment section, introducing how Istio provides mesh functionality to applications with minimal application code changes and linking to namespace requirements, application requirements, and the Bookinfo deployment walkthrough.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/installing-service-mesh/application-deployment/namespace-requirements.mdx": {
+      "sha256": "e483f83c778676ba5f94f11d0fffba46189f2c26b831be5f5140718531a81835",
+      "size": 612,
+      "description": "Notes that namespaces created with `kubectl create namespace` have no special requirements, while namespaces created from the Alauda Container Platform web console (Projects > Namespace) must have their Pod Security Admission `Enforce` mode set to something other than `Restricted` — `Baseline` is recommended for mesh-enabled workloads.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/installing-service-mesh/custom-istio-config.mdx": {
+      "sha256": "5c5d10d799371ae282f1636005eb412a084b31db6c39612bfc5ebb4f196632d7",
+      "size": 931,
+      "description": "Customizes the deployed Istio control plane by editing the `values` field of the `Istio` custom resource (Helm-style configuration). Navigates via Marketplace > OperatorHub > Alauda Service Mesh v2 > All Instances > the `default` Istio instance, then uses Actions > Update to modify YAML, and points to the sail-operator API reference for the full set of supported `values` fields.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/installing-service-mesh/index.mdx": {
+      "sha256": "631760b17bc3079aa7102766db159ed042075f5887edf8060a193a61932d9a10",
+      "size": 88,
+      "description": "Landing page for the Installing Alauda Service Mesh section, gathering procedures for installing the Operator and control plane, configuring custom Istio values, deploying applications, and related setup topics.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/installing-service-mesh/install-mesh.mdx": {
+      "sha256": "ebbf412bcc762d345145eec85a366a73ddbc1fd2eec284792fb618ee286032d4",
+      "size": 14351,
+      "description": "Walks through installing the Alauda Service Mesh v2 Operator (web console and CLI flows for the `servicemesh-operator2` Subscription, `stable` channels, and InstallPlan approval), then deploying the Istio data plane by creating the `IstioCNI` and `Istio` custom resources in the `istio-cni` and `istio-system` namespaces. Lists the Sail Operator CRDs (`Istio`, `IstioRevision`, `IstioCNI`, `ZTunnel`) installed under `sailoperator.io`, prerequisites such as the Multus plugin and kube-ovn v4.1.5+, and verification commands like `kubectl wait --for condition=Ready istiocni/default`.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/installing-service-mesh/istio-high-availability/configuring-istio-ha-by-using-autoscaling.mdx": {
+      "sha256": "2eba08e9680180445aeb07631619311b6a5c8352a3003fb9fe1849e71dc8b45d",
+      "size": 4400,
+      "description": "Configures high availability for the Istio control plane by patching the `Istio` resource with `spec.values.pilot.autoscaleMin`, `autoscaleMax`, and CPU/memory `targetAverageUtilization` so the Horizontal Pod Autoscaler scales `istiod` replicas based on load. Covers both web console and `kubectl patch` workflows and verifies two `istiod` pods are running as the minimum HA baseline.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/installing-service-mesh/istio-high-availability/configuring-istio-ha-by-using-replica-count.mdx": {
+      "sha256": "56afbc52f6fd6994421d7b4998f25517debc99534dfd2afbe36910c867269b11",
+      "size": 3623,
+      "description": "Configures Istio control plane HA with a fixed replica count by setting `spec.values.pilot.autoscaleEnabled: false` and `replicaCount: 2` on the `Istio` resource, suitable for steady or predictable control plane load. Provides web console and `kubectl patch` procedures and verifies the result by listing `istiod` pods.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/installing-service-mesh/istio-high-availability/index.mdx": {
+      "sha256": "35384f6ed413ba51cb7f648a9da6ca65e054bc72abb71dc8edef1222e4abb17c",
+      "size": 2102,
+      "description": "Introduces Istio control plane High Availability and the two enablement approaches (static replica count vs HPA-driven autoscaling), explaining how multi-replica `istiod` survives pod failures, smooths upgrades, and supports zone-level fault tolerance. Includes a single-node cluster note for disabling the default Pod Disruption Budget via `spec.values.global.defaultPodDisruptionBudget.enabled: false` to avoid blocking drains.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/installing-service-mesh/scoping-the-service-mesh/index.mdx": {
+      "sha256": "2ac18c7e32c6c48680326a4eadf348ac3a4a4118b48a1d79fc8f4a3782fb0049",
+      "size": 2424,
+      "description": "Explains why limiting Istiod's configuration scope matters at scale and compares the three Istio scoping mechanisms — `Sidecar` for workload-side import, `exportTo` for service-owner visibility, and `discoverySelectors` for namespace-level filtering. Includes FAQ entries on unmatched traffic when calling out-of-scope services and how Gateways interact with these scoping primitives.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/installing-service-mesh/scoping-the-service-mesh/using-discovery-selectors.mdx": {
+      "sha256": "8d268a55e43a655178848a9fa07f870aa9c0e4a2b8feb171049d9f89e2c57f23",
+      "size": 3913,
+      "description": "Uses `meshConfig.discoverySelectors` in the `Istio` resource with Kubernetes label selectors (such as `istio-discovery=enabled`) to control which namespaces Istiod monitors, reducing proxy configuration cost at scale. Warns that discovery selectors are not a security boundary and walks through labeling `istio-system` and patching the control plane resource.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/installing-service-mesh/scoping-the-service-mesh/using-export-to.mdx": {
+      "sha256": "74d276c24f25e0551570e2d32e479e870c098a6e86f4d4f0c2b2336fe40c7b4e",
+      "size": 826,
+      "description": "Restricts service visibility from the producer side using the `spec.exportTo` field on `VirtualService`, `DestinationRule`, and `ServiceEntry`, plus the `networking.istio.io/exportTo` annotation on `Service`. Shows an example that limits the `details` Service to its own namespace and a `client` namespace.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/installing-service-mesh/scoping-the-service-mesh/using-sidecar-import.mdx": {
+      "sha256": "c77db16cbeaea340118dd9c49b4c0d2f507ce10d08f9348b5aad0b4d10e034a3",
+      "size": 852,
+      "description": "Limits the configuration each Envoy sidecar receives by listing hosts under `egress.hosts` of a `Sidecar` resource, supporting same-namespace (`./*`), other-namespace (`bookinfo/*`), and specific-host (`external-services/example.com`) patterns. Useful for trimming proxy memory and CPU when workloads only need a subset of cluster services.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/istioctl.mdx": {
+      "sha256": "68fa9f66b38b9fb0292f7ed72e0ab0da8c909625af388c669bc28e7818e274fd",
+      "size": 1768,
+      "description": "Installs the `istioctl` command-line utility for debugging and diagnosing Alauda Service Mesh deployments, including how to look up the running `Istio` resource version, download the matching binary from the Istio GitHub releases, extract it on Linux/macOS or Windows, and confirm client/control plane/data plane versions with `istioctl version`.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/mtls.mdx": {
+      "sha256": "922fd1abf6f234a7d18b279489974013143818aedc9f155f8a816c5c8d183083",
+      "size": 3859,
+      "description": "Configures mutual TLS in Alauda Service Mesh using `PeerAuthentication` (`PERMISSIVE` vs `STRICT`) and `DestinationRule` (`DISABLE`, `SIMPLE`, `MUTUAL`, `ISTIO_MUTUAL`) modes, plus the auto-mTLS feature controlled by `enableAutoMtls`. Provides namespace-scoped and mesh-wide STRICT mTLS examples (including an `api-server` DestinationRule that disables TLS for the Kubernetes API) and shows how to validate encryption with Kiali lock-icon indicators.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/multi-cluster/configuration-overview.mdx": {
+      "sha256": "650bccc1831aa596bfa5a495fba68403ec14abc0965e045511674659085bf0b0",
+      "size": 11341,
+      "description": "Prepares a multi-cluster mesh by generating a shared root CA and per-cluster intermediate CA certificates with OpenSSL (using `root-ca.conf` and `intermediate.conf` configs for the East and West clusters), then applying them as `cacerts` secrets in `istio-system` on both clusters via `kubectl --context`. Lists the multi-cluster prerequisites — Multus, kube-ovn v4.1.5+, the Alauda Service Mesh v2 Operator on every cluster, and cross-cluster API server reachability.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/multi-cluster/index.mdx": {
+      "sha256": "73ccc54e8754671ce9e4167f0395971a7848e632deae1875f332b1b8bd7aedd4",
+      "size": 2329,
+      "description": "Introduces multi-cluster service mesh deployment with Alauda Service Mesh v2 and enumerates the four supported topologies built from two control-plane models (Multi-Primary vs Primary-Remote) and two network models (Single Network vs Multi-Network). Explains when east-west gateways are required and how the primary cluster's control plane configures sidecars on remote clusters.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/multi-cluster/install-multi-primary-multi-network.mdx": {
+      "sha256": "e2687374b32b763d38ba9eff5cba1860d647d266aa55dbf5364d4b08aaba0603",
+      "size": 17113,
+      "description": "Installs Istio in a multi-primary multi-network topology across an East and West cluster, creating `IstioCNI` and `Istio` resources with `global.meshID=mesh1`, distinct `network1`/`network2` and `clusterName` values, plus east-west gateways from the `sail-operator` manifests and `expose-services.yaml`. Uses `istioctl create-remote-secret` to swap API server credentials, then validates by deploying `helloworld` v1/v2 and `sleep` in a `sample` namespace and curling across clusters.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/multi-cluster/install-primary-remote-multi-network.mdx": {
+      "sha256": "44fc706fe35d82ba749d1f937fa288582052a498e6cfc98008e98b0da15ab51d",
+      "size": 18754,
+      "description": "Installs Istio in a primary-remote multi-network topology where the East cluster runs the control plane with `externalIstiod: true` and the West cluster uses `profile: remote` pointing at `global.remotePilotAddress` (the East east-west gateway IP) and `istiodRemote.injectionPath`. Covers exposing istiod via `expose-istiod.yaml`, annotating `istio-system` on the remote with `topology.istio.io/controlPlaneClusters=cluster1`, sharing remote secrets, and verifying load balancing of `helloworld` v1/v2 across both clusters.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/sidecar-injection/identifying-the-revision-name.mdx": {
+      "sha256": "4cd0d651b6fa803f0a22feb8c8a36b61bd292ec41b8d805f577693911a88877f",
+      "size": 2928,
+      "description": "Explains how `IstioRevision` resources are named — matching the `Istio` resource name under the `InPlace` update strategy, or `<name>-v<version>` under `RevisionBased` — and how to list them with `kubectl get istiorevisions`. Documents the namespace/pod labels that enable injection (`istio-injection=enabled`, `sidecar.istio.io/inject=true`, `istio.io/rev=<revision>`) and the precedence rules when both `istio-injection` and `istio.io/rev` are set.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/sidecar-injection/index.mdx": {
+      "sha256": "592992d50c579ccb591ae428a9abd2349d0ebf49c342e234896608e54f49f596",
+      "size": 1370,
+      "description": "Introduces how Istio sidecar proxies are injected into mesh workloads, primarily via namespace- or pod-level labels handled by an admission controller at pod creation. Explains that the revision label binds a workload to a specific Istio control plane instance and that automatic injection only changes pods (verifiable with `kubectl describe`), not the parent Deployment.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/sidecar-injection/sidecar-injection-with-istiorevisiontag.mdx": {
+      "sha256": "d6abea90665f6ecdf3e91f6fb7ef6f2d2710eff40be95d2f5c69c8594458ed09",
+      "size": 4674,
+      "description": "Walks through creating an `IstioRevisionTag` resource named `default` (kind `sailoperator.io/v1`) that points at a non-default `Istio` revision such as `default-v1-28-6`, so workloads can keep using the conventional `istio-injection=enabled` namespace label. Includes the apply, verify, label, and `kubectl rollout restart` steps against the Bookinfo namespace, and confirms success by pods moving from `1/1` to `2/2` READY.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/installing/sidecar-injection/sidecar-injection-with-lables.mdx": {
+      "sha256": "ee01ba7e14ef094e03bb6021d80691a2c169f56368569c30a9e8bbb38a9403a0",
+      "size": 9649,
+      "description": "Demonstrates two label-driven sidecar injection methods on the Bookinfo application: namespace-wide enablement using `kubectl label namespace bookinfo istio-injection=enabled` plus a rollout restart, and per-pod selection via the revision label `istio.io/rev=<name>` (for example `my-mesh`) in the Deployment's `spec.template.metadata.labels`. Also shows how to opt a workload like `ratings-v1` out of an injected namespace by setting `sidecar.istio.io/inject: \"false\"`.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/integration/index.mdx": {
+      "sha256": "d8f34e8d0cbce834fce06e47abf7043c4bae59b2b4409e5123cff0d739d0a3d5",
+      "size": 69,
+      "description": "Landing page for the Integration section, which groups guides on connecting Alauda Service Mesh to external systems and observability stacks.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/integration/observability/distributed-tracing-and-mesh.mdx": {
+      "sha256": "047967926f1c8ff4b81b83694bda33c07caf46c0fa533fdaaf2c791b816985c4",
+      "size": 6281,
+      "description": "Covers wiring Alauda Service Mesh into distributed tracing, including the headers (`x-request-id`, W3C `traceparent`/`tracestate`) applications must propagate so Envoy-emitted spans can be stitched into traces. Provides an end-to-end procedure that installs a `Jaeger` instance via `install-jaeger.sh`, deploys an `OpenTelemetryCollector` exporting OTLP to `jaeger-prod-collector-headless`, enables tracing on the `Istio` resource through `meshConfig.enableTracing` and an `opentelemetry` extension provider, and activates it with a `Telemetry` CR setting `randomSamplingPercentage`.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/integration/observability/index.mdx": {
+      "sha256": "22b483b1656acff7a5981c6b7a0dbccb8f8d137fe674461ab383704851601ced",
+      "size": 170,
+      "description": "Landing page for the Observability integration section, which orients readers to the Alauda observability components that plug into Service Mesh.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/integration/observability/kiali.mdx": {
+      "sha256": "10ed4c4aa18499dc3e3ebaa6623cd3c9ead0007427eb378ed3857259b9d3f52b",
+      "size": 17475,
+      "description": "Installs and configures Alauda Build of Kiali (Kiali Operator v2.17.1-r1) as the mesh management console, covering OperatorHub and CLI install via Subscription/InstallPlan, then creating a `Kiali` CR with OpenID auth backed by Dex, ingress through the platform's ALB class, and Prometheus/VictoriaMetrics access via the `kiali-monitoring-basic-auth` Secret and optional Thanos proxy. Also shows how to enable distributed tracing in Kiali by setting `external_services.tracing` to a Jaeger or Tempo backend so traces appear under the Workload Traces tab.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/integration/observability/metrics-and-mesh.mdx": {
+      "sha256": "a15cc7182fd32a147f9f21466a02fb0b3995a2a187a0a4f638b7a5ca7afa78c6",
+      "size": 5075,
+      "description": "Configures user-workload monitoring for Service Mesh by applying a `ServiceMonitor` (`istiod-monitor` selecting `istio=pilot`) and a `PodMonitor` (`istio-proxies-monitor` scraping `istio-proxy` containers at `/stats/prometheus`) labelled `prometheus: kube-prometheus` for ACP Prometheus. Also defines an Istio `Telemetry` resource (`asm-default`) that adds a `mesh_id` tag override sourced from `xds.node.metadata['MESH_ID']` so multi-cluster ambient deployments can disambiguate metrics.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/integration/observability/observability-and-mesh.mdx": {
+      "sha256": "d2bb3ddaa60f5d04cd2052f93b1fdff0699016d69b250c56e7513f653856b249",
+      "size": 1082,
+      "description": "Outlines how Alauda Service Mesh combines monitoring (Prometheus or VictoriaMetrics with Alertmanager), distributed tracing (Jaeger and OpenTelemetry), and Alauda Build of Kiali to deliver a unified telemetry view of mesh topology, traffic, and request flow.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/uninstalling/index.mdx": {
+      "sha256": "74b9de679c87a0fbdcb03be62a3b81e0c2b3edb461229d8f36361e2fa2bf05a2",
+      "size": 155,
+      "description": "Landing page for the Uninstalling section, which links to the procedures for removing Alauda Service Mesh, its ambient-mode resources, and Alauda Build of Kiali.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/uninstalling/uninstalling-alauda-build-of-kiali.mdx": {
+      "sha256": "f61cf2f4b94c24afbcb680f24f7188e84deac140ecb48b0f4182a1e813a2c983",
+      "size": 3746,
+      "description": "Removes Alauda Build of Kiali from ACP by deleting the `Kiali` custom resource (via web console All Instances or `kubectl delete kiali/<name> -n <namespace>`) and then the `kiali-operator` Subscription, with an optional final step that deletes all `kiali.io` CRDs using `kubectl get crds -oname | grep -e kiali.io | xargs kubectl delete`.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/uninstalling/uninstalling-alauda-service-mesh-in-ambient-mode.mdx": {
+      "sha256": "695ffedd70d90e124b1408aa422d1e99d2558df7b1a5f5e688a7be82d52cbb09",
+      "size": 9711,
+      "description": "Tears down an ambient-mode Service Mesh by deleting waypoint proxy `Gateway` resources (selected via `istio.io/waypoint-for`), removing the `istio.io/dataplane-mode=ambient` label from enrolled namespaces, then deleting the `ZTunnel`, `Istio`, and `IstioCNI` resources, the `servicemesh-operator2` Subscription, and the `ztunnel`, `istio-system`, and `istio-cni` namespaces. Includes a final optional step to remove all `istio.io` and `sailoperator.io` CRDs.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/uninstalling/uninstalling-alauda-service-mesh.mdx": {
+      "sha256": "6d395a1237c344d3bc2b8b1e51bc4c441585934e959eb105b5f284493082cd13",
+      "size": 6021,
+      "description": "Uninstalls the standard (sidecar-mode) Alauda Service Mesh v2 Operator by deleting the `Istio` and `IstioCNI` custom resources through the web console or `kubectl delete`, removing the `servicemesh-operator2` Subscription in the `sail-operator` namespace, and cleaning up the `istio-system` and `istio-cni` namespaces, with an optional CRD purge covering `istio.io` and `sailoperator.io`.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/updating/index.mdx": {
+      "sha256": "82a051a794a997c268ddbc1c953145b28eabc708afab3ae3679d051fa6475bb8",
+      "size": 148,
+      "description": "Landing page for the Updating section, which links to the operator-update and Istio control-plane update procedures.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/updating/update-mesh/index.mdx": {
+      "sha256": "48f603971d917377d4eaacf63a066dc74b6cb6cfd2c86cb952c6e510ef9367c5",
+      "size": 4707,
+      "description": "Explains semantic versioning for Alauda Service Mesh releases and how OLM channels (`stable` versus versioned channels like `stable-2.0`) control Operator updates and approval flow. Describes the two `Istio` resource update strategies (`InPlace`, the default, and `RevisionBased`) and how `spec.version` (including aliases such as `vX.Y-latest`) drives control-plane upgrades after the Operator itself is updated.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/updating/update-mesh/istio-cni.mdx": {
+      "sha256": "a39ec582bf9d20b80ed1716fce4a1b186288c8d37db8cdbed598cdb22a770e9a",
+      "size": 2056,
+      "description": "Updates the Istio CNI plugin in place by modifying the `spec.version` field on the `IstioCNI` resource, which prompts the Service Mesh v2 Operator to roll the `istio-cni-node` daemonset pods to the target `vX.Y.Z` build. Includes a `kubectl patch istiocni default` example targeting `v1.28.6` and a `kubectl get istiocni` readiness check showing `Healthy` status.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/updating/update-mesh/revision-based-strategy/index.mdx": {
+      "sha256": "cbb0fc96c51b704190f1025fe734044359c369438461dae805aa0b6830b74179",
+      "size": 1111,
+      "description": "Introduces the `RevisionBased` update strategy, which provisions a second Istio control plane instance for each change to `spec.version` so workloads can migrate gradually via `istio.io/rev` label changes or `IstioRevisionTag` retargeting. Highlights its support for canary upgrades, jumps across more than one minor version, and validation against a subset of workloads before fully cutting over large or mission-critical meshes.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/updating/update-mesh/revision-based-strategy/selecting-revisionbased-strategy.mdx": {
+      "sha256": "ce8b113ca05b231068f0befd4f1efc0e878d5507922b8df3f1baf9178dd40347",
+      "size": 493,
+      "description": "Shows the minimal `Istio` resource YAML that selects the `RevisionBased` upgrade strategy by setting `spec.updateStrategy.type: RevisionBased` alongside `spec.version`. Notes that the Operator then materializes an `IstioRevision` named `<istio_resource_name>-<version>`.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/updating/update-mesh/revision-based-strategy/update-revisionbased-and-istiorevisiontag.mdx": {
+      "sha256": "35db608f96a6fd7f8985c63b046084086aa27ab97a158bf826c65acc5d3acbc4",
+      "size": 12409,
+      "description": "Walks through a full canary upgrade driven by an `IstioRevisionTag` that points at an `Istio` resource using `RevisionBased`: install `IstioCNI`, `Istio`, the tag, and the Bookinfo sample, then patch `spec.version` from `v1.26.3` to `v1.28.6`. Verifies parallel `istiod` revisions with `kubectl get istio/istiorevision/istiorevisiontag`, retargets workloads by rolling deployments without editing namespace labels, and explains how `spec.updateStrategy.inactiveRevisionDeletionGracePeriodSeconds` controls cleanup of the old revision.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/updating/update-mesh/revision-based-strategy/update-revisionbased.mdx": {
+      "sha256": "d3651c84001ba51589e503409749d30482918028c33f2371799a1afd875d9373",
+      "size": 11965,
+      "description": "Performs a `RevisionBased` upgrade without `IstioRevisionTag`, relying on the `istio.io/rev=<revision_name>` namespace label to move Bookinfo workloads from `default-v1-26-3` to `default-v1-28-6`. Covers installing `IstioCNI` and the `Istio` resource, patching `spec.version`, confirming two `istiod` pods coexist via `istioctl proxy-status`, relabeling the namespace, rolling deployments, and waiting out `inactiveRevisionDeletionGracePeriodSeconds` before the old `IstioRevision` is reaped.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/updating/update-mesh/update-inplace.mdx": {
+      "sha256": "f18db75b0c33781a573816dc5d27fe325aa94d9c10e4ffb95fa257ea669b728a",
+      "size": 10733,
+      "description": "Covers the `InPlace` update strategy, where a single `istiod` revision is restarted with the new version and existing sidecars automatically reconnect; only one minor version step is supported per upgrade. Provides end-to-end procedures for installing `IstioCNI` and `Istio` with `spec.updateStrategy.type: InPlace`, deploying Bookinfo, patching `spec.version` to `v1.28.6`, restarting workloads to refresh Envoy proxies, verifying via `istioctl proxy-status`, and tearing down the dev environment with `kubectl delete istio/default istiocni/default`.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    },
+    "docs/en/updating/upgrade-kiali/index.mdx": {
+      "sha256": "5ca08a9c220f555a1d683b08c4fc8af57a7bd9a157b394dbb8fa1d3296216320",
+      "size": 2415,
+      "description": "Documents the sequential Kiali Operator upgrade path 2.11.z to 2.17.z to 2.22.z for Alauda Build of Kiali, noting that the Operator automatically upgrades the matching Kiali Server. Post-upgrade verification uses `kubectl get pods -l app.kubernetes.io/name=kiali`, log inspection for the `Version:` line, and the Kiali UI About dialog to confirm the new release.",
+      "generation_method": "ai_agent_reading",
+      "updated_at": "2026-05-16T09:39:26Z"
+    }
+  }
+}
