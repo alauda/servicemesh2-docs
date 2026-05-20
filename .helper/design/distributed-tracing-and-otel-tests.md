@@ -179,7 +179,7 @@ tracing:../distributed-tracing-docs
 
 | 钩子函数 | 调用时机 | 职责 | mesh 实现 | otel 实现 | tracing 实现 |
 | --- | --- | --- | --- | --- | --- |
-| `project_check_env` | 每次运行开头 | 校验该项目专属环境变量，缺失则返回非 0 | 校验 5 个 `PKG_*` | 校验 `PKG_OPENTELEMETRY_OPERATOR_URL` | 校验 `PKG_OPENTELEMETRY_OPERATOR_URL`；`TRACING_ES_*` 缺失只 warn（测试脚本内 SKIPPED） |
+| `project_check_env` | 每次运行开头 | 校验该项目专属环境变量，缺失则返回非 0 | 校验 5 个 `PKG_*` | 校验 `PKG_OPENTELEMETRY_OPERATOR2_URL` | 校验 `PKG_OPENTELEMETRY_OPERATOR2_URL`；`TRACING_ES_*` 缺失只 warn（测试脚本内 SKIPPED） |
 | `project_init <clusters...>` | 仅 `--init-only` / `--force-init` | 重量级初始化 | `ensure_kubeconfig "$@" global` → `upload_all_packages` → `install_all_servicemesh_operators` → `install_istioctl` | `ensure_kubeconfig "$@"` → 上传并 `install_operator` 安装 OTel Operator | `ensure_kubeconfig "$@"` → `pushd $OTEL_REPO_ROOT` 上传并安装 OTel Operator |
 | `project_prepare` | 每次运行（`--init-only` 后或 `--file` 模式） | 轻量级准备 | `load_kubeconfig` → `fetch_platform_ca` 并 `export PLATFORM_CA` | `load_kubeconfig` | `load_kubeconfig` |
 
@@ -314,7 +314,7 @@ test_install_opentelemetry() {
     install_operator \
         "opentelemetry-operator2" \
         "opentelemetry-operator2" \
-        "$PKG_OPENTELEMETRY_OPERATOR_URL" \
+        "$PKG_OPENTELEMETRY_OPERATOR2_URL" \
         "install-otel"
 }
 ```
@@ -361,7 +361,7 @@ test_install_opentelemetry() {
 | 17 | 等待 otel collector deployment 就绪 | A | `install-tracing:wait-otel-rollout` |
 | 18 | 部署 telemetrygen 生成 trace 并 wait/delete | A | `install-tracing:deploy-telemetrygen` |
 
-> 步骤 1 的 OTel Operator 安装在功能上与 `runme-test_install-opentelemetry.sh` 重复，但二者走同一个通用 `install_operator`（幂等），互不干扰。`PKG_OPENTELEMETRY_OPERATOR_URL` 是已有环境变量。
+> 步骤 1 的 OTel Operator 安装在功能上与 `runme-test_install-opentelemetry.sh` 重复，但二者走同一个通用 `install_operator`（幂等），互不干扰。`PKG_OPENTELEMETRY_OPERATOR2_URL` 是已有环境变量。
 >
 > 步骤 11：`install-tracing:apply-jaeger` 内容为 `envsubst < jaeger.yaml | kubectl apply -f -`，依赖 cwd 存在 `jaeger.yaml`。先 `runme print install-tracing:jaeger-yaml > /tmp/jaeger.yaml`，再 `kubectl_apply_runme_block "install-tracing:apply-jaeger" "/tmp/"`。
 
@@ -425,8 +425,8 @@ test_install_opentelemetry() {
 | `TRACING_ES_USER` | 新增 | Elasticsearch 用户 | tracing 测试 SKIPPED |
 | `TRACING_ES_PASS` | 新增 | Elasticsearch 密码 | tracing 测试 SKIPPED |
 | `RUNME_VERSION` / `PLATFORM_ADDRESS` / `ACP_API_TOKEN` / `PLATFORM_USERNAME` / `PLATFORM_PASSWORD` | 复用 | 引擎通用必需 | 引擎 `check_env` 报错 |
-| `PKG_OPENTELEMETRY_OPERATOR_URL` | 复用 | otel / tracing 的 OTel Operator 安装包 | `project_check_env` 报错 |
-| `PKG_SERVICEMESH_OPERATOR2_URL` / `PKG_KIALI_OPERATOR_URL` / `PKG_JAEGER_OPERATOR_URL` / `PKG_METALLB_OPERATOR_URL` | 复用 | 仅 mesh 项目需要 | mesh `project_check_env` 报错 |
+| `PKG_OPENTELEMETRY_OPERATOR2_URL` | 复用 | otel / tracing 的 OTel Operator 安装包 | `project_check_env` 报错 |
+| `PKG_SERVICEMESH_OPERATOR2_URL` / `PKG_KIALI_OPERATOR_URL` / `PKG_METALLB_OPERATOR_URL` | 复用 | 仅 mesh 项目需要 | mesh `project_check_env` 报错 |
 
 > v1 的 `EXTRA_DOC_REPOS` 取消，由 `repos.conf` + `<PROJECT>_REPO_ROOT` 取代。引擎通用 `check_env` 只校验通用 5 项；`PKG_*` 下放到各项目 `project_check_env`；`TRACING_ES_*` 不进必需列表，仅软检查。
 
@@ -518,7 +518,7 @@ source "$REPO_ROOT/tests/util/verify.sh"
 # projects/tracing/project.sh
 
 project_check_env() {
-    [ -n "$PKG_OPENTELEMETRY_OPERATOR_URL" ] || { log_error "缺少 PKG_OPENTELEMETRY_OPERATOR_URL"; return 1; }
+    [ -n "$PKG_OPENTELEMETRY_OPERATOR2_URL" ] || { log_error "缺少 PKG_OPENTELEMETRY_OPERATOR2_URL"; return 1; }
     if [ -z "${TRACING_ES_ENDPOINT:-}" ]; then
         log_warn "未设置 TRACING_ES_*，tracing 测试将 SKIPPED"
     fi
@@ -529,11 +529,11 @@ project_init() {                       # 仅 --init-only / --force-init
     ensure_kubeconfig "${clusters[@]}" || return 1
     # 安装 tracing 的前置依赖：OTel Operator（块在 opentelemetry-docs）
     for c in "${clusters[@]}"; do
-        upload_package "$c" "$PKG_OPENTELEMETRY_OPERATOR_URL"
+        upload_package "$c" "$PKG_OPENTELEMETRY_OPERATOR2_URL"
     done
     pushd "$OTEL_REPO_ROOT" >/dev/null
     install_operator "opentelemetry-operator2" "opentelemetry-operator2" \
-        "$PKG_OPENTELEMETRY_OPERATOR_URL" "install-otel"
+        "$PKG_OPENTELEMETRY_OPERATOR2_URL" "install-otel"
     popd >/dev/null
 }
 
@@ -564,7 +564,7 @@ test_installing_distributed_tracing() {
 
     # 步骤 1：安装 OTel Operator（跨仓库，幂等）
     _in_otel_repo install_operator "opentelemetry-operator2" "opentelemetry-operator2" \
-        "$PKG_OPENTELEMETRY_OPERATOR_URL" "install-otel"
+        "$PKG_OPENTELEMETRY_OPERATOR2_URL" "install-otel"
 
     # 步骤 3-18：在 distributed-tracing-docs 内逐步执行（引擎已 cd 到 $DOC_REPO_ROOT）
     eval "$(runme print install-tracing:get-platform-config)"

@@ -3,11 +3,11 @@ name: auto-test-creator
 description: >
   Use this skill whenever the user wants to create, update, debug, or manage automated test scripts
   for MDX documentation files. This includes: generating runme-test_*.sh scripts for docs/en/ MDX files,
-  adding or checking {name=prefix:action} attributes on MDX code blocks, updating the tests/README.md
-  test table, modifying tests/run-all.sh orchestration script (including --no-cleanup/--cleanup-only
+  adding or checking {name=prefix:action} attributes on MDX code blocks, updating the docs-runme-tests
+  README.md test table, modifying run-<project>-all.sh orchestration scripts (including --no-cleanup/--cleanup-only
   split execution), or troubleshooting failing runme test scripts. Trigger this skill when the user
   mentions any of: MDX testing, runme tests, document testing, code block name attributes, test script
-  generation, run-all.sh updates, test coverage for documentation, or automated doc validation.
+  generation, run-<project>-all.sh updates, test coverage for documentation, or automated doc validation.
   Also use when the user references specific MDX files and wants to verify their code blocks work correctly.
 ---
 
@@ -53,7 +53,7 @@ description: >
    - 具体描述发现的问题
    - 建议的处理方式（在文档中补充步骤 / 在测试脚本中增加辅助逻辑）
 5. **cleanup 判断**：是否需要 cleanup 函数，依据是什么
-6. **编排脚本更新方案**：在 `run-all.sh` 中的放置位置和执行方式
+6. **编排脚本更新方案**：在对应项目的 `run-<project>-all.sh` 中的放置位置和执行方式
 
 **计划格式示例：**
 
@@ -145,14 +145,14 @@ namespace/test created
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/<相对路径>" && pwd)"
+# FRAMEWORK_ROOT 由 docs-runme-tests/run.sh 引擎注入
+: "${FRAMEWORK_ROOT:?该脚本需经 docs-runme-tests/run.sh 运行}"
 
-# 加载工具函数
-source "$REPO_ROOT/tests/util/common.sh"
-source "$REPO_ROOT/tests/util/verify.sh"
-
-# runme 命令可以在项目的任意目录中执行
+# 加载框架函数库
+source "$FRAMEWORK_ROOT/framework/common.sh"
+source "$FRAMEWORK_ROOT/framework/verify.sh"
+# mesh 项目脚本如需 kubectl_apply_with_mirror 等，额外引入对应 project.sh：
+# source "$FRAMEWORK_ROOT/projects/mesh/project.sh"
 
 test_<feature_name>() {
     log_info "=========================================="
@@ -185,17 +185,23 @@ cleanup_<feature_name>() {
 
 ### 关键规则
 
-#### REPO_ROOT 路径计算
+#### 框架定位（FRAMEWORK_ROOT 注入）
 
-根据脚本在项目中的深度计算相对路径（从 `docs/en/` 开始算起）：
+测试脚本不再自行计算仓库路径。`docs-runme-tests/run.sh` 引擎在执行测试脚本前会注入以下环境变量：
 
-| 脚本目录深度 | 示例路径                                         | REPO_ROOT                    |
-| ------------ | ------------------------------------------------ | ---------------------------- |
-| 3 级         | `docs/en/uninstalling/`                          | `$SCRIPT_DIR/../../..`       |
-| 4 级         | `docs/en/installing/dual-stack/`                 | `$SCRIPT_DIR/../../../..`    |
-| 5 级         | `docs/en/installing/.../application-deployment/` | `$SCRIPT_DIR/../../../../..` |
+| 变量                  | 含义                                                        |
+| --------------------- | ----------------------------------------------------------- |
+| `FRAMEWORK_ROOT`      | docs-runme-tests 框架仓库根                                 |
+| `DOC_REPO_ROOT`       | 当前被测脚本所在的文档仓库根                                 |
+| `<PROJECT>_REPO_ROOT` | 各文档仓库根（如 `OTEL_REPO_ROOT`），用于跨仓库执行 runme 块 |
 
-**计算方法**：从脚本所在目录数回到仓库根目录需要几层 `..`。
+脚本头部固定写法（与脚本所在目录深度无关）：
+
+```bash
+: "${FRAMEWORK_ROOT:?该脚本需经 docs-runme-tests/run.sh 运行}"
+source "$FRAMEWORK_ROOT/framework/common.sh"
+source "$FRAMEWORK_ROOT/framework/verify.sh"
+```
 
 #### 测试步骤模式
 
@@ -280,7 +286,7 @@ install_operator \
 
 #### 可用的公共工具函数
 
-来自 `tests/util/common.sh`：
+来自 `framework/common.sh`：
 
 | 函数                          | 用途                         |
 | ----------------------------- | ---------------------------- |
@@ -292,7 +298,7 @@ install_operator \
 | `retry_command`               | 重试执行命令                 |
 | `install_operator`            | 通用 Operator 安装           |
 
-来自 `tests/util/verify.sh`：
+来自 `framework/verify.sh`：
 
 | 函数                 | 用途                                   |
 | -------------------- | -------------------------------------- |
@@ -399,7 +405,7 @@ log_success "验证通过"
 - `istioctl proxy-status` 输出：pod 名和版本号 → 用 `+ deployment-name` 和 `+ version` 验证
 - 任何包含动态 IP、时间戳、随机 ID 的表格输出
 
-**参考实现**：`docs/en/updating/update-mesh/runme-test_update-inplace.sh` 中步骤 9、12、15 展示了 `__cmp_lines` 的标准用法。
+**参考实现**：`servicemesh2-docs/docs/en/updating/update-mesh/runme-test_update-inplace.sh` 中步骤 9、12、15 展示了 `__cmp_lines` 的标准用法。
 
 **与手动 grep 循环的对比：**
 
@@ -449,15 +455,15 @@ output=$(runme run <prefix>:<action> 2>&1) || {
 
 ### 第五步：更新测试文档表格
 
-编辑 `tests/README.md`，在 "当前已有的测试文档" 表格中添加新条目：
+编辑 `docs-runme-tests/README.md`，在对应项目的测试文档表格中添加新条目：
 
 ```markdown
-| <文档名称> | [runme-test\_<文档名>.sh](相对路径) | `./run.sh --file <文档名>` |
+| <文档名称> | [runme-test\_<文档名>.sh](相对路径) | `./run.sh --project <项目> --file <文档名>` |
 ```
 
 ### 第六步：更新测试编排脚本
 
-编辑 `tests/run-all.sh`，在合适的位置添加新的测试 case 或加入已有 case。
+编辑对应项目的 `run-<project>-all.sh`（如 `run-mesh-all.sh` / `run-otel-all.sh` / `run-tracing-all.sh`），在合适的位置添加新的测试 case 或加入已有 case。下方示例中的 `./run.sh --file <name>` 可省略 `--project`（引擎按 repos.conf 自动查找）；编排脚本中建议显式写 `./run.sh --project <项目> --file <name>`。
 
 #### 判断执行方式
 
@@ -516,15 +522,15 @@ chmod +x <测试脚本路径>
 
 如需更详细的信息，请参阅：
 
-- `tests/README.md` - 测试框架完整说明
-- `tests/util/common.sh` - 公共工具函数源码
-- `tests/util/verify.sh` - 验证函数源码
-- `tests/run.sh` - 测试执行器
-- `tests/run-all.sh` - 测试编排脚本
+- `docs-runme-tests/README.md` - 测试框架完整说明
+- `docs-runme-tests/framework/common.sh` - 公共工具函数源码
+- `docs-runme-tests/framework/verify.sh` - 验证函数源码
+- `docs-runme-tests/run.sh` - 测试执行引擎
+- `docs-runme-tests/run-<project>-all.sh` - 各项目测试编排脚本
 
 ## 已有测试脚本参考
 
-以下是项目中已有的测试脚本，可作为编写新脚本的参考：
+以下是 servicemesh2-docs 仓库中已有的 mesh 测试脚本，可作为编写新脚本的参考（路径相对该仓库根）：
 
 - `docs/en/installing/dual-stack/runme-test_install-mesh-in-dual-stack-mode.sh`
 - `docs/en/installing/installing-service-mesh/runme-test_install-mesh.sh`
