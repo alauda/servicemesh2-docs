@@ -1,0 +1,129 @@
+---
+weight: 25
+---
+
+# Distributed Tracing and Service Mesh
+
+## Building applications to support trace context propagation
+
+Although Istio proxies can automatically send spans, extra information is needed to join those spans into a single trace. Applications must propagate this information in HTTP headers, so that when proxies send spans, the backend can join them together into a single trace.
+
+To do this, each application must collect headers from each incoming request and forward the headers to all outgoing requests triggered by that incoming request. The choice of headers to forward depends on the configured trace backend. The following is a summary:
+
+All applications should forward the following headers:
+
+- `x-request-id`: an Envoy-specific header that is used to consistently sample logs and traces.
+- `traceparent` and `tracestate`: [W3C standard headers](https://www.w3.org/TR/trace-context/)
+
+For other observability tools, refer to their documentation.
+
+## Configuring distributed tracing platform with Service Mesh
+
+Alauda Service Mesh supports distributed tracing through integration with the following components:
+
+- **Alauda Build of Jaeger v2**: A customized distribution based on the open source [Jaeger](https://www.jaegertracing.io/) project (Jaeger 2.16.0). It provides end-to-end visibility into requests across complex distributed systems. In v2, the Jaeger instance is deployed as an `OpenTelemetryCollector` custom resource managed by the Alauda Build of OpenTelemetry v2 Operator.
+
+- **Alauda Build of OpenTelemetry v2**: Based on the [OpenTelemetry](https://opentelemetry.io/) project, this Operator manages the lifecycle of both the Jaeger v2 instance and the OpenTelemetry Collector that fronts it.
+
+The [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) acts as an intermediary for telemetry signals. It supports multiple data formats and provides a standardized pipeline for processing and exporting telemetry to backends such as Jaeger.
+
+## Configuring distributed tracing data collection with Service Mesh
+
+You can integrate Alauda Service Mesh with Alauda Distributed Tracing by deploying a Jaeger v2 instance and an OpenTelemetry Collector, then configuring Istio to export trace data through them.
+
+The Jaeger v2 instance and the OpenTelemetry Collector are not service-mesh-specific: a single Jaeger v2 and OpenTelemetry Collector pair (deployed by default in the `jaeger-system` namespace) can serve both Service Mesh and other workloads in the cluster. This section only covers the Service Mesh-specific configuration; refer to the Alauda Distributed Tracing documentation for the underlying installation steps.
+
+**Prerequisites**
+
+- The Alauda Build of OpenTelemetry v2 Operator is installed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing.html#installing-the-alauda-build-of-opentelemetry-v2-operator" children="Installing the Alauda Build of OpenTelemetry v2 Operator" />.
+- A Jaeger v2 instance is deployed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing.html#installing-alauda-build-of-jaeger-v2" children="Installing Alauda Build of Jaeger v2" />.
+- An OpenTelemetry Collector is deployed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing.html#deploying-the-opentelemetry-collector" children="Deploying the OpenTelemetry Collector" />.
+- An Istio instance is created.
+- An Istio CNI instance is created.
+
+:::info
+The `JAEGER_ES_INDEX_PREFIX` variable referenced in the install procedure controls the prefix of the Elasticsearch indices that store trace data. The default value, `acp-${CLUSTER_NAME}`, works for a single-cluster deployment. For a service mesh deployment, choose the prefix according to the topology of the mesh:
+
+- For a single-cluster service mesh, we recommend ending the prefix with the cluster name, for example `acp-cluster-1`.
+- For a multi-cluster service mesh, traces from all clusters must be stored in the same index family; we recommend ending the prefix with the meshID, for example `acp-mesh-1`. Use the same `JAEGER_ES_INDEX_PREFIX` when running the install procedure on every cluster in the mesh so that the Jaeger UI can correlate spans across clusters.
+:::
+
+**Procedure**
+
+<Steps>
+  ### Update the `Istio` resource to enable tracing and define the OpenTelemetry tracing provider
+
+  **Example: Enabling tracing via `meshConfig`**
+
+  ```yaml
+  apiVersion: sailoperator.io/v1
+  kind: Istio
+  metadata:
+    name: default
+    # ...
+  spec:
+    namespace: istio-system
+    # ...
+    values:
+      meshConfig:
+        enableTracing: true
+        extensionProviders:
+        - name: otel
+          opentelemetry:
+            port: 4317
+            service: otel-collector.jaeger-system.svc.cluster.local  # [!code callout]
+  ```
+
+  <Callouts>
+    1. The `service` field is the FQDN of the OpenTelemetry Collector Service. The default value targets the Collector deployed in the `jaeger-system` namespace as described in <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing.html#deploying-the-opentelemetry-collector" children="Deploying the OpenTelemetry Collector" />. Replace it with the actual Collector address if you deployed the Collector in a different namespace or with a different instance name.
+  </Callouts>
+
+  ### Update the `Telemetry` resource to enable the tracing provider defined in the `meshConfig`:
+
+  **Example Istio Telemetry resource**
+
+  ```yaml
+  apiVersion: telemetry.istio.io/v1
+  kind: Telemetry
+  metadata:
+    name: asm-default
+    namespace: istio-system
+    # ...
+  spec:
+    # ...
+    tracing:
+      - providers:
+          - name: otel
+        randomSamplingPercentage: 100
+  ```
+
+  :::note
+  Once you verify that you can see traces, lower the `randomSamplingPercentage` value to reduce the number of requests.
+  :::
+</Steps>
+
+## Uninstalling distributed tracing
+
+If you no longer need the distributed tracing integration with Service Mesh, remove the configuration in the order below.
+
+### Removing the Service Mesh tracing configuration
+
+Before removing the underlying components, detach the mesh from the OpenTelemetry Collector so that Istio stops sending spans.
+
+1. Edit the `Telemetry` resource and remove the `tracing` providers entry that references the `otel` provider:
+
+    ```bash
+    kubectl -n istio-system edit telemetry asm-default
+    ```
+
+2. Edit the `Istio` resource and remove the `meshConfig.extensionProviders` entry named `otel`, or set `meshConfig.enableTracing` to `false`:
+
+    ```bash
+    kubectl edit istio default
+    ```
+
+### Uninstalling the OpenTelemetry Collector and Jaeger v2
+
+Skip this step if other workloads in the cluster still rely on the OpenTelemetry Collector or the Jaeger v2 instance.
+
+For instructions on deleting the OpenTelemetry Collector instance, the Jaeger v2 instance, and (optionally) the Alauda Build of OpenTelemetry v2 Operator, see <ExternalSiteLink name="distributed-tracing" href="/uninstalling/uninstalling-distributed-tracing.html" children="Uninstalling Alauda Distributed Tracing" />.
