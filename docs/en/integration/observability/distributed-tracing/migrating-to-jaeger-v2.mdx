@@ -37,7 +37,7 @@ The v1 and v2 `Alauda Build of OpenTelemetry` Operators share the same CRDs, so 
     kubectl -n istio-system delete opentelemetrycollector otel
     ```
 
-2. Uninstall the `Alauda Build of OpenTelemetry` Operator from the **Administrator** view in the web console. Skip this step if other workloads in the cluster still rely on it.
+2. Uninstall the `Alauda Build of OpenTelemetry` Operator from the **Administrator** view in the web console.
 
     - From **Marketplace** → **OperatorHub** → use the **search box** to search for `Alauda build of OpenTelemetry`.
     - Click on the **Alauda build of OpenTelemetry** title to enter its details.
@@ -106,7 +106,7 @@ Pre-cutover traces are not migrated into the new Jaeger v2 backend; once the leg
     kubectl -n istio-system delete configmap    jaeger-prod-oauth2-proxy  --ignore-not-found
     ```
 
-2. Uninstall the `Alauda build of Jaeger` Operator from the **Administrator** view in the web console. Skip this step if other workloads in the cluster still rely on it.
+2. Uninstall the `Alauda build of Jaeger` Operator from the **Administrator** view in the web console.
 
     - From **Marketplace** → **OperatorHub** → use the **search box** to search for `Alauda build of Jaeger`.
     - Click on the **Alauda build of Jaeger** title to enter its details.
