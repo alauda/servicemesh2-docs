@@ -100,10 +100,22 @@ Before removing the underlying components, detach the mesh from the OpenTelemetr
     kubectl -n istio-system edit telemetry asm-default
     ```
 
+    Alternatively, remove the `tracing` configuration non-interactively with `kubectl patch`:
+
+    ```bash
+    kubectl -n istio-system patch telemetry asm-default --type=json -p='[{"op": "remove", "path": "/spec/tracing"}]'
+    ```
+
 2. Edit the `Istio` resource and remove the `meshConfig.extensionProviders` entry named `otel`, or set `meshConfig.enableTracing` to `false`:
 
     ```bash
     kubectl edit istio default
+    ```
+
+    Alternatively, set `meshConfig.enableTracing` to `false` non-interactively with `kubectl patch`:
+
+    ```bash
+    kubectl patch istio default --type=merge -p='{"spec":{"values":{"meshConfig":{"enableTracing":false}}}}'
     ```
 
 ### Uninstalling the OpenTelemetry Collector and Jaeger v2

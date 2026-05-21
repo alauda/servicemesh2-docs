@@ -174,10 +174,16 @@ After uninstalling, historical traces stored in Elasticsearch are no longer reac
 
 Before deleting the underlying components, remove the mesh-side tracing configuration so that Istio stops sending spans to the legacy collector.
 
-1. Edit the `Telemetry` resource and remove the `tracing` providers entry that references the legacy `otel` provider:
+1. Edit the `Telemetry` resource and remove the `tracing` providers entry that references the `otel` provider:
 
     ```bash
     kubectl -n istio-system edit telemetry asm-default
+    ```
+
+    Alternatively, remove the `tracing` configuration non-interactively with `kubectl patch`:
+
+    ```bash
+    kubectl -n istio-system patch telemetry asm-default --type=json -p='[{"op": "remove", "path": "/spec/tracing"}]'
     ```
 
 2. Edit the `Istio` resource and remove the `meshConfig.extensionProviders` entry named `otel`, or set `meshConfig.enableTracing` to `false`:
@@ -185,6 +191,13 @@ Before deleting the underlying components, remove the mesh-side tracing configur
     ```bash
     kubectl edit istio default
     ```
+
+    Alternatively, set `meshConfig.enableTracing` to `false` non-interactively with `kubectl patch`:
+
+    ```bash
+    kubectl patch istio default --type=merge -p='{"spec":{"values":{"meshConfig":{"enableTracing":false}}}}'
+    ```
+
 
 ### Deleting the OpenTelemetry Collector instance
 
