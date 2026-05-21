@@ -3,12 +3,12 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+: "${FRAMEWORK_ROOT:?该脚本需经 docs-runme-tests/run.sh 运行}"
 
-# 加载工具函数
-source "$REPO_ROOT/tests/util/common.sh"
-source "$REPO_ROOT/tests/util/verify.sh"
+# 加载框架函数库
+source "$FRAMEWORK_ROOT/framework/common.sh"
+source "$FRAMEWORK_ROOT/framework/verify.sh"
+source "$FRAMEWORK_ROOT/projects/mesh/project.sh"
 
 # runme 命令可以在项目的任意目录中执行
 
