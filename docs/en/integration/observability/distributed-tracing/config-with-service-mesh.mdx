@@ -62,6 +62,22 @@ The Jaeger v2 instance and the OpenTelemetry Collector are not service-mesh-spec
     1. The `service` field is the FQDN of the OpenTelemetry Collector Service. The default value targets the Collector deployed in the `jaeger-system` namespace as described in <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing.html#deploying-the-opentelemetry-collector" children="Deploying the OpenTelemetry Collector" />. Replace it with the actual Collector address if you deployed the Collector in a different namespace or with a different instance name.
   </Callouts>
 
+  To apply this configuration, patch the `Istio` resource:
+
+  ```bash {name=mesh-tracing:patch-istio}
+  kubectl patch istio default --type=merge -p '
+  spec:
+    values:
+      meshConfig:
+        enableTracing: true
+        extensionProviders:
+        - name: otel
+          opentelemetry:
+            port: 4317
+            service: otel-collector.jaeger-system.svc.cluster.local
+  '
+  ```
+
   ### Update the `Telemetry` resource to enable the tracing provider defined in the `meshConfig`:
 
   **Example Istio Telemetry resource**
@@ -79,6 +95,18 @@ The Jaeger v2 instance and the OpenTelemetry Collector are not service-mesh-spec
       - providers:
           - name: otel
         randomSamplingPercentage: 100
+  ```
+
+  To apply this configuration, patch the `Telemetry` resource:
+
+  ```bash {name=mesh-tracing:patch-telemetry}
+  kubectl -n istio-system patch telemetry asm-default --type=merge -p '
+  spec:
+    tracing:
+      - providers:
+          - name: otel
+        randomSamplingPercentage: 100
+  '
   ```
 
   :::note
