@@ -134,7 +134,7 @@ Before removing the underlying components, detach the mesh from the OpenTelemetr
 
     Alternatively, remove the `tracing` configuration non-interactively with `kubectl patch`:
 
-    ```bash
+    ```bash {name=mesh-tracing:remove-telemetry-tracing}
     kubectl -n istio-system patch telemetry asm-default --type=json -p='[{"op": "remove", "path": "/spec/tracing"}]'
     ```
 
@@ -146,7 +146,7 @@ Before removing the underlying components, detach the mesh from the OpenTelemetr
 
     Alternatively, set `meshConfig.enableTracing` to `false` non-interactively with `kubectl patch`:
 
-    ```bash
+    ```bash {name=mesh-tracing:disable-istio-tracing}
     kubectl patch istio default --type=merge -p='{"spec":{"values":{"meshConfig":{"enableTracing":false}}}}'
     ```
 
