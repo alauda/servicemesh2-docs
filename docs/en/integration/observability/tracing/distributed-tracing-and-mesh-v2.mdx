@@ -1,27 +1,12 @@
 ---
-weight: 25
+weight: 10
 ---
 
-# Distributed Tracing and Service Mesh
-
-## Building applications to support trace context propagation
-
-Although Istio proxies can automatically send spans, extra information is needed to join those spans into a single trace. Applications must propagate this information in HTTP headers, so that when proxies send spans, the backend can join them together into a single trace.
-
-To do this, each application must collect headers from each incoming request and forward the headers to all outgoing requests triggered by that incoming request. The choice of headers to forward depends on the configured trace backend. The following is a summary:
-
-All applications should forward the following headers:
-
-- `x-request-id`: an Envoy-specific header that is used to consistently sample logs and traces.
-- `traceparent` and `tracestate`: [W3C standard headers](https://www.w3.org/TR/trace-context/)
-
-For other observability tools, refer to their documentation.
-
-## Configuring distributed tracing platform with Service Mesh
+# Configuring distributed tracing platform with Service Mesh
 
 Alauda Service Mesh supports distributed tracing through integration with the following components:
 
-- **Alauda Build of Jaeger v2**: A customized distribution based on the open source [Jaeger](https://www.jaegertracing.io/) project (Jaeger 2.16.0). It provides end-to-end visibility into requests across complex distributed systems. In v2, the Jaeger instance is deployed as an `OpenTelemetryCollector` custom resource managed by the Alauda Build of OpenTelemetry v2 Operator.
+- **Alauda Build of Jaeger v2**: A customized distribution based on the open source [Jaeger](https://www.jaegertracing.io/) project. It provides end-to-end visibility into requests across complex distributed systems. In v2, the Jaeger instance is deployed as an `OpenTelemetryCollector` custom resource managed by the Alauda Build of OpenTelemetry v2 Operator.
 
 - **Alauda Build of OpenTelemetry v2**: Based on the [OpenTelemetry](https://opentelemetry.io/) project, this Operator manages the lifecycle of both the Jaeger v2 instance and the OpenTelemetry Collector that fronts it.
 
