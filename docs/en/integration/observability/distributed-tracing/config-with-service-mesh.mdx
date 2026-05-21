@@ -78,6 +78,10 @@ The Jaeger v2 instance and the OpenTelemetry Collector are not service-mesh-spec
   '
   ```
 
+  :::warning
+  This command uses a JSON merge patch, which replaces the entire `meshConfig.extensionProviders` array. If the `Istio` resource already defines other extension providers, they will be overwritten. To preserve them, edit the resource with `kubectl edit istio default` and append the `otel` entry by hand, or use a JSON Patch (`--type=json`) that appends to `/spec/values/meshConfig/extensionProviders/-`.
+  :::
+
   ### Update the `Telemetry` resource to enable the tracing provider defined in the `meshConfig`:
 
   **Example Istio Telemetry resource**
