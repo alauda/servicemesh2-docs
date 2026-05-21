@@ -421,11 +421,11 @@ This capability supports the analysis of request flow behavior, aiding in root c
          enabled: true  # [!code callout]
          provider: jaeger  # [!code callout]
          use_grpc: true
-         internal_url: "http://jaeger-prod-query.istio-system:16685/jaeger"  # [!code callout]
+         internal_url: "http://jaeger-collector.jaeger-system:16685/jaeger"  # [!code callout]
          # When external_url is not defined, disable_version_check should be set to true
          disable_version_check: true
          # (Optional) Public facing URL of Jaeger [!code callout]
-         # external_url: "<platform-url>/clusters/<cluster>/istio/jaeger"
+         # external_url: "<platform-url>/clusters/<cluster-name>/jaeger"
    ```
 
    <Callouts>
