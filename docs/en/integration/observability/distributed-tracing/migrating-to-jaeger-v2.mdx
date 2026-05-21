@@ -1,0 +1,118 @@
+---
+weight: 30
+---
+
+# Migrating to Jaeger v2
+
+This document describes how to migrate an existing Service Mesh distributed tracing stack — the legacy `Alauda Build of Jaeger` (Jaeger 1.60.0) plus `Alauda Build of OpenTelemetry` integration described in [Configuring distributed tracing platform with Service Mesh (Deprecated)](./config-with-service-mesh-deprecated.mdx) — to the current <ExternalSiteLink name="distributed-tracing" href="/" children="Alauda Distributed Tracing" /> integration based on `Jaeger v2` (2.16.0) plus `Alauda Build of OpenTelemetry v2`.
+
+After the migration:
+
+- New traces are ingested by the v2 OpenTelemetry Collector and stored in the new Jaeger v2 backend.
+- The legacy Jaeger instance is kept running for an observation window (default 7 days) so that previously stored traces remain queryable through the legacy Jaeger UI, then it is removed.
+
+For background, comparison tables, dual-export options, and rollback paths, refer to the underlying <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html" children="Migrating from Alauda Container Platform Tracing" /> guide; this Service Mesh document focuses on the steps that differ for a Service Mesh deployment.
+
+:::warning Tracing outage during migration
+Trace ingestion is interrupted between the time the legacy `OpenTelemetryCollector` is deleted and the time the `Istio` resource is patched to point at the new OpenTelemetry Collector. Application traffic is not affected, but spans generated during that window are dropped. Plan the migration during a low-traffic window and notify telemetry consumers in advance.
+:::
+
+## Prerequisites
+
+- An active `kubectl` session by a cluster administrator with the `cluster-admin` role.
+- The legacy Service Mesh tracing stack described in [Configuring distributed tracing platform with Service Mesh (Deprecated)](./config-with-service-mesh-deprecated.mdx) is currently installed — that is, an `OpenTelemetryCollector` named `otel` and a `Jaeger` instance named `jaeger-prod` are both running in the `istio-system` namespace, and the `Istio` resource defines an `otel` extension provider that targets `otel-collector.istio-system.svc.cluster.local`.
+- Telemetry consumers (developers, Kiali users, SRE dashboards) and application owners have been notified of the planned outage window.
+
+## Migration procedure
+
+<Steps>
+
+### Uninstall the legacy OpenTelemetry Collector and Operator
+
+The v1 and v2 `Alauda Build of OpenTelemetry` Operators share the same CRDs, so the v1 Operator must be removed before the v2 Operator is installed. The legacy `Alauda Build of Jaeger` Operator owns a separate CRD (`jaegertracing.io/v1.Jaeger`) and is left running so that the legacy Jaeger continues to serve historical traces during the observation window.
+
+1. Delete the legacy `OpenTelemetryCollector` instance in the `istio-system` namespace:
+
+    ```bash
+    kubectl -n istio-system delete opentelemetrycollector otel
+    ```
+
+2. Uninstall the `Alauda Build of OpenTelemetry` Operator from the **Administrator** view in the web console. Skip this step if other workloads in the cluster still rely on it.
+
+    - From **Marketplace** → **OperatorHub** → use the **search box** to search for `Alauda build of OpenTelemetry`.
+    - Click on the **Alauda build of OpenTelemetry** title to enter its details.
+    - On the **Alauda build of OpenTelemetry** details page, click the **Uninstall** button in the upper right corner.
+    - In the **Uninstall "opentelemetry-operator"?** window, click **Uninstall**.
+
+For background on why the v1 Operator must be removed before the v2 Operator is installed, and on the resulting outage characteristics, see <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#migrate-alauda-build-of-opentelemetry-to-v2" children="Migrate Alauda Build of OpenTelemetry to v2" /> in the Alauda Distributed Tracing migration guide.
+
+### Deploy the new distributed tracing stack
+
+Complete the **Prerequisites** section of [Configuring distributed tracing platform with Service Mesh](./config-with-service-mesh.mdx) to bring up the v2 stack:
+
+- Install the `Alauda Build of OpenTelemetry v2` Operator.
+- Deploy a new `Jaeger v2` instance (defaulted to the `jaeger-system` namespace).
+- Deploy the v2 OpenTelemetry Collector (defaulted to the `jaeger-system` namespace).
+
+The v2 stack is namespace-isolated from the legacy `jaeger-prod` Jaeger in `istio-system`, so the two can coexist for the duration of the observation window.
+
+:::note
+Stop after the **Prerequisites** of [Configuring distributed tracing platform with Service Mesh](./config-with-service-mesh.mdx) are satisfied. The mesh-side configuration (the `Istio` and `Telemetry` resources) is already in place from the legacy installation and is updated by the patch in the next step — do not follow the **Procedure** section of that document during the migration.
+:::
+
+### Repoint the Istio extension provider at the new OpenTelemetry Collector
+
+Patch the `Istio` resource so that the `otel` extension provider targets the new v2 OpenTelemetry Collector in the `jaeger-system` namespace instead of the deleted legacy Collector in `istio-system`:
+
+```bash
+kubectl patch istio default --type=merge -p '
+spec:
+  values:
+    meshConfig:
+      enableTracing: true
+      extensionProviders:
+      - name: otel
+        opentelemetry:
+          port: 4317
+          service: otel-collector.jaeger-system.svc.cluster.local
+'
+```
+
+:::warning
+This command uses a JSON merge patch, which replaces the entire `meshConfig.extensionProviders` array. If the `Istio` resource defines other extension providers, edit the resource interactively with `kubectl edit istio default` or use a JSON Patch (`--type=json`) that appends to `/spec/values/meshConfig/extensionProviders/-` so they are preserved.
+:::
+
+Once the patch is applied and the Istio control plane reconciles, sidecars send spans to the new OpenTelemetry Collector and new traces appear in the Jaeger v2 UI. The `Telemetry` resource does not need to be changed because it already references the provider by name (`otel`).
+
+### (After ≥ 7 days) Uninstall the legacy Jaeger instance and Operator
+
+:::tip Wait for the legacy retention window to elapse
+The legacy Jaeger keeps serving traces produced *before* the cutover for as long as the legacy `jaeger-es-index-cleaner` retains them — by default 7 days from each index's creation date. Keep the legacy Jaeger running for at least 7 days after the cutover so that users can still search recent historical traces in the legacy UI at `<platform-url>/clusters/<cluster>/istio/jaeger`. Once the legacy retention has aged out, proceed with the cleanup below.
+
+Pre-cutover traces are not migrated into the new Jaeger v2 backend; once the legacy Jaeger is deleted, those traces are no longer recoverable. See <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#trace-data-continuity-strategy" children="Trace data continuity strategy" /> for the data-continuity model.
+:::
+
+1. Delete the legacy `Jaeger` instance and its supporting resources in the `istio-system` namespace. The resource names below match the defaults produced by `install-jaeger.sh` with `--target-namespace='istio-system'`; adjust them if you used a different `--jaeger-instance-name` during the original installation.
+
+    ```bash
+    kubectl -n istio-system delete ingress      jaeger-prod-query         --ignore-not-found
+    kubectl -n istio-system delete podmonitor   jaeger-prod-monitor       --ignore-not-found
+    kubectl -n istio-system delete jaeger       jaeger-prod               --ignore-not-found
+    kubectl -n istio-system delete rolebinding  jaeger-prod-rb            --ignore-not-found
+    kubectl -n istio-system delete role         jaeger-prod-role          --ignore-not-found
+    kubectl -n istio-system delete sa           jaeger-prod-sa            --ignore-not-found
+    kubectl -n istio-system delete secret       jaeger-prod-oauth2-proxy  --ignore-not-found
+    kubectl -n istio-system delete secret       jaeger-prod-es-basic-auth --ignore-not-found
+    kubectl -n istio-system delete configmap    jaeger-prod-oauth2-proxy  --ignore-not-found
+    ```
+
+2. Uninstall the `Alauda build of Jaeger` Operator from the **Administrator** view in the web console. Skip this step if other workloads in the cluster still rely on it.
+
+    - From **Marketplace** → **OperatorHub** → use the **search box** to search for `Alauda build of Jaeger`.
+    - Click on the **Alauda build of Jaeger** title to enter its details.
+    - On the **Alauda build of Jaeger** details page, click the **Uninstall** button in the upper right corner.
+    - In the **Uninstall "jaeger-operator"?** window, click **Uninstall**.
+
+For optional follow-up tasks — cleaning up leftover legacy Elasticsearch indices that the deleted `jaeger-es-index-cleaner` no longer rotates — see <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#disable-the-legacy-feature-switch-and-clean-up-legacy-indices" children="Disable the legacy feature switch and clean up legacy indices" /> in the Alauda Distributed Tracing migration guide.
+
+</Steps>

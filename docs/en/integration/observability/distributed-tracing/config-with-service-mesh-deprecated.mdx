@@ -8,10 +8,7 @@ weight: 20
 
 The `Alauda build of Jaeger` (Jaeger 1.60.0) and `Alauda Build of OpenTelemetry` integration described in this document is deprecated and will be removed in ACP 4.4. Use the new <ExternalSiteLink name="distributed-tracing" href="/" children="Alauda Distributed Tracing" /> integration documented in [Configuring distributed tracing platform with Service Mesh](./config-with-service-mesh.mdx) for all new deployments.
 
-Choose the migration path that matches your operational needs:
-
-- **You do not need to query historical trace data.** Uninstall the legacy `Alauda Build of OpenTelemetry` and `Alauda build of Jaeger` components by following [Uninstalling distributed tracing](#uninstalling-distributed-tracing) below, then deploy the new stack as described in [Configuring distributed tracing platform with Service Mesh](./config-with-service-mesh.mdx).
-- **You need to keep historical trace data searchable.** Follow <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html" children="Migrating from Alauda Container Platform Tracing" /> in the Alauda Distributed Tracing documentation. The migration performs an in-place dual-export so historical traces remain reachable during the observation window.
+To migrate an existing installation to the new stack, follow [Migrating to Jaeger v2](./migrating-to-jaeger-v2.mdx).
 
 :::
 
