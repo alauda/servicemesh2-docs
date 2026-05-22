@@ -124,10 +124,99 @@ test_kiali() {
         return 1
     }
 
-    # 组合 Kiali 访问地址
+    # 输出 Kiali 访问地址
     log_info "Kiali 访问地址: $PLATFORM_URL/clusters/$CLUSTER_NAME/kiali"
 
     log_success "Kiali 配置测试完成"
+
+    # ==========================================================================
+    # 调用链集成配置（仅在 jaeger-system/jaeger-collector svc 存在时执行）
+    # ==========================================================================
+    log_info "=========================================="
+    log_info "检查是否启用 Kiali 调用链集成"
+    log_info "=========================================="
+
+    if ! kubectl -n jaeger-system get svc jaeger-collector >/dev/null 2>&1; then
+        log_warn "未检测到 jaeger-system/jaeger-collector，跳过 Kiali 调用链集成测试"
+        log_success "=========================================="
+        log_success "Kiali 文档测试完成（未启用调用链集成）"
+        log_success "=========================================="
+        return 0
+    fi
+    log_info "检测到 jaeger-collector svc，继续执行调用链集成测试"
+
+    # 步骤 8: 计算 external_url
+    # 沿用 install-tracing:set-jaeger-defaults 中的 JAEGER_BASEPATH 约定：
+    #   JAEGER_BASEPATH="/clusters/${CLUSTER_NAME}/jaeger"
+    local jaeger_basepath="/clusters/${CLUSTER_NAME}/jaeger"
+    local external_url="${PLATFORM_URL}${jaeger_basepath}"
+    log_info "步骤 8: external_url = $external_url"
+
+    # 步骤 9: 获取调用链集成 YAML 模板
+    log_info "步骤 9: 获取 config-kiali:tracing-yaml 模板"
+    runme print config-kiali:tracing-yaml > /tmp/kiali_cr.yaml || {
+        log_error "获取 tracing-yaml 模板失败"
+        return 1
+    }
+
+    # 步骤 10: 改写 YAML
+    #   - disable_version_check: true -> false（启用 external_url 后允许版本探测）
+    #   - 将注释行 `# external_url: "<platform-url>/clusters/<cluster-name>/jaeger"`
+    #     替换为实际可用的 `external_url: "${PLATFORM_URL}${JAEGER_BASEPATH}"` 值
+    # 使用 "sed > tmp && mv" 模式替代 `sed -i`，兼容 GNU sed (Linux) 与 BSD sed (macOS)：
+    # 后者 -i 必须显式带备份扩展名参数，与 GNU 不一致；改用 POSIX 重定向写法可在两端通用。
+    log_info "步骤 10: 改写 disable_version_check / external_url"
+    if ! sed \
+            -e 's/disable_version_check: true/disable_version_check: false/' \
+            -e "s|# external_url: \"<platform-url>/clusters/<cluster-name>/jaeger\"|external_url: \"${external_url}\"|" \
+            /tmp/kiali_cr.yaml > /tmp/kiali_cr.yaml.new; then
+        rm -f /tmp/kiali_cr.yaml.new
+        log_error "改写 disable_version_check / external_url 失败"
+        return 1
+    fi
+    mv /tmp/kiali_cr.yaml.new /tmp/kiali_cr.yaml
+
+    # 校验 sed 改写结果
+    if ! grep -q "disable_version_check: false" /tmp/kiali_cr.yaml; then
+        log_error "disable_version_check 未改写为 false"
+        cat /tmp/kiali_cr.yaml
+        return 1
+    fi
+    if ! grep -qE "^[[:space:]]*external_url:" /tmp/kiali_cr.yaml; then
+        log_error "external_url 注释未被放开"
+        cat /tmp/kiali_cr.yaml
+        return 1
+    fi
+    log_success "kiali_cr.yaml 改写完成"
+
+    # 步骤 11: 在 /tmp 下应用 patch（命令使用 `cat kiali_cr.yaml` 相对路径）
+    log_info "步骤 11: 应用 Kiali 调用链集成 patch"
+    local patch_cmd patch_output expected_patch
+    patch_cmd=$(runme print config-kiali:apply-tracing-patch)
+    patch_output=$(cd /tmp && eval "$patch_cmd" 2>&1) || {
+        log_error "应用调用链集成 patch 失败: $patch_output"
+        return 1
+    }
+
+    expected_patch=$(runme print config-kiali:apply-tracing-patch-output)
+    if ! __cmp_contains "$patch_output" "$expected_patch"; then
+        log_error "调用链集成 patch 输出验证失败"
+        log_error "期待包含: $expected_patch"
+        log_error "实际输出: $patch_output"
+        return 1
+    fi
+
+    log_info "等待 Kiali CR 就绪"
+    kubectl -nistio-system wait --for=condition=Successful kiali/kiali --timeout=3m || {
+        log_warn "等待 Kiali CR 就绪超时，继续执行..."
+    }
+    log_info "等待 Kiali Deployment 就绪"
+    _wait_for_deployment istio-system kiali || {
+        log_error "等待 Kiali Deployment 就绪超时"
+        return 1
+    }
+
+    log_success "Kiali 调用链集成配置完成"
 
     log_success "=========================================="
     log_success "Kiali 文档测试完成，所有验证通过！"
