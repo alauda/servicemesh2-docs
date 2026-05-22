@@ -163,15 +163,18 @@ test_kiali() {
     #   - disable_version_check: true -> false（启用 external_url 后允许版本探测）
     #   - 将注释行 `# external_url: "<platform-url>/clusters/<cluster-name>/jaeger"`
     #     替换为实际可用的 `external_url: "${PLATFORM_URL}${JAEGER_BASEPATH}"` 值
+    # 使用 "sed > tmp && mv" 模式替代 `sed -i`，兼容 GNU sed (Linux) 与 BSD sed (macOS)：
+    # 后者 -i 必须显式带备份扩展名参数，与 GNU 不一致；改用 POSIX 重定向写法可在两端通用。
     log_info "步骤 10: 改写 disable_version_check / external_url"
-    sed -i 's/disable_version_check: true/disable_version_check: false/' /tmp/kiali_cr.yaml || {
-        log_error "改写 disable_version_check 失败"
+    if ! sed \
+            -e 's/disable_version_check: true/disable_version_check: false/' \
+            -e "s|# external_url: \"<platform-url>/clusters/<cluster-name>/jaeger\"|external_url: \"${external_url}\"|" \
+            /tmp/kiali_cr.yaml > /tmp/kiali_cr.yaml.new; then
+        rm -f /tmp/kiali_cr.yaml.new
+        log_error "改写 disable_version_check / external_url 失败"
         return 1
-    }
-    sed -i "s|# external_url: \"<platform-url>/clusters/<cluster-name>/jaeger\"|external_url: \"${external_url}\"|" /tmp/kiali_cr.yaml || {
-        log_error "改写 external_url 失败"
-        return 1
-    }
+    fi
+    mv /tmp/kiali_cr.yaml.new /tmp/kiali_cr.yaml
 
     # 校验 sed 改写结果
     if ! grep -q "disable_version_check: false" /tmp/kiali_cr.yaml; then
