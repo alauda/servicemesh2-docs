@@ -67,7 +67,7 @@ cleanup_config_with_service_mesh() {
 
     # 步骤 2: 在 Istio 中关闭 enableTracing
     log_info "步骤 2: 关闭 Istio enableTracing"
-    output=$(runme run mesh-tracing:disable-istio-tracing 2>&1) || {
+    output=$(runme run mesh-tracing:disable-istio-tracing-config 2>&1) || {
         log_warn "关闭 Istio enableTracing 失败: $output"
     }
 
