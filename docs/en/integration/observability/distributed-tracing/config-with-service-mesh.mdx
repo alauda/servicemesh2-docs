@@ -64,7 +64,7 @@ The Jaeger v2 instance and the OpenTelemetry Collector are not service-mesh-spec
 
   To apply this configuration, patch the `Istio` resource:
 
-  ```bash {name=mesh-tracing:patch-istio}
+  ```bash {name=mesh-tracing:patch-istio-config}
   kubectl patch istio default --type=merge -p '
   spec:
     values:
@@ -103,7 +103,7 @@ The Jaeger v2 instance and the OpenTelemetry Collector are not service-mesh-spec
 
   To apply this configuration, patch the `Telemetry` resource:
 
-  ```bash {name=mesh-tracing:patch-telemetry}
+  ```bash {name=mesh-tracing:patch-telemetry-config}
   kubectl -n istio-system patch telemetry asm-default --type=merge -p '
   spec:
     tracing:
@@ -134,7 +134,7 @@ Before removing the underlying components, detach the mesh from the OpenTelemetr
 
     Alternatively, remove the `tracing` configuration non-interactively with `kubectl patch`:
 
-    ```bash {name=mesh-tracing:remove-telemetry-tracing}
+    ```bash {name=mesh-tracing:remove-telemetry-tracing-config}
     kubectl -n istio-system patch telemetry asm-default --type=json -p='[{"op": "remove", "path": "/spec/tracing"}]'
     ```
 
@@ -146,7 +146,7 @@ Before removing the underlying components, detach the mesh from the OpenTelemetr
 
     Alternatively, set `meshConfig.enableTracing` to `false` non-interactively with `kubectl patch`:
 
-    ```bash {name=mesh-tracing:disable-istio-tracing}
+    ```bash {name=mesh-tracing:disable-istio-tracing-config}
     kubectl patch istio default --type=merge -p='{"spec":{"values":{"meshConfig":{"enableTracing":false}}}}'
     ```
 

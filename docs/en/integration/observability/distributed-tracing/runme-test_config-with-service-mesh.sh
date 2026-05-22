@@ -23,7 +23,7 @@ test_config_with_service_mesh() {
     # 步骤 1: Patch Istio resource，启用 tracing 并配置 OpenTelemetry extensionProvider
     log_info "步骤 1: Patch Istio 启用 tracing 与 otel extensionProvider"
     local output
-    output=$(runme run mesh-tracing:patch-istio 2>&1) || {
+    output=$(runme run mesh-tracing:patch-istio-config 2>&1) || {
         log_error "Patch Istio 失败"
         log_error "输出: $output"
         return 1
@@ -36,7 +36,7 @@ test_config_with_service_mesh() {
 
     # 步骤 2: Patch Telemetry asm-default，启用 otel provider
     log_info "步骤 2: Patch Telemetry asm-default 启用 otel provider"
-    output=$(runme run mesh-tracing:patch-telemetry 2>&1) || {
+    output=$(runme run mesh-tracing:patch-telemetry-config 2>&1) || {
         log_error "Patch Telemetry 失败"
         log_error "输出: $output"
         return 1
@@ -61,7 +61,7 @@ cleanup_config_with_service_mesh() {
     # 步骤 1: 移除 Telemetry asm-default 的 tracing 配置
     log_info "步骤 1: 移除 Telemetry asm-default tracing 配置"
     local output
-    output=$(runme run mesh-tracing:remove-telemetry-tracing 2>&1) || {
+    output=$(runme run mesh-tracing:remove-telemetry-tracing-config 2>&1) || {
         log_warn "移除 Telemetry tracing 失败（可能已被移除）: $output"
     }
 
