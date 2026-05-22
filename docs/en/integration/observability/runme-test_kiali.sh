@@ -124,7 +124,7 @@ test_kiali() {
         return 1
     }
 
-    # 组合 Kiali 访问地址
+    # 输出 Kiali 访问地址
     log_info "Kiali 访问地址: $PLATFORM_URL/clusters/$CLUSTER_NAME/kiali"
 
     log_success "Kiali 配置测试完成"
@@ -205,6 +205,17 @@ test_kiali() {
         log_error "实际输出: $patch_output"
         return 1
     fi
+
+    log_info "等待 Kiali CR 就绪"
+    kubectl -nistio-system wait --for=condition=Successful kiali/kiali --timeout=3m || {
+        log_warn "等待 Kiali CR 就绪超时，继续执行..."
+    }
+    log_info "等待 Kiali Deployment 就绪"
+    _wait_for_deployment istio-system kiali || {
+        log_error "等待 Kiali Deployment 就绪超时"
+        return 1
+    }
+
     log_success "Kiali 调用链集成配置完成"
 
     log_success "=========================================="
