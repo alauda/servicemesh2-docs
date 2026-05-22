@@ -32,6 +32,10 @@ test_istio_cni() {
         log_error "等待 IstioCNI DaemonSet 就绪失败"
         return 1
     }
+    _wait_for_daemonset istio-cni istio-cni-node || {
+        log_error "等待 istio-cni-node DaemonSet rollout 失败"
+        return 1
+    }
 
     # 3. 验证 IstioCNI 状态（输出包含动态 AGE 值，使用 __cmp_lines 验证关键字段）
     log_info "步骤 3: 验证 IstioCNI 状态"
