@@ -14,6 +14,14 @@ You can use the following field to manage version updates:
 
 To update the CNI plugin, modify the `spec.version` field with the target version. The `IstioCNI` resource also includes a `values` field that exposes configuration options from the `istio-cni` chart.
 
+When the mesh operates in ambient mode, the Istio CNI component is responsible for traffic redirection. If you upgrade by using the `RevisionBased` strategy, the same CNI component stays compatible with the previous control plane version and keeps redirecting traffic for both the existing and the newly deployed control planes for the duration of the migration.
+
+:::note
+The Istio CNI supports a control plane that runs either the same minor version or a minor version that is one release ahead.
+:::
+
+Once you finish upgrading the Istio control plane, proceed to upgrade the Istio CNI component. The Alauda Service Mesh v2 Operator rolls out the new CNI plugin version to replace the previous deployment. Pods in the `istio-cni-node` DaemonSet are then refreshed through a rolling update, which keeps traffic redirection rules in effect for the entire upgrade window.
+
 ## Updating the Istio CNI resource version
 
 You can update the Istio CNI resource version by changing the version in the resource. Then, the Service Mesh v2 Operator deploys a new version of the CNI plugin that replaces the old version of the CNI plugin. The `istio-cni-node` pods automatically reconnect to the new CNI plugin.
@@ -23,6 +31,7 @@ You can update the Istio CNI resource version by changing the version in the res
 - You are logged in to the Alauda Container Platform web console as **cluster-admin**.
 - You have installed the Alauda Service Mesh v2 Operator, and deployed Istio.
 - You have installed the Istio CNI plugin with the desired version. In this example, the `IstioCNI` resource named `default` is deployed in the `istio-cni` namespace.
+- Depending on the chosen update strategy, you have already prepared the control plane: for the `InPlace` strategy, the Istio control plane has been upgraded to the target version; for the `RevisionBased` strategy, a new control plane revision has been created.
 
 **Procedure**
 
@@ -32,7 +41,13 @@ You can update the Istio CNI resource version by changing the version in the res
    kubectl patch istiocni default --type='merge' -p '{"spec":{"version":"v1.28.6"}}'
    ```
 
-2. Confirm that the new version of the CNI plugin is ready by running the following command:
+2. After the patch is applied, wait until the `IstioCNI` DaemonSet reports the `Ready` condition by running the following command:
+
+   ```bash
+   kubectl wait --for=condition=Ready istiocnis/default --timeout=5m
+   ```
+
+3. Confirm that the new version of the CNI plugin is ready by running the following command:
 
    ```bash
    kubectl get istiocni default
@@ -44,3 +59,24 @@ You can update the Istio CNI resource version by changing the version in the res
    NAME      NAMESPACE   PROFILE   READY   STATUS    VERSION   AGE
    default   istio-cni             True    Healthy   v1.28.6   30m
    ```
+
+4. Inspect the resulting CNI pods by running the following command:
+
+   ```bash
+   kubectl get pods -n istio-cni
+   ```
+
+   **Example Output**
+
+   ```
+   NAME                   READY   STATUS    RESTARTS   AGE
+   istio-cni-node-abc12   1/1     Running   0          3m
+   istio-cni-node-def34   1/1     Running   0          3m
+   istio-cni-node-ghi56   1/1     Running   0          3m
+   ```
+
+   <Directive type="note">
+
+   If you adopt the `RevisionBased` strategy, the Istio CNI component can interoperate with several control plane versions at once. The component keeps handling traffic redirection for both the previous and the newly deployed control planes during the migration. Compatibility holds when the control plane runs at the same minor version as the CNI or at most one minor version above.
+
+   </Directive>
