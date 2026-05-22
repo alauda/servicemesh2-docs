@@ -37,38 +37,38 @@ You can update the Istio CNI resource version by changing the version in the res
 
 1. Change the version in the `Istio` resource. For example, to update to Istio `1.28.6`, set the spec.version field to `v1.28.6` by running the following command:
 
-   ```bash
+   ```bash {name=update-istio-cni:patch-version}
    kubectl patch istiocni default --type='merge' -p '{"spec":{"version":"v1.28.6"}}'
    ```
 
 2. After the patch is applied, wait until the `IstioCNI` DaemonSet reports the `Ready` condition by running the following command:
 
-   ```bash
+   ```bash {name=update-istio-cni:wait-ready}
    kubectl wait --for=condition=Ready istiocnis/default --timeout=5m
    ```
 
 3. Confirm that the new version of the CNI plugin is ready by running the following command:
 
-   ```bash
+   ```bash {name=update-istio-cni:get-istiocni}
    kubectl get istiocni default
    ```
 
    **Example Output**
 
-   ```bash
+   ```text {name=update-istio-cni:get-istiocni-output}
    NAME      NAMESPACE   PROFILE   READY   STATUS    VERSION   AGE
    default   istio-cni             True    Healthy   v1.28.6   30m
    ```
 
 4. Inspect the resulting CNI pods by running the following command:
 
-   ```bash
+   ```bash {name=update-istio-cni:get-pods}
    kubectl get pods -n istio-cni
    ```
 
    **Example Output**
 
-   ```bash
+   ```text {name=update-istio-cni:get-pods-output}
    NAME                   READY   STATUS    RESTARTS   AGE
    istio-cni-node-225z6   1/1     Running   0          2m
    istio-cni-node-97j9k   1/1     Running   0          2m
