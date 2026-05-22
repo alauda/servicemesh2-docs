@@ -18,6 +18,10 @@ test_uninstalling_alauda_build_of_kiali() {
     log_info "开始 Kiali 卸载测试 (CLI 方式)"
     log_info "=========================================="
 
+    if [ "${SKIP_OPERATOR_AND_CRDS:-false}" = "true" ]; then
+        log_info "启用轻量清理模式：跳过卸载 kiali-operator subscription 和 Kiali CRDs"
+    fi
+
     # 1. 获取 Kiali 资源名称
     log_info "步骤 1: 获取 Kiali 资源名称"
     local kiali_output
@@ -65,35 +69,41 @@ test_uninstalling_alauda_build_of_kiali() {
     fi
     log_success "删除 Kiali 资源成功"
 
-    # 3. 删除 kiali-operator subscription
-    log_info "步骤 3: 删除 kiali-operator subscription"
-    local delete_subscription_output
-    delete_subscription_output=$(runme run uninstall-kiali:delete-subscription 2>&1) || {
-        log_error "删除 subscription 失败"
-        log_error "输出: $delete_subscription_output"
-        return 1
-    }
+    # 3-4. (可选) 删除 kiali-operator subscription 与 Kiali CRDs
+    # 受 --skip-operator-and-crds 控制：传入时保留 Operator 与 CRDs 以便后续测试复用。
+    if [ "${SKIP_OPERATOR_AND_CRDS:-false}" = "true" ]; then
+        log_info "步骤 3-4: 跳过卸载 kiali-operator subscription 和删除 Kiali CRDs"
+    else
+        # 3. 删除 kiali-operator subscription
+        log_info "步骤 3: 删除 kiali-operator subscription"
+        local delete_subscription_output
+        delete_subscription_output=$(runme run uninstall-kiali:delete-subscription 2>&1) || {
+            log_error "删除 subscription 失败"
+            log_error "输出: $delete_subscription_output"
+            return 1
+        }
 
-    # 验证删除输出
-    local expected_subscription_output
-    expected_subscription_output=$(runme print uninstall-kiali:delete-subscription-output)
-    if ! __cmp_contains "$delete_subscription_output" "$expected_subscription_output"; then
-        log_error "删除 subscription 验证失败"
-        log_error "期待输出: $expected_subscription_output"
-        log_error "实际输出: $delete_subscription_output"
-        return 1
+        # 验证删除输出
+        local expected_subscription_output
+        expected_subscription_output=$(runme print uninstall-kiali:delete-subscription-output)
+        if ! __cmp_contains "$delete_subscription_output" "$expected_subscription_output"; then
+            log_error "删除 subscription 验证失败"
+            log_error "期待输出: $expected_subscription_output"
+            log_error "实际输出: $delete_subscription_output"
+            return 1
+        fi
+        log_success "删除 subscription 成功"
+
+        # 4. 删除 Kiali CRDs
+        log_info "步骤 4: 删除 Kiali CRDs"
+        local delete_crds_output
+        delete_crds_output=$(runme run uninstall-kiali:delete-crds 2>&1) || {
+            log_error "删除 Kiali CRDs 失败"
+            log_error "输出: $delete_crds_output"
+            return 1
+        }
+        log_success "删除 Kiali CRDs 成功"
     fi
-    log_success "删除 subscription 成功"
-
-    # 4. 删除 Kiali CRDs
-    log_info "步骤 4: 删除 Kiali CRDs"
-    local delete_crds_output
-    delete_crds_output=$(runme run uninstall-kiali:delete-crds 2>&1) || {
-        log_error "删除 Kiali CRDs 失败"
-        log_error "输出: $delete_crds_output"
-        return 1
-    }
-    log_success "删除 Kiali CRDs 成功"
 
     log_success "=========================================="
     log_success "Kiali 卸载测试完成，所有验证通过！"

@@ -1,23 +1,16 @@
 ---
-weight: 30
+weight: 20
 ---
 
-# Distributed Tracing and Service Mesh
+# Configuring distributed tracing platform with Service Mesh (Deprecated)
 
-## Building applications to support trace context propagation
+:::danger Deprecation Notice
 
-Although Istio proxies can automatically send spans, extra information is needed to join those spans into a single trace. Applications must propagate this information in HTTP headers, so that when proxies send spans, the backend can join them together into a single trace.
+The `Alauda build of Jaeger` (Jaeger 1.60.0) and `Alauda Build of OpenTelemetry` integration described in this document is deprecated and will be removed in ACP 4.4. Use the new <ExternalSiteLink name="distributed-tracing" href="/" children="Alauda Distributed Tracing" /> integration documented in [Configuring distributed tracing platform with Service Mesh](./config-with-service-mesh.mdx) for all new deployments.
 
-To do this, each application must collect headers from each incoming request and forward the headers to all outgoing requests triggered by that incoming request. The choice of headers to forward depends on the configured trace backend. The following is a summary:
+To migrate an existing installation to the new stack, follow [Migrating to Jaeger v2](./migrating-to-jaeger-v2.mdx).
 
-All applications should forward the following headers:
-
-- `x-request-id`: an Envoy-specific header that is used to consistently sample logs and traces.
-- `traceparent` and `tracestate`: [W3C standard headers](https://www.w3.org/TR/trace-context/)
-
-For other observability tools, refer to their documentation.
-
-## Configuring distributed tracing platform with Service Mesh
+:::
 
 Alauda Service Mesh supports distributed tracing through integration with the following components:
 
@@ -165,3 +158,90 @@ You can integrate Alauda Service Mesh with OpenTelemetry to instrument, generate
   Once you verify that you can see traces, lower the `randomSamplingPercentage` value to reduce the number of requests.
   :::
 </Steps>
+
+## Uninstalling distributed tracing \{#uninstalling-distributed-tracing}
+
+If you no longer need the `Alauda Build of OpenTelemetry` and `Alauda build of Jaeger` integration with Service Mesh, follow the steps below to remove them.
+
+:::warning
+After uninstalling, historical traces stored in Elasticsearch are no longer reachable from the Jaeger UI.
+:::
+
+### Removing the Service Mesh tracing configuration
+
+Before deleting the underlying components, remove the mesh-side tracing configuration so that Istio stops sending spans to the legacy collector.
+
+1. Edit the `Telemetry` resource and remove the `tracing` providers entry that references the `otel` provider:
+
+    ```bash
+    kubectl -n istio-system edit telemetry asm-default
+    ```
+
+    Alternatively, remove the `tracing` configuration non-interactively with `kubectl patch`:
+
+    ```bash
+    kubectl -n istio-system patch telemetry asm-default --type=json -p='[{"op": "remove", "path": "/spec/tracing"}]'
+    ```
+
+2. Edit the `Istio` resource and remove the `meshConfig.extensionProviders` entry named `otel`, or set `meshConfig.enableTracing` to `false`:
+
+    ```bash
+    kubectl edit istio default
+    ```
+
+    Alternatively, set `meshConfig.enableTracing` to `false` non-interactively with `kubectl patch`:
+
+    ```bash
+    kubectl patch istio default --type=merge -p='{"spec":{"values":{"meshConfig":{"enableTracing":false}}}}'
+    ```
+
+
+### Deleting the OpenTelemetry Collector instance
+
+Log in to the cluster where the integration is installed and delete the `OpenTelemetryCollector` instance:
+
+```bash
+kubectl -n istio-system delete opentelemetrycollector otel
+```
+
+### Uninstalling the Alauda Build of OpenTelemetry Operator
+
+Skip this step if other workloads in the cluster still rely on the `Alauda Build of OpenTelemetry` Operator.
+
+You can uninstall the Operator using the **Administrator** view in the Web Console.
+
+**Steps**
+
+- From **Marketplace** → **OperatorHub** → use the **search box** to search for `Alauda build of OpenTelemetry`.
+- Click on the **Alauda build of OpenTelemetry** title to enter its details.
+- On the **Alauda build of OpenTelemetry** details page, click the **Uninstall** button in the upper right corner.
+- In the **Uninstall "opentelemetry-operator"?** window, click **Uninstall**.
+
+### Deleting the Jaeger instance
+
+Log in to the cluster where the integration is installed and delete the `Jaeger` instance and its supporting resources. The resource names below match the defaults produced by `install-jaeger.sh` with `--target-namespace='istio-system'`; adjust them if you used a different `--jaeger-instance-name` during installation.
+
+```bash
+kubectl -n istio-system delete ingress      jaeger-prod-query         --ignore-not-found
+kubectl -n istio-system delete podmonitor   jaeger-prod-monitor       --ignore-not-found
+kubectl -n istio-system delete jaeger       jaeger-prod               --ignore-not-found
+kubectl -n istio-system delete rolebinding  jaeger-prod-rb            --ignore-not-found
+kubectl -n istio-system delete role         jaeger-prod-role          --ignore-not-found
+kubectl -n istio-system delete sa           jaeger-prod-sa            --ignore-not-found
+kubectl -n istio-system delete secret       jaeger-prod-oauth2-proxy  --ignore-not-found
+kubectl -n istio-system delete secret       jaeger-prod-es-basic-auth --ignore-not-found
+kubectl -n istio-system delete configmap    jaeger-prod-oauth2-proxy  --ignore-not-found
+```
+
+### Uninstalling the Alauda build of Jaeger Operator
+
+Skip this step if other workloads in the cluster still rely on the `Alauda build of Jaeger` Operator.
+
+You can uninstall the Operator using the **Administrator** view in the Web Console.
+
+**Steps**
+
+- From **Marketplace** → **OperatorHub** → use the **search box** to search for `Alauda build of Jaeger`.
+- Click on the **Alauda build of Jaeger** title to enter its details.
+- On the **Alauda build of Jaeger** details page, click the **Uninstall** button in the upper right corner.
+- In the **Uninstall "jaeger-operator"?** window, click **Uninstall**.
