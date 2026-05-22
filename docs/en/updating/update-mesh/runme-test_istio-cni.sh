@@ -24,6 +24,7 @@ test_istio_cni() {
         log_error "升级 IstioCNI 版本失败"
         return 1
     }
+    sleep 0.5
 
     # 2. 等待 IstioCNI DaemonSet Ready
     log_info "步骤 2: 等待 IstioCNI DaemonSet 就绪"
