@@ -16,14 +16,14 @@ You can use the following section to understand the update process. You can skip
 
 1. Create the `istio-cni` and `istio-system` namespace by running the following command:
 
-   ```bash
+   ```bash {name=update-revisionbased:create-namespaces}
    kubectl create ns istio-cni
    kubectl create ns istio-system
    ```
 
 2. Install the Istio CNI plugin with the desired version. The following example configuration creates an `IstioCNI` resource named default in the `istio-cni` namespace:
 
-   ```yaml
+   ```yaml {name=update-revisionbased:create-istio-cni}
    apiVersion: sailoperator.io/v1
    kind: IstioCNI
    metadata:
@@ -43,7 +43,7 @@ You can use the following section to understand the update process. You can skip
 
    **Example configuration**
 
-   ```yaml
+   ```yaml {name=update-revisionbased:create-istio}
    apiVersion: sailoperator.io/v1
    kind: Istio
    metadata:
@@ -57,13 +57,13 @@ You can use the following section to understand the update process. You can skip
 
 4. Get the `IstioRevision` name by running the following command:
 
-   ```bash
+   ```bash {name=update-revisionbased:get-istiorevision}
    kubectl get istiorevision -n istio-system
    ```
 
    **Example output**
 
-   ```
+   ```text {name=update-revisionbased:get-istiorevision-output}
    NAME              NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
    default-v1-26-3   istio-system             True    Healthy   False    v1.26.3   4m18s
    ```
@@ -71,52 +71,52 @@ You can use the following section to understand the update process. You can skip
    The `IstioRevision` name is in the format `<istio_resource_name>-<version>`.
 
 5. Set up the application workloads to execute in the cluster. For instance, you can deploy the `bookinfo` sample application into the `bookinfo` namespace.
-    
-    a. Generate the `bookinfo` namespace with the command below:
-        
-        ```shell
-        kubectl create ns bookinfo
-        ```
 
-    b. Apply a label to the `bookinfo` namespace to activate automatic sidecar injection. Use the following command:
-        
-        ```shell
-        # <revision_name> example: default-v1-26-3
-        kubectl label namespace bookinfo istio.io/rev=<revision_name>
-        ```
+   a. Generate the `bookinfo` namespace with the command below:
 
-    c. Deploy the `bookinfo` application pods into the `bookinfo` namespace by executing this command:
-        
-        ```shell
-        kubectl -n bookinfo apply -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
-        ```
+   ```shell {name=update-revisionbased:create-bookinfo-ns}
+   kubectl create ns bookinfo
+   ```
+
+   b. Apply a label to the `bookinfo` namespace to activate automatic sidecar injection. Use the following command:
+
+   ```shell {name=update-revisionbased:label-bookinfo-ns}
+   # <revision_name> example: default-v1-26-3
+   kubectl label namespace bookinfo istio.io/rev=<revision_name>
+   ```
+
+   c. Deploy the `bookinfo` application pods into the `bookinfo` namespace by executing this command:
+
+   ```shell {name=update-revisionbased:deploy-bookinfo}
+   kubectl -n bookinfo apply -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
+   ```
 
 6. Inspect the `Istio` resource using the following command:
-    
-    ```shell
-    kubectl get istio -n istio-system
-    ```
-    
-    **Example output**
-    
-    ```shell
-    NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
-    default   istio-system             1           1       1        default-v1-26-3   Healthy   v1.26.3   12m
-    ```
-    
-    The `IN USE` field shows `1` after you deploy the application.
+
+   ```shell {name=update-revisionbased:get-istio-install}
+   kubectl get istio -n istio-system
+   ```
+
+   **Example output**
+
+   ```text {name=update-revisionbased:get-istio-install-output}
+   NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
+   default   istio-system             1           1       1        default-v1-26-3   Healthy   v1.26.3   12m
+   ```
+
+   The `IN USE` field shows `1` after you deploy the application.
 
 7. Confirm that the proxy version matches the control plane version by running the following command:
 
-   ```bash
+   ```bash {name=update-revisionbased:verify-proxy-install}
    istioctl proxy-status
    ```
 
    The `VERSION` column should match the control plane version.
-   
+
    **Example output**
 
-   ```
+   ```text {name=update-revisionbased:verify-proxy-install-output}
    NAME                                        CLUSTER        CDS                LDS                EDS                RDS                ECDS        ISTIOD                                      VERSION
    details-v1-5c89dbb599-t2lg5.bookinfo        Kubernetes     SYNCED (1m25s)     SYNCED (1m25s)     SYNCED (1m25s)     SYNCED (1m25s)     IGNORED     istiod-default-v1-26-3-79c8fddcf7-4lgqh     1.26.3-asm-r0
    productpage-v1-f8fdd5649-5hrtj.bookinfo     Kubernetes     SYNCED (1m25s)     SYNCED (1m25s)     SYNCED (1m25s)     SYNCED (1m25s)     IGNORED     istiod-default-v1-26-3-79c8fddcf7-4lgqh     1.26.3-asm-r0
@@ -145,7 +145,7 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 
 1. Change the version in the `Istio` resource. For example, to update to Istio `1.28.6`, set the spec.version field to `v1.28.6` by running the following command:
 
-   ```bash
+   ```bash {name=update-revisionbased:patch-istio-version}
    kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.28.6"}}'
    ```
 
@@ -165,26 +165,26 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 
    a. Confirm that `Istio` resource is ready by running the following command:
 
-      ```bash
+      ```bash {name=update-revisionbased:get-istio-update}
       kubectl get istio
       ```
 
       **Example output**
 
-      ```
+      ```text {name=update-revisionbased:get-istio-update-output}
       NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
       default   istio-system             2           2       1        default-v1-28-6   Healthy   v1.28.6   14m
       ```
 
    b. Confirm that `IstioRevision` resource is ready by running the following command:
 
-      ```bash
+      ```bash {name=update-revisionbased:get-istiorevision-update}
       kubectl get istiorevision
       ```
 
       **Example output**
 
-      ```
+      ```text {name=update-revisionbased:get-istiorevision-update-output}
       NAME              NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
       default-v1-26-3   istio-system             True    Healthy   True     v1.26.3   15m
       default-v1-28-6   istio-system             True    Healthy   False    v1.28.6   61s
@@ -192,13 +192,13 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 
 3. Confirm that there are two control plane pods running, one for each revision by running the following command:
 
-   ```bash
+   ```bash {name=update-revisionbased:get-pods-update}
    kubectl get pods -n istio-system
    ```
 
    **Example output**
 
-   ```
+   ```text {name=update-revisionbased:get-pods-update-output}
    NAME                                      READY   STATUS    RESTARTS   AGE
    istiod-default-v1-26-3-79c8fddcf7-4lgqh   1/1     Running   0          16m
    istiod-default-v1-28-6-79b66bfb5f-fhvk9   1/1     Running   0          81s
@@ -206,13 +206,13 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 
 4. Confirm that the workload sidecars are still connected to the previous control plane by running the following command:
 
-   ```bash
+   ```bash {name=update-revisionbased:verify-proxy-old}
    istioctl proxy-status
    ```
 
    **Example output**
 
-   ```
+   ```text {name=update-revisionbased:verify-proxy-old-output}
    NAME                                        CLUSTER        CDS                LDS                EDS                RDS                ECDS        ISTIOD                                      VERSION
    details-v1-5c89dbb599-t2lg5.bookinfo        Kubernetes     SYNCED (3m23s)     SYNCED (3m23s)     SYNCED (3m22s)     SYNCED (3m23s)     IGNORED     istiod-default-v1-26-3-79c8fddcf7-4lgqh     1.26.3-asm-r0
    productpage-v1-f8fdd5649-5hrtj.bookinfo     Kubernetes     SYNCED (3m23s)     SYNCED (3m23s)     SYNCED (3m22s)     SYNCED (3m23s)     IGNORED     istiod-default-v1-26-3-79c8fddcf7-4lgqh     1.26.3-asm-r0
@@ -226,14 +226,14 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 
 5. Move the workloads to the new control plane by updating the `istio.io/rev` label on the application namespace or pods to the revision name. For example, update the label for the entire namespace by running the following command:
 
-   ```bash
+   ```bash {name=update-revisionbased:migrate-workloads}
    # <new_revision_name> example: default-v1-28-6
    kubectl label namespace bookinfo istio.io/rev=<new_revision_name> --overwrite
    ```
 
 6. Restart the application workloads so that the new version of the sidecar gets injected by running the following command:
 
-   ```bash
+   ```bash {name=update-revisionbased:restart-workloads}
    kubectl rollout restart deployment -n bookinfo
    ```
 
@@ -241,7 +241,7 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 
 1. Verify that the new version of the sidecar is running by entering the following command:
 
-   ```bash
+   ```bash {name=update-revisionbased:verify-proxy-new}
    istioctl proxy-status
    ```
 
@@ -251,22 +251,36 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 
    a. Verify that the old control plane has been deleted by running the following command:
 
-      ```bash
+      ```bash {name=update-revisionbased:verify-pods}
       kubectl get pods -n istio-system
       ```
 
    b. Verify that the `Istio` resource has been deleted by running the following command:
-      
-      ```bash
+
+      ```bash {name=update-revisionbased:verify-istio}
       kubectl get istio
       ```
 
    c. Verify that the `IstioRevision` resource has been deleted by running the following command:
-      
-      ```bash
+
+      ```bash {name=update-revisionbased:verify-istiorevision}
       kubectl get istiorevision
       ```
 
 The Alauda Service Mesh v2 Operator deletes the old `IstioRevision` resource and the associated control plane after the grace period defined in the `spec.updateStrategy.inactiveRevisionDeletionGracePeriodSeconds` field expires. The default grace period is `30` seconds.
 
 You can increase the grace period to allow sufficient time to test the new control plane before removing the previous revision. Set a higher value during canary upgrades to ensure workload stability before fully transitioning.
+
+## Removing RevisionBased update resources from a development environment
+
+After completing your verification and experimentation, you should remove the RevisionBased update configuration to clean up the development environment and release resources.
+
+**Procedure**
+
+Execute the following commands to remove all Istio components and the sample applications:
+
+```bash {name=update-revisionbased:cleanup}
+kubectl delete istio/default istiocni/default
+kubectl delete ns/bookinfo
+kubectl delete ns/istio-system ns/istio-cni
+```
