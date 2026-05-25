@@ -249,7 +249,11 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 
 2. Verify that the old control plane, `Istio`, and `IstioRevision` resources has been deleted.
 
-   a. Verify that the old control plane has beend deleted by running the following command:
+   a. Verify that the old control plane has been deleted by running the following command:
+
+      ```bash
+      kubectl get pods -n istio-system
+      ```
 
    b. Verify that the `Istio` resource has been deleted by running the following command:
       
