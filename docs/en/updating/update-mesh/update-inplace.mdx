@@ -25,6 +25,8 @@ spec:
 
 You can set this value while creating the resource or edit it later. If you edit the resource after creation, make the change before updating the Istio control plane.
 
+To minimize traffic disruption during an update, you can run the Istio control plane in High Availability (HA) mode, which requires some additional configuration in the `Istio` resource. For more information, see [Istio High Availability](../../installing/installing-service-mesh/istio-high-availability/index.mdx).
+
 ## Installing with InPlace update strategy
 
 You can install the Istio control plane, Istio CNI, and the Bookinfo demo application using the `InPlace` update strategy.
@@ -32,6 +34,8 @@ You can install the Istio control plane, Istio CNI, and the Bookinfo demo applic
 :::note
 You can use the following section to understand the update process. You can skip this installation if the cluster already includes an Istio deployment.
 :::
+
+With the `InPlace` strategy, the `IstioRevision` resource that the Alauda Service Mesh v2 Operator creates always has the same name as its parent `Istio` resource.
 
 ### Procedure
 
