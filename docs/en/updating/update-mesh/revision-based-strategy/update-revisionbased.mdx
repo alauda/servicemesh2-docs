@@ -24,6 +24,7 @@ You can use the following section to understand the update process. You can skip
 2. Install the Istio CNI plugin with the desired version. The following example configuration creates an `IstioCNI` resource named default in the `istio-cni` namespace:
 
    ```yaml {name=update-revisionbased:create-istio-cni}
+   cat <<EOF | kubectl apply -f -
    apiVersion: sailoperator.io/v1
    kind: IstioCNI
    metadata:
@@ -37,6 +38,7 @@ You can use the following section to understand the update process. You can skip
          excludeNamespaces:
            - istio-cni
            - kube-system
+   EOF
    ```
 
 3. Deploy the Istio control plane using the `RevisionBased` update strategy. The following example configuration creates an `Istio` resource named `default` in the `istio-system` namespace:
@@ -44,6 +46,7 @@ You can use the following section to understand the update process. You can skip
    **Example configuration**
 
    ```yaml {name=update-revisionbased:create-istio}
+   cat <<EOF | kubectl apply -f -
    apiVersion: sailoperator.io/v1
    kind: Istio
    metadata:
@@ -53,6 +56,7 @@ You can use the following section to understand the update process. You can skip
      version: v1.26.3
      updateStrategy:
        type: RevisionBased
+   EOF
    ```
 
 4. Get the `IstioRevision` name by running the following command:
@@ -109,7 +113,8 @@ You can use the following section to understand the update process. You can skip
 7. Confirm that the proxy version matches the control plane version by running the following command:
 
    ```bash {name=update-revisionbased:verify-proxy-install}
-   istioctl proxy-status
+   # <revision_name> example: default-v1-26-3
+   istioctl proxy-status --revision <revision_name>
    ```
 
    The `VERSION` column should match the control plane version.
@@ -207,7 +212,8 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 4. Confirm that the workload sidecars are still connected to the previous control plane by running the following command:
 
    ```bash {name=update-revisionbased:verify-proxy-old}
-   istioctl proxy-status
+   # <revision_name> example: default-v1-26-3
+   istioctl proxy-status --revision <revision_name>
    ```
 
    **Example output**
@@ -242,7 +248,8 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 1. Verify that the new version of the sidecar is running by entering the following command:
 
    ```bash {name=update-revisionbased:verify-proxy-new}
-   istioctl proxy-status
+   # <new_revision_name> example: default-v1-28-6
+   istioctl proxy-status --revision <new_revision_name>
    ```
 
    The `VERSION` column should match the new control plane version.

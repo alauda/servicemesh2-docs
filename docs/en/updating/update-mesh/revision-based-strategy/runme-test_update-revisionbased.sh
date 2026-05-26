@@ -15,7 +15,7 @@ test_update_revisionbased() {
     log_info "开始 RevisionBased 更新策略测试"
     log_info "=========================================="
 
-    local output REV NEW_REV i
+    local output REV NEW_REV i ps_cmd
 
     # ===== 安装 =====
 
@@ -69,7 +69,7 @@ EOF
 
     # 6. 创建 bookinfo 命名空间
     log_info "步骤 6: 创建 bookinfo 命名空间"
-    runme run update-revisionbased:create-bookinfo-ns || {
+    _create_namespace_safe update-revisionbased:create-bookinfo-ns "bookinfo" || {
         log_error "创建 bookinfo 命名空间失败"
         return 1
     }
@@ -118,7 +118,9 @@ EOF
 
     # 11. 验证 sidecar 代理版本与控制面一致（安装后）
     log_info "步骤 11: 验证 sidecar 代理状态（安装后）"
-    output=$(runme run update-revisionbased:verify-proxy-install 2>&1)
+    ps_cmd=$(runme print update-revisionbased:verify-proxy-install)
+    ps_cmd="${ps_cmd//<revision_name>/$REV}"
+    output=$(eval "$ps_cmd" 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
 + 1.26.3
 + details-v1
@@ -207,7 +209,9 @@ EOF
 
     # 17. 确认 sidecar 仍连接旧控制面
     log_info "步骤 17: 确认 sidecar 仍连接旧控制面"
-    output=$(runme run update-revisionbased:verify-proxy-old 2>&1)
+    ps_cmd=$(runme print update-revisionbased:verify-proxy-old)
+    ps_cmd="${ps_cmd//<revision_name>/$REV}"
+    output=$(eval "$ps_cmd" 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
 + 1.26.3
 + details-v1
@@ -255,7 +259,9 @@ EOF
 
     # 21. 验证 sidecar 已切换到新版本
     log_info "步骤 21: 验证 sidecar 已切换到新版本"
-    output=$(runme run update-revisionbased:verify-proxy-new 2>&1)
+    ps_cmd=$(runme print update-revisionbased:verify-proxy-new)
+    ps_cmd="${ps_cmd//<new_revision_name>/$NEW_REV}"
+    output=$(eval "$ps_cmd" 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
 + 1.28.6
 + details-v1
@@ -274,7 +280,7 @@ EOF
 
     # 22. 等待旧 revision 及其控制面被回收（grace period 默认 30s）
     log_info "步骤 22: 等待旧 revision ($REV) 被回收"
-    retry_command "! kubectl get istiorevision 2>/dev/null | grep -q '$REV'" 18 10 || {
+    retry_command "! kubectl get istiorevision 2>/dev/null | grep -q '$REV'" 20 5 || {
         log_error "旧 revision 未在预期时间内被回收"
         return 1
     }
