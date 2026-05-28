@@ -21,7 +21,7 @@ The Jaeger v2 instance and the OpenTelemetry Collector are not service-mesh-spec
 **Prerequisites**
 
 - The Alauda Build of OpenTelemetry v2 Operator is installed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing.html#installing-the-alauda-build-of-opentelemetry-v2-operator" children="Installing the Alauda Build of OpenTelemetry v2 Operator" />.
-- A Jaeger v2 instance is deployed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing.html#installing-alauda-build-of-jaeger-v2" children="Installing Alauda Build of Jaeger v2" />.
+- A Jaeger v2 instance is deployed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing.html#deploying-the-alauda-build-of-jaeger-v2" children="Deploying the Alauda Build of Jaeger v2" />.
   :::info
   The `JAEGER_ES_INDEX_PREFIX` variable referenced in the install procedure controls the prefix of the Elasticsearch indices that store trace data. The default value, `acp-${CLUSTER_NAME}`, works for a single-cluster deployment. For a service mesh deployment, choose the prefix according to the topology of the mesh:
 
