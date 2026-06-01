@@ -2,10 +2,9 @@ apiVersion: opentelemetry.io/v1alpha1
 kind: Instrumentation
 metadata:
   name: acp-common-java
-  namespace: jaeger-system
 spec:
   java:
-    image: registry.alauda.cn:60070/asm/autoinstrumentation-java:2.26.1
+    image: {{ include "mesh-v2-test-suite.image" (dict "ctx" . "name" "autoinstrumentation-java") }}
     env:
       - name: OTEL_JAVAAGENT_DEBUG
         value: "false"

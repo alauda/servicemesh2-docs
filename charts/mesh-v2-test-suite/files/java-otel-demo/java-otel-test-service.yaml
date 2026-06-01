@@ -1,5 +1,3 @@
-# (while true; do curl 'otel-demo-consumer-for-test:8081/proxy/get?url=http://otel-demo-provider-for-test:8080/hello?foo=bar'; echo; curl 'otel-demo-consumer-for-test:8081/proxy/get?url=http://otel-demo-provider-for-test:8080/hello?aaa=bbb'; echo; curl otel-demo-consumer-for-test:8081/get/503; echo; curl otel-demo-consumer-for-test:8081/get/418; echo; echo "---"; sleep 18.5; done;)&
-# (while true; do curl 'otel-demo-consumer-for-test:8081/proxy/get?url=http://otel-demo-provider-for-test:8080/delay/2000'; echo; echo "---"; sleep 17.5; done;)&
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,7 +22,7 @@ spec:
         service.cpaas.io/name: deployment-otel-demo-consumer-for-test
         app.kubernetes.io/name: consumer-demo
       annotations:
-        instrumentation.opentelemetry.io/inject-java: jaeger-system/acp-common-java
+        instrumentation.opentelemetry.io/inject-java: otelv2-java-demo/acp-common-java
     spec:
       affinity: {}
       containers:
@@ -35,7 +33,7 @@ spec:
           value: otel-demo-provider-for-test
         - name: JAVA_OPTS
           value: -XX:+PrintFlagsFinal -XX:MaxRAMPercentage=75.0
-        image: registry.alauda.cn:60070/asm/demo/otel-demo-consumer-java-for-test:v4.0.1
+        image: {{ include "mesh-v2-test-suite.image" (dict "ctx" . "name" "otel-demo-consumer-java-for-test") }}
         imagePullPolicy: IfNotPresent
         name: otel-demo-consumer-for-test
         ports:
@@ -109,7 +107,7 @@ spec:
         service.cpaas.io/name: deployment-otel-demo-provider-for-test
         app.kubernetes.io/name: provider-demo
       annotations:
-        instrumentation.opentelemetry.io/inject-java: jaeger-system/acp-common-java
+        instrumentation.opentelemetry.io/inject-java: otelv2-java-demo/acp-common-java
     spec:
       affinity: {}
       containers:
@@ -118,7 +116,7 @@ spec:
           value: /opt/java/openjdk-21
         - name: JAVA_OPTS
           value: -XX:+PrintFlagsFinal -XX:MaxRAMPercentage=75.0
-        image: registry.alauda.cn:60070/asm/demo/otel-demo-provider-java-for-test:v4.0.1
+        image: {{ include "mesh-v2-test-suite.image" (dict "ctx" . "name" "otel-demo-provider-java-for-test") }}
         imagePullPolicy: IfNotPresent
         name: otel-demo-provider-for-test
         ports:
@@ -196,8 +194,13 @@ spec:
       affinity: {}
       containers:
       - command:
-        - http-server
-        image: registry.alauda.cn:60070/asm/asm-test-image:latest
+        - sh
+        - -c
+        - |
+          (while true; do curl 'otel-demo-consumer-for-test:8081/proxy/get?url=http://otel-demo-provider-for-test:8080/hello?foo=bar'; echo; curl 'otel-demo-consumer-for-test:8081/proxy/get?url=http://otel-demo-provider-for-test:8080/hello?aaa=bbb'; echo; curl otel-demo-consumer-for-test:8081/get/503; echo; curl otel-demo-consumer-for-test:8081/get/418; echo; echo "---"; sleep 18.5; done;) &
+          (while true; do curl 'otel-demo-consumer-for-test:8081/proxy/get?url=http://otel-demo-provider-for-test:8080/delay/2000'; echo; echo "---"; sleep 17.5; done;) &
+          exec http-server
+        image: {{ include "mesh-v2-test-suite.image" (dict "ctx" . "name" "asm-test-image") }}
         imagePullPolicy: Always
         name: asm-test-image
         ports:
@@ -236,5 +239,3 @@ spec:
     service.cpaas.io/name: deployment-asm-client
   sessionAffinity: None
   type: ClusterIP
-
----
