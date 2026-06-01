@@ -70,7 +70,6 @@ kind: Service
 metadata:
   name: otel-demo-consumer-for-test
 spec:
-  externalTrafficPolicy: Cluster
   internalTrafficPolicy: Cluster
   ports:
   - appProtocol: http
