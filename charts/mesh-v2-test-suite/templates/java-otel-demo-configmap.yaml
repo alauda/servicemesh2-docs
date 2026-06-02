@@ -26,6 +26,15 @@ data:
     # 4. 在 Operations Center / Monitor / Dashboards 中创建自定义监控面板
     kubectl get cm {{ include "mesh-v2-test-suite.name" . }}-java-otel-demo -n {{ .Values.global.namespace }} -o jsonpath='{.data.otel-java-http-monitor-dashboard\.yaml}' | kubectl apply -f -
     kubectl get cm {{ include "mesh-v2-test-suite.name" . }}-java-otel-demo -n {{ .Values.global.namespace }} -o jsonpath='{.data.otel-java-jvm-monitor-dashboard\.yaml}' | kubectl apply -f -
+
+    卸载（清理上述资源，与部署顺序相反）：
+
+    # 1. 删除自定义监控面板
+    kubectl get cm {{ include "mesh-v2-test-suite.name" . }}-java-otel-demo -n {{ .Values.global.namespace }} -o jsonpath='{.data.otel-java-http-monitor-dashboard\.yaml}' | kubectl delete -f -
+    kubectl get cm {{ include "mesh-v2-test-suite.name" . }}-java-otel-demo -n {{ .Values.global.namespace }} -o jsonpath='{.data.otel-java-jvm-monitor-dashboard\.yaml}' | kubectl delete -f -
+
+    # 2. 删除示例命名空间（连同 Instrumentation 与所有工作负载一并清理）
+    kubectl delete ns otelv2-java-demo
   java-instrumentation.yaml: |
 {{ tpl (.Files.Get "files/java-otel-demo/java-instrumentation.yaml") . | indent 4 }}
   java-otel-test-service.yaml: |
