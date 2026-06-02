@@ -56,7 +56,7 @@ mesh-v2-test-suite/
 
 ## 如何打包与上架
 
-详细背景请参考根目录 [docs/plugin-build-guide.md](../docs/plugin-build-guide.md)。
+详细背景请参考在线文档 [plugin-build-guide.md](https://github.com/alauda/cluster-plugin/blob/main/docs/plugin-build-guide.md)。
 
 ### 1. 推送 chart 到 OCI 仓库
 
