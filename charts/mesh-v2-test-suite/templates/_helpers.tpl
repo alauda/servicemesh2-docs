@@ -23,3 +23,15 @@ registry 地址来自 .Values.global.registry.address，在 ACP 安装时由 plu
 {{- end -}}
 {{ $items | sortAlpha | join "\n" }}
 {{- end -}}
+
+{{/*
+通过镜像名（即 .Values.global.images 的 key）拼出该镜像在当前集群下的完整可拉取地址。
+registry 同样来自 .Values.global.registry.address，安装时会被 valuesTemplates 重写为
+平台内置镜像仓库，所以渲染结果就是用户可直接使用的最终镜像地址。
+用法：
+  image: {{ include "mesh-v2-test-suite.image" (dict "ctx" . "name" "asm-test-image") }}
+*/}}
+{{- define "mesh-v2-test-suite.image" -}}
+{{- $img := index .ctx.Values.global.images .name -}}
+{{- printf "%s/%s:%s" .ctx.Values.global.registry.address $img.repository $img.tag -}}
+{{- end -}}
