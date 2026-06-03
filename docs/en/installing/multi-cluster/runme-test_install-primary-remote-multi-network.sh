@@ -72,6 +72,9 @@ test_install_primary_remote_multi_network() {
     _setup_env || return 1
     _check_cacerts_prerequisite || return 1
 
+    # 创建外部 IP 地址池 (仅 ENABLE_METALLB=true 时生效): 东西向网关 LoadBalancer 依赖其可用地址
+    setup_external_ip_pools "$EAST_CLUSTER_NAME" "$WEST_CLUSTER_NAME" || return 1
+
     if [ -z "$WORK_DIR" ] || [ ! -d "$WORK_DIR" ]; then
         WORK_DIR=$(mktemp -d -t pr-mn-XXXXXX)
         log_info "工作目录: $WORK_DIR (用于 istio-external.yaml)"
@@ -283,6 +286,9 @@ cleanup_install_primary_remote_multi_network() {
         log_warn "West 卸载命令返回非零 (可能资源已不存在)"
         rc=1
     }
+
+    # 删除外部 IP 地址池 (仅 ENABLE_METALLB=true 时生效)
+    teardown_external_ip_pools "$EAST_CLUSTER_NAME" "$WEST_CLUSTER_NAME" || rc=1
 
     if [ -n "$WORK_DIR" ] && [ -d "$WORK_DIR" ]; then
         log_info "删除工作目录 $WORK_DIR"

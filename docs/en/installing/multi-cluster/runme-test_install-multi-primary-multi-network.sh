@@ -54,6 +54,9 @@ test_install_multi_primary_multi_network() {
     _setup_env || return 1
     _check_cacerts_prerequisite || return 1
 
+    # 创建外部 IP 地址池 (仅 ENABLE_METALLB=true 时生效): 东西向网关 LoadBalancer 依赖其可用地址
+    setup_external_ip_pools "$EAST_CLUSTER_NAME" "$WEST_CLUSTER_NAME" || return 1
+
     # ============================================================
     # Phase 1: 安装 Istio 多主多网络拓扑
     # ============================================================
@@ -249,6 +252,9 @@ cleanup_install_multi_primary_multi_network() {
         log_warn "West 卸载命令返回非零 (可能资源已不存在)"
         rc=1
     }
+
+    # 删除外部 IP 地址池 (仅 ENABLE_METALLB=true 时生效)
+    teardown_external_ip_pools "$EAST_CLUSTER_NAME" "$WEST_CLUSTER_NAME" || rc=1
 
     if [ "$rc" -eq 0 ]; then
         log_success "测试资源清理完成"
