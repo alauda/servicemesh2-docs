@@ -20,15 +20,15 @@ The Jaeger v2 instance and the OpenTelemetry Collector are not service-mesh-spec
 
 **Prerequisites**
 
-- The Alauda Build of OpenTelemetry v2 Operator is installed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing.html#installing-the-alauda-build-of-opentelemetry-v2-operator" children="Installing the Alauda Build of OpenTelemetry v2 Operator" />.
-- A Jaeger v2 instance is deployed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing.html#deploying-the-alauda-build-of-jaeger-v2" children="Deploying the Alauda Build of Jaeger v2" />.
+- The Alauda Build of OpenTelemetry v2 Operator is installed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-elasticsearch.html#installing-the-alauda-build-of-opentelemetry-v2-operator" children="Installing the Alauda Build of OpenTelemetry v2 Operator" />.
+- A Jaeger v2 instance is deployed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-elasticsearch.html#deploying-the-alauda-build-of-jaeger-v2" children="Deploying the Alauda Build of Jaeger v2 with Elasticsearch" /> or <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-opensearch.html#deploying-the-alauda-build-of-jaeger-v2" children="Deploying the Alauda Build of Jaeger v2 with OpenSearch" />.
   :::info
   The `JAEGER_ES_INDEX_PREFIX` variable referenced in the install procedure controls the prefix of the Elasticsearch indices that store trace data. The default value, `acp-${CLUSTER_NAME}`, works for a single-cluster deployment. For a service mesh deployment, choose the prefix according to the topology of the mesh:
 
   - For a single-cluster service mesh, we recommend ending the prefix with the cluster name, for example `acp-cluster-1`.
   - For a multi-cluster service mesh, traces from all clusters must be stored in the same index family; we recommend ending the prefix with the meshID, for example `acp-mesh-1`. Use the same `JAEGER_ES_INDEX_PREFIX` when running the install procedure on every cluster in the mesh so that the Jaeger UI can correlate spans across clusters.
   :::
-- An OpenTelemetry Collector is deployed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing.html#deploying-the-opentelemetry-collector" children="Deploying the OpenTelemetry Collector" />.
+- An OpenTelemetry Collector is deployed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-elasticsearch.html#deploying-the-opentelemetry-collector" children="Deploying the OpenTelemetry Collector" />.
 - An Istio instance is created.
 - An Istio CNI instance is created.
 
@@ -59,7 +59,7 @@ The Jaeger v2 instance and the OpenTelemetry Collector are not service-mesh-spec
   ```
 
   <Callouts>
-    1. The `service` field is the FQDN of the OpenTelemetry Collector Service. The default value targets the Collector deployed in the `jaeger-system` namespace as described in <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing.html#deploying-the-opentelemetry-collector" children="Deploying the OpenTelemetry Collector" />. Replace it with the actual Collector address if you deployed the Collector in a different namespace or with a different instance name.
+    1. The `service` field is the FQDN of the OpenTelemetry Collector Service. The default value targets the Collector deployed in the `jaeger-system` namespace as described in <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-elasticsearch.html#deploying-the-opentelemetry-collector" children="Deploying the OpenTelemetry Collector" />. Replace it with the actual Collector address if you deployed the Collector in a different namespace or with a different instance name.
   </Callouts>
 
   To apply this configuration, patch the `Istio` resource:
