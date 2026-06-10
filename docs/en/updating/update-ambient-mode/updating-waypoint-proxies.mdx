@@ -160,29 +160,3 @@ If you created the routing and authorization resources only for this verificatio
 kubectl delete -n bookinfo httproute reviews
 kubectl delete -n bookinfo authorizationpolicy productpage-waypoint
 ```
-
-## Verifying cross-namespace waypoint configuration
-
-If workloads use a waypoint that lives in a different namespace, make sure the waypoint labels are present and correct before you update, so that traffic keeps flowing through the waypoint afterwards. The following example checks the `bookinfo` namespace, which uses the waypoint `waypoint-common` from the `common-infrastructure` namespace; see [Waypoint proxies](../../installing/ambient-mode/waypoint-proxies.mdx) for the setup.
-
-**Procedure**
-
-1. Inspect the waypoint-related labels on the namespace:
-
-    ```bash
-    kubectl get ns bookinfo --show-labels | grep waypoint
-    ```
-
-2. If either label is missing or points to the wrong waypoint, re-apply them:
-
-    - Set the namespace where the waypoint resides:
-
-        ```bash
-        kubectl label ns bookinfo istio.io/use-waypoint-namespace=common-infrastructure --overwrite
-        ```
-
-    - Set the waypoint to use:
-
-        ```bash
-        kubectl label ns bookinfo istio.io/use-waypoint=waypoint-common --overwrite
-        ```

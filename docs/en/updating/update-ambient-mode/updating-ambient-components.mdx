@@ -34,7 +34,7 @@ This section exists so that you can walk through the update process from a known
     metadata:
       name: default
     spec:
-      version: v1.26.3 # [!code callout]
+      version: v1.28.3 # [!code callout]
       namespace: istio-cni
       profile: ambient
       values:
@@ -68,7 +68,7 @@ This section exists so that you can walk through the update process from a known
     metadata:
       name: default
     spec:
-      version: v1.26.3
+      version: v1.28.3
       namespace: istio-system
       profile: ambient
       updateStrategy:
@@ -102,7 +102,7 @@ This section exists so that you can walk through the update process from a known
     metadata:
       name: default
     spec:
-      version: v1.26.3 # [!code callout]
+      version: v1.28.3 # [!code callout]
       namespace: ztunnel
     EOF
     ```
@@ -115,6 +115,28 @@ This section exists so that you can walk through the update process from a known
 
     ```bash
     kubectl wait --for=condition=Ready ztunnel/default --timeout=3m
+    ```
+
+8. Set up the application workloads in the cluster. For instance, you can deploy the Bookinfo sample application into the `bookinfo` namespace. The following steps are a condensed version of [Deploying the Bookinfo application in ambient mode](../../installing/ambient-mode/deploying-ambient-bookinfo.mdx).
+
+    a. Create the `bookinfo` namespace and add the `istio-discovery=enabled` label so that the control plane discovers it:
+
+    ```shell
+    kubectl create namespace bookinfo
+    kubectl label namespace bookinfo istio-discovery=enabled
+    ```
+
+    b. Deploy the Bookinfo application together with its per-version services:
+
+    ```shell
+    kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
+    kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo-versions.yaml
+    ```
+
+    c. Enroll all workloads of the namespace in the ambient mesh:
+
+    ```shell
+    kubectl label namespace bookinfo istio.io/dataplane-mode=ambient
     ```
 
 ## Updating the components
@@ -220,11 +242,10 @@ Replacing a ZTunnel pod can reset long-lived TCP connections on that node. If yo
     kubectl wait --for=condition=Ready ztunnel/default --timeout=10m
     ```
 
-4. Confirm the new version and inspect the per-node pods:
+4. Confirm that the ZTunnel proxy reports the new version:
 
     ```bash
     kubectl get ztunnel default
-    kubectl get pods -n ztunnel -o wide
     ```
 
     **Example output**
@@ -232,7 +253,17 @@ Replacing a ZTunnel pod can reset long-lived TCP connections on that node. If yo
     ```text
     NAME      NAMESPACE   PROFILE   READY   STATUS    VERSION   AGE
     default   ztunnel     ambient   True    Healthy   v1.28.6   18m
+    ```
 
+5. Inspect the per-node ZTunnel pods:
+
+    ```bash
+    kubectl get pods -n ztunnel -o wide
+    ```
+
+    **Example output**
+
+    ```text
     NAME            READY   STATUS    RESTARTS   AGE     IP           NODE
     ztunnel-4xrhj   1/1     Running   0          2m11s   10.3.0.152   192.168.131.32
     ztunnel-9kt5n   1/1     Running   0          3m02s   10.3.1.78    192.168.131.33
