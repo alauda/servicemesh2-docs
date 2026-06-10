@@ -317,11 +317,13 @@ If you deployed waypoint proxies, additionally verify them as described in [Upda
 
 ## Removing update resources from a development environment
 
-After you finish verifying the update procedure in a development environment, remove the mesh components and their namespaces to release the resources:
+After you finish verifying the update procedure in a development environment, remove the sample application and the mesh components to release the resources:
 
 ```bash
+# Remove the Bookinfo namespace from the ambient data plane and delete it
+kubectl label namespace bookinfo istio.io/dataplane-mode-
+kubectl delete namespace bookinfo
+# Remove the mesh components and their namespaces
 kubectl delete istio/default istiocni/default ztunnel/default
 kubectl delete ns/istio-system ns/istio-cni ns/ztunnel
 ```
-
-To remove the Bookinfo application, follow the cleanup steps in [Deploying the Bookinfo application in ambient mode](../../installing/ambient-mode/deploying-ambient-bookinfo.mdx).
