@@ -24,21 +24,24 @@ test_istio_cni() {
         log_error "升级 IstioCNI 版本失败"
         return 1
     }
-    sleep 0.5
+    sleep 5  # 等待 operator 改写 DaemonSet 模板
 
-    # 2. 等待 IstioCNI DaemonSet Ready
-    log_info "步骤 2: 等待 IstioCNI DaemonSet 就绪"
+    # 2. 观察 istio-cni-node DaemonSet 滚动
+    log_info "步骤 2: 观察 istio-cni-node DaemonSet 滚动"
+    runme run update-istio-cni:rollout-status || {
+        log_error "istio-cni-node DaemonSet 滚动失败"
+        return 1
+    }
+
+    # 3. 等待 IstioCNI 资源 Ready
+    log_info "步骤 3: 等待 IstioCNI 资源就绪"
     runme run update-istio-cni:wait-ready || {
-        log_error "等待 IstioCNI DaemonSet 就绪失败"
-        return 1
-    }
-    _wait_for_daemonset istio-cni istio-cni-node || {
-        log_error "等待 istio-cni-node DaemonSet rollout 失败"
+        log_error "等待 IstioCNI 资源就绪失败"
         return 1
     }
 
-    # 3. 验证 IstioCNI 状态（输出包含动态 AGE 值，使用 __cmp_lines 验证关键字段）
-    log_info "步骤 3: 验证 IstioCNI 状态"
+    # 4. 验证 IstioCNI 状态（输出包含动态 AGE 值，使用 __cmp_lines 验证关键字段）
+    log_info "步骤 4: 验证 IstioCNI 状态"
     output=$(runme run update-istio-cni:get-istiocni 2>&1)
 
     if ! __cmp_lines "$output" "$(cat <<'EOF'
@@ -55,8 +58,8 @@ EOF
     fi
     log_success "IstioCNI 状态验证通过"
 
-    # 4. 验证 istio-cni-node Pod 状态（输出包含动态 pod 名后缀和 AGE，使用 __cmp_lines 验证关键字段）
-    log_info "步骤 4: 验证 istio-cni-node Pod 状态"
+    # 5. 验证 istio-cni-node Pod 状态（输出包含动态 pod 名后缀和 AGE，使用 __cmp_lines 验证关键字段）
+    log_info "步骤 5: 验证 istio-cni-node Pod 状态"
     output=$(runme run update-istio-cni:get-pods 2>&1)
 
     if ! __cmp_lines "$output" "$(cat <<'EOF'

@@ -18,17 +18,17 @@ Because a waypoint always follows the active control plane, keep it within one m
 
 Confirm that the waypoint proxy reconnected to the updated control plane and runs the new proxy version:
 
-```bash
+```bash {name=update-waypoint:verify-proxy-status}
 istioctl proxy-status | grep waypoint
 ```
 
 **Example output**
 
-```text
+```text {name=update-waypoint:verify-proxy-status-output}
 waypoint-7b6bcffd55-lj54j.bookinfo     Kubernetes     istiod-85c76b5b66-qgbrv     1.28.6-asm-r3     4 (CDS,LDS,EDS,WDS)
 ```
 
-The output lists the waypoint pod together with its synchronization state for each configuration type, the istiod pod it is connected to, and the proxy version it runs. `SYNCED` in every column confirms that the waypoint receives configuration from the control plane, and the `VERSION` column should now show the updated release.
+The output lists the waypoint pod, the istiod pod it is connected to, the proxy version it runs, and the xDS configuration types the proxy subscribes to. A populated subscription list confirms that the waypoint receives configuration from the control plane, and the `VERSION` column should now show the updated release.
 
 ## Verifying L7 traffic routing
 
@@ -43,7 +43,7 @@ After the waypoint proxies are updated, confirm that Layer 7 (L7) traffic manage
 
 1. Optional: If it does not exist yet, create the `HTTPRoute` resource that distributes `reviews` traffic 80/20 between `reviews-v1` and `reviews-v2`:
 
-    ```yaml
+    ```yaml {name=update-waypoint:create-httproute}
     cat <<EOF | kubectl apply -f -
     apiVersion: gateway.networking.k8s.io/v1
     kind: HTTPRoute
@@ -69,7 +69,7 @@ After the waypoint proxies are updated, confirm that Layer 7 (L7) traffic manage
 
 2. Send repeated requests through the mesh and observe which `reviews` version answers:
 
-    ```bash
+    ```bash {name=update-waypoint:verify-traffic-split}
     kubectl exec "$(kubectl get pod -l app=ratings -n bookinfo -o jsonpath='{.items[0].metadata.name}')" \
       -c ratings -n bookinfo \
       -- bash -lc '\
@@ -92,7 +92,7 @@ Confirm that L7 authorization decisions survive the update. The following exampl
 
 1. Optional: If it does not exist yet, create the `AuthorizationPolicy` resource:
 
-    ```yaml
+    ```yaml {name=update-waypoint:create-authz-policy}
     cat <<EOF | kubectl apply -f -
     apiVersion: security.istio.io/v1
     kind: AuthorizationPolicy
@@ -122,7 +122,7 @@ Confirm that L7 authorization decisions survive the update. The following exampl
 
 2. Confirm that a `GET` request from the allowed client succeeds with an `HTTP 200` response:
 
-    ```bash
+    ```bash {name=update-waypoint:verify-get-allowed}
     kubectl -n curl exec deploy/curl -- sh -c '\
       curl -s -o /dev/null -w "HTTP %{http_code}\n" \
         -X GET \
@@ -131,13 +131,13 @@ Confirm that L7 authorization decisions survive the update. The following exampl
 
     **Expected output**
 
-    ```text
+    ```text {name=update-waypoint:verify-get-allowed-output}
     HTTP 200
     ```
 
 3. Confirm that a workload outside the allow list, such as the `ratings` pod, is still rejected:
 
-    ```bash
+    ```bash {name=update-waypoint:verify-get-denied}
     kubectl exec "$(kubectl get pod -l app=ratings -n bookinfo \
       -o jsonpath='{.items[0].metadata.name}')" \
       -c ratings -n bookinfo \
@@ -146,7 +146,7 @@ Confirm that L7 authorization decisions survive the update. The following exampl
 
     **Expected output**
 
-    ```text
+    ```text {name=update-waypoint:verify-get-denied-output}
     RBAC: access denied
     ```
 
@@ -156,7 +156,7 @@ Confirm that L7 authorization decisions survive the update. The following exampl
 
 If you created the routing and authorization resources only for this verification, remove them afterwards:
 
-```bash
+```bash {name=update-waypoint:cleanup}
 kubectl delete -n bookinfo httproute reviews
 kubectl delete -n bookinfo authorizationpolicy productpage-waypoint
 ```

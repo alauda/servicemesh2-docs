@@ -18,7 +18,7 @@ This section exists so that you can walk through the update process from a known
 
 1. Create the `istio-cni`, `istio-system`, and `ztunnel` namespaces, each labeled with `istio-discovery=enabled` so that the control plane discovers them:
 
-    ```bash
+    ```bash {name=update-ambient:create-namespaces}
     kubectl create namespace istio-cni
     kubectl create namespace istio-system
     kubectl create namespace ztunnel
@@ -27,7 +27,7 @@ This section exists so that you can walk through the update process from a known
 
 2. Create the `IstioCNI` resource with the starting version:
 
-    ```yaml
+    ```yaml {name=update-ambient:create-istio-cni}
     cat <<EOF | kubectl apply -f -
     apiVersion: sailoperator.io/v1
     kind: IstioCNI
@@ -55,13 +55,13 @@ This section exists so that you can walk through the update process from a known
 
 3. Wait for the Istio CNI pods to become ready:
 
-    ```bash
+    ```bash {name=update-ambient:wait-istiocni-install}
     kubectl wait --for=condition=Ready istiocnis/default --timeout=3m
     ```
 
 4. Create the `Istio` resource with the same starting version:
 
-    ```yaml
+    ```yaml {name=update-ambient:create-istio}
     cat <<EOF | kubectl apply -f -
     apiVersion: sailoperator.io/v1
     kind: Istio
@@ -89,13 +89,13 @@ This section exists so that you can walk through the update process from a known
 
 5. Wait for the Istio control plane to become ready:
 
-    ```bash
+    ```bash {name=update-ambient:wait-istio-install}
     kubectl wait --for=condition=Ready istios/default --timeout=3m
     ```
 
 6. Create the `ZTunnel` resource with the same starting version:
 
-    ```yaml
+    ```yaml {name=update-ambient:create-ztunnel}
     cat <<EOF | kubectl apply -f -
     apiVersion: sailoperator.io/v1
     kind: ZTunnel
@@ -113,7 +113,7 @@ This section exists so that you can walk through the update process from a known
 
 7. Wait for the ZTunnel pods to become ready:
 
-    ```bash
+    ```bash {name=update-ambient:wait-ztunnel-install}
     kubectl wait --for=condition=Ready ztunnel/default --timeout=3m
     ```
 
@@ -121,21 +121,26 @@ This section exists so that you can walk through the update process from a known
 
     a. Create the `bookinfo` namespace and add the `istio-discovery=enabled` label so that the control plane discovers it:
 
-    ```shell
+    ```shell {name=update-ambient:create-bookinfo-ns}
     kubectl create namespace bookinfo
     kubectl label namespace bookinfo istio-discovery=enabled
     ```
 
-    b. Deploy the Bookinfo application together with its per-version services:
+    b. Deploy the Bookinfo application:
 
-    ```shell
+    ```shell {name=update-ambient:deploy-bookinfo}
     kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
+    ```
+
+    c. Deploy the per-version services of the Bookinfo application:
+
+    ```shell {name=update-ambient:deploy-bookinfo-versions}
     kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo-versions.yaml
     ```
 
-    c. Enroll all workloads of the namespace in the ambient mesh:
+    d. Enroll all workloads of the namespace in the ambient mesh:
 
-    ```shell
+    ```shell {name=update-ambient:enroll-bookinfo}
     kubectl label namespace bookinfo istio.io/dataplane-mode=ambient
     ```
 
@@ -154,7 +159,7 @@ This section exists so that you can walk through the update process from a known
 
 1. Change the version in the `Istio` resource. For example, to update to Istio `1.28.6`, set the `spec.version` field to `v1.28.6` by running the following command:
 
-    ```bash
+    ```bash {name=update-ambient:patch-istio-version}
     kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.28.6"}}'
     ```
 
@@ -162,19 +167,19 @@ This section exists so that you can walk through the update process from a known
 
 2. Wait for the control plane to become ready:
 
-    ```bash
+    ```bash {name=update-ambient:wait-istio-update}
     kubectl wait --for=condition=Ready istios/default --timeout=3m
     ```
 
 3. Confirm that the control plane reports the new version:
 
-    ```bash
+    ```bash {name=update-ambient:get-istio-update}
     kubectl get istio default
     ```
 
     **Example output**
 
-    ```text
+    ```text {name=update-ambient:get-istio-update-output}
     NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
     default   istio-system   ambient   1           1       0        default           Healthy   v1.28.6   12m
     ```
@@ -185,25 +190,31 @@ Update the Istio CNI plugin only after the control plane update has completed, b
 
 1. Set the `spec.version` field of the `IstioCNI` resource to the same version as the control plane:
 
-    ```bash
+    ```bash {name=update-ambient:patch-istiocni-version}
     kubectl patch istiocni default --type='merge' -p '{"spec":{"version":"v1.28.6"}}'
     ```
 
-2. Wait for the `istio-cni-node` DaemonSet to finish rolling out:
+2. Watch the `istio-cni-node` DaemonSet roll out:
 
-    ```bash
+    ```bash {name=update-ambient:rollout-istiocni}
+    kubectl rollout status daemonset/istio-cni-node -n istio-cni
+    ```
+
+3. Wait for the `IstioCNI` resource to report readiness:
+
+    ```bash {name=update-ambient:wait-istiocni-update}
     kubectl wait --for=condition=Ready istiocnis/default --timeout=5m
     ```
 
-3. Confirm that the CNI plugin reports the new version:
+4. Confirm that the CNI plugin reports the new version:
 
-    ```bash
+    ```bash {name=update-ambient:get-istiocni-update}
     kubectl get istiocni default
     ```
 
     **Example output**
 
-    ```text
+    ```text {name=update-ambient:get-istiocni-update-output}
     NAME      NAMESPACE   PROFILE   READY   STATUS    VERSION   AGE
     default   istio-cni   ambient   True    Healthy   v1.28.6   15m
     ```
@@ -220,13 +231,13 @@ Replacing a ZTunnel pod can reset long-lived TCP connections on that node. If yo
 
 1. Set the `spec.version` field of the `ZTunnel` resource to the same version as the control plane:
 
-    ```bash
+    ```bash {name=update-ambient:patch-ztunnel-version}
     kubectl patch ztunnel default --type='merge' -p '{"spec":{"version":"v1.28.6"}}'
     ```
 
 2. Watch the ZTunnel DaemonSet roll out:
 
-    ```bash
+    ```bash {name=update-ambient:rollout-ztunnel}
     kubectl rollout status daemonset/ztunnel -n ztunnel
     ```
 
@@ -238,32 +249,32 @@ Replacing a ZTunnel pod can reset long-lived TCP connections on that node. If yo
 
 3. Wait for the `ZTunnel` resource to report readiness:
 
-    ```bash
+    ```bash {name=update-ambient:wait-ztunnel-update}
     kubectl wait --for=condition=Ready ztunnel/default --timeout=10m
     ```
 
 4. Confirm that the ZTunnel proxy reports the new version:
 
-    ```bash
+    ```bash {name=update-ambient:get-ztunnel-update}
     kubectl get ztunnel default
     ```
 
     **Example output**
 
-    ```text
+    ```text {name=update-ambient:get-ztunnel-update-output}
     NAME      NAMESPACE   READY   STATUS    VERSION   AGE
     default   ztunnel     True    Healthy   v1.28.6   18m
     ```
 
 5. Inspect the per-node ZTunnel pods:
 
-    ```bash
+    ```bash {name=update-ambient:get-ztunnel-pods}
     kubectl get pods -n ztunnel -o wide
     ```
 
     **Example output**
 
-    ```text
+    ```text {name=update-ambient:get-ztunnel-pods-output}
     NAME            READY   STATUS    RESTARTS   AGE     IP           NODE
     ztunnel-2b6pb   1/1     Running   0          2m11s   10.3.0.202   192.168.136.57
     ztunnel-2s7m7   1/1     Running   0          2m3s    10.3.0.203   192.168.143.119
@@ -276,19 +287,31 @@ After all components run the new version, confirm that the workloads still parti
 
 1. Check that the application pods are running:
 
-    ```bash
+    ```bash {name=update-ambient:verify-bookinfo-pods}
     kubectl get pods -n bookinfo
+    ```
+
+    **Example output**
+
+    ```text {name=update-ambient:verify-bookinfo-pods-output}
+    NAME                              READY   STATUS    RESTARTS   AGE
+    details-v1-657cf9fcfb-r75r4       1/1     Running   0          25m
+    productpage-v1-667466dfd9-k6ddq   1/1     Running   0          25m
+    ratings-v1-5bdc95577b-s7n8w       1/1     Running   0          25m
+    reviews-v1-8468d47c78-m7fww       1/1     Running   0          25m
+    reviews-v2-869977f6f8-jklhm       1/1     Running   0          25m
+    reviews-v3-7bcdd7dd74-zdc87       1/1     Running   0          25m
     ```
 
 2. Confirm that ZTunnel still proxies the workloads. Pods enrolled in the ambient mesh report the `HBONE` protocol:
 
-    ```bash
+    ```bash {name=update-ambient:verify-ztunnel-workloads}
     istioctl -n ztunnel ztunnel-config workloads
     ```
 
     **Example output**
 
-    ```text
+    ```text {name=update-ambient:verify-ztunnel-workloads-output}
     NAMESPACE    POD NAME                        ADDRESS    NODE            WAYPOINT PROTOCOL
     bookinfo     details-v1-657cf9fcfb-r75r4     10.3.0.192 192.168.141.97  None     HBONE
     bookinfo     productpage-v1-667466dfd9-k6ddq 10.3.0.197 192.168.141.97  None     HBONE
@@ -300,7 +323,7 @@ After all components run the new version, confirm that the workloads still parti
 
 3. Test connectivity through the mesh by calling a service from another pod:
 
-    ```bash
+    ```bash {name=update-ambient:verify-connectivity}
     kubectl exec "$(kubectl get pod -l app=ratings -n bookinfo \
       -o jsonpath='{.items[0].metadata.name}')" \
       -c ratings -n bookinfo \
@@ -309,7 +332,7 @@ After all components run the new version, confirm that the workloads still parti
 
     **Example output**
 
-    ```html
+    ```html {name=update-ambient:verify-connectivity-output}
     <title>Simple Bookstore App</title>
     ```
 
@@ -319,7 +342,7 @@ If you deployed waypoint proxies, additionally verify them as described in [Upda
 
 After you finish verifying the update procedure in a development environment, remove the sample application and the mesh components to release the resources:
 
-```bash
+```bash {name=update-ambient:cleanup}
 # Remove the Bookinfo namespace from the ambient data plane and delete it
 kubectl label namespace bookinfo istio.io/dataplane-mode-
 kubectl delete namespace bookinfo
