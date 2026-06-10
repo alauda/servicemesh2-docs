@@ -150,7 +150,7 @@ This section exists so that you can walk through the update process from a known
 
 - You are logged in to the Alauda Container Platform web console as **cluster-admin**.
 - You have installed the Alauda Container Platform Networking for Multus plugin, and kube-ovn must be v4.1.5 or later.
-- Alauda Service Mesh Operator 2.1.1 or later is installed, and the new target version is available in the Operator.
+- You have upgraded the Alauda Service Mesh Operator to version 2.1.2 or later, and the new target version is available in the Operator. For more information, see [Understanding Operator updates and channels](../update-mesh/index.mdx#understanding-operator-updates-and-channels).
 - Istio is deployed in ambient mode. In this example, the `Istio`, `IstioCNI`, and `ZTunnel` resources are all named `default`.
 - You have installed `istioctl` on your local machine.
 - Application workloads are enrolled in the ambient mesh. In this example, the Bookinfo application runs in the `bookinfo` namespace; see [Deploying the Bookinfo application in ambient mode](../../installing/ambient-mode/deploying-ambient-bookinfo.mdx).
