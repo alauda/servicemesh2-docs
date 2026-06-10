@@ -1,0 +1,292 @@
+---
+weight: 10
+---
+
+# Updating ambient mode components
+
+This page describes how to update the Istio control plane, the Istio CNI plugin, and the ZTunnel proxy in ambient mode. All three components use the `InPlace` update strategy and must be updated in this exact order. Waypoint proxies are rolled out automatically after the control plane update; see [Updating waypoint proxies](./updating-waypoint-proxies.mdx) for the related verification steps.
+
+## Installing ambient mode with a specific version
+
+You can install the Istio control plane, the Istio CNI plugin, and the ZTunnel proxy in ambient mode with an explicitly pinned version, which lets you exercise the update procedure afterwards.
+
+:::note
+This section exists so that you can walk through the update process from a known starting version. Skip it if the cluster already runs Istio in ambient mode. The installation steps mirror [Installing Istio ambient mode](../../installing/ambient-mode/installing-ambient-mode.mdx), except that each resource pins `spec.version` to an older release.
+:::
+
+### Procedure
+
+1. Create the `istio-cni`, `istio-system`, and `ztunnel` namespaces, each labeled with `istio-discovery=enabled` so that the control plane discovers them:
+
+    ```bash
+    kubectl create namespace istio-cni
+    kubectl create namespace istio-system
+    kubectl create namespace ztunnel
+    kubectl label namespace istio-cni istio-system ztunnel istio-discovery=enabled
+    ```
+
+2. Create the `IstioCNI` resource with the starting version:
+
+    ```yaml
+    cat <<EOF | kubectl apply -f -
+    apiVersion: sailoperator.io/v1
+    kind: IstioCNI
+    metadata:
+      name: default
+    spec:
+      version: v1.26.3 # [!code callout]
+      namespace: istio-cni
+      profile: ambient
+      values:
+        cni:
+          cniConfDir: /etc/cni/multus/net.d
+          excludeNamespaces:
+            - istio-cni
+            - kube-system
+          ambient:
+            reconcileIptablesOnStartup: true # [!code callout]
+    EOF
+    ```
+
+    <Callouts>
+        1. Pinning `spec.version` defines the version that the update procedure starts from.
+        2. The `reconcileIptablesOnStartup` option lets the CNI agent detect and repair incompatible iptables rules in already-running ambient pods when the agent restarts — exactly the situation an upgrade creates.
+    </Callouts>
+
+3. Wait for the Istio CNI pods to become ready:
+
+    ```bash
+    kubectl wait --for=condition=Ready istiocnis/default --timeout=3m
+    ```
+
+4. Create the `Istio` resource with the same starting version:
+
+    ```yaml
+    cat <<EOF | kubectl apply -f -
+    apiVersion: sailoperator.io/v1
+    kind: Istio
+    metadata:
+      name: default
+    spec:
+      version: v1.26.3
+      namespace: istio-system
+      profile: ambient
+      updateStrategy:
+        type: InPlace # [!code callout]
+      values:
+        pilot:
+          trustedZtunnelNamespace: ztunnel
+        meshConfig:
+          discoverySelectors:
+            - matchLabels:
+                istio-discovery: enabled
+    EOF
+    ```
+
+    <Callouts>
+        1. `InPlace` is the default strategy, so this field is optional; it is shown here to make the strategy explicit. Ambient mode supports no other strategy.
+    </Callouts>
+
+5. Wait for the Istio control plane to become ready:
+
+    ```bash
+    kubectl wait --for=condition=Ready istios/default --timeout=3m
+    ```
+
+6. Create the `ZTunnel` resource with the same starting version:
+
+    ```yaml
+    cat <<EOF | kubectl apply -f -
+    apiVersion: sailoperator.io/v1
+    kind: ZTunnel
+    metadata:
+      name: default
+    spec:
+      version: v1.26.3 # [!code callout]
+      namespace: ztunnel
+    EOF
+    ```
+
+    <Callouts>
+        1. Unlike the installation guide, this example sets `spec.version` so that the ZTunnel update step below has an older version to move away from.
+    </Callouts>
+
+7. Wait for the ZTunnel pods to become ready:
+
+    ```bash
+    kubectl wait --for=condition=Ready ztunnel/default --timeout=3m
+    ```
+
+## Updating the components
+
+### Prerequisites
+
+- You are logged in to the Alauda Container Platform web console as **cluster-admin**.
+- You have installed the Alauda Container Platform Networking for Multus plugin, and kube-ovn must be v4.1.5 or later.
+- Alauda Service Mesh Operator 2.1.1 or later is installed, and the new target version is available in the Operator.
+- Istio is deployed in ambient mode. In this example, the `Istio`, `IstioCNI`, and `ZTunnel` resources are all named `default`.
+- You have installed `istioctl` on your local machine.
+- Application workloads are enrolled in the ambient mesh. In this example, the Bookinfo application runs in the `bookinfo` namespace; see [Deploying the Bookinfo application in ambient mode](../../installing/ambient-mode/deploying-ambient-bookinfo.mdx).
+
+### Updating the Istio control plane
+
+1. Change the version in the `Istio` resource. For example, to update to Istio `1.28.6`, set the `spec.version` field to `v1.28.6` by running the following command:
+
+    ```bash
+    kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.28.6"}}'
+    ```
+
+    The Operator replaces the running control plane with the new version. ZTunnel and any waypoint proxies reconnect to the new istiod instance automatically; the application pods keep running and do not need a restart.
+
+2. Wait for the control plane to become ready:
+
+    ```bash
+    kubectl wait --for=condition=Ready istios/default --timeout=3m
+    ```
+
+3. Confirm that the control plane reports the new version:
+
+    ```bash
+    kubectl get istio default
+    ```
+
+    **Example output**
+
+    ```text
+    NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
+    default   istio-system   ambient   1           1       1        default           Healthy   v1.28.6   12m
+    ```
+
+### Updating the Istio CNI plugin
+
+Update the Istio CNI plugin only after the control plane update has completed, because a CNI plugin at version `1.x` supports a control plane at version `1.x` or `1.x+1`.
+
+1. Set the `spec.version` field of the `IstioCNI` resource to the same version as the control plane:
+
+    ```bash
+    kubectl patch istiocni default --type='merge' -p '{"spec":{"version":"v1.28.6"}}'
+    ```
+
+2. Wait for the `istio-cni-node` DaemonSet to finish rolling out:
+
+    ```bash
+    kubectl wait --for=condition=Ready istiocnis/default --timeout=5m
+    ```
+
+3. Confirm that the CNI plugin reports the new version:
+
+    ```bash
+    kubectl get istiocni default
+    ```
+
+    **Example output**
+
+    ```text
+    NAME      NAMESPACE   PROFILE   READY   STATUS    VERSION   AGE
+    default   istio-cni   ambient   True    Healthy   v1.28.6   15m
+    ```
+
+For details about the `IstioCNI` resource and its update behavior, see [The Istio CNI update process](../update-mesh/istio-cni.mdx).
+
+### Updating the ZTunnel proxy
+
+Update the ZTunnel proxy last, after both the control plane and the CNI plugin run the new version.
+
+:::warning
+Replacing a ZTunnel pod can reset long-lived TCP connections on that node. If your workloads hold long-lived connections, review [The ZTunnel update process](./ztunnel-update-process.mdx) before this step and choose an appropriate mitigation.
+:::
+
+1. Set the `spec.version` field of the `ZTunnel` resource to the same version as the control plane:
+
+    ```bash
+    kubectl patch ztunnel default --type='merge' -p '{"spec":{"version":"v1.28.6"}}'
+    ```
+
+2. Watch the ZTunnel DaemonSet roll out:
+
+    ```bash
+    kubectl rollout status daemonset/ztunnel -n ztunnel
+    ```
+
+    <Directive type="note">
+
+    The DaemonSet replaces ZTunnel pods node by node to keep mesh connectivity available, so the rollout can take several minutes on larger clusters.
+
+    </Directive>
+
+3. Wait for the `ZTunnel` resource to report readiness:
+
+    ```bash
+    kubectl wait --for=condition=Ready ztunnel/default --timeout=10m
+    ```
+
+4. Confirm the new version and inspect the per-node pods:
+
+    ```bash
+    kubectl get ztunnel default
+    kubectl get pods -n ztunnel -o wide
+    ```
+
+    **Example output**
+
+    ```text
+    NAME      NAMESPACE   PROFILE   READY   STATUS    VERSION   AGE
+    default   ztunnel     ambient   True    Healthy   v1.28.6   18m
+
+    NAME            READY   STATUS    RESTARTS   AGE     IP           NODE
+    ztunnel-4xrhj   1/1     Running   0          2m11s   10.3.0.152   192.168.131.32
+    ztunnel-9kt5n   1/1     Running   0          3m02s   10.3.1.78    192.168.131.33
+    ```
+
+## Verifying ambient workloads
+
+After all components run the new version, confirm that the workloads still participate in the mesh.
+
+1. Check that the application pods are running:
+
+    ```bash
+    kubectl get pods -n bookinfo
+    ```
+
+2. Confirm that ZTunnel still proxies the workloads. Pods enrolled in the ambient mesh report the `HBONE` protocol:
+
+    ```bash
+    istioctl -n ztunnel ztunnel-config workloads
+    ```
+
+    **Example output**
+
+    ```text
+    NAMESPACE    POD NAME                        ADDRESS    NODE           WAYPOINT PROTOCOL
+    bookinfo     details-v1-569946bc86-f5xks     10.3.0.143 192.168.131.32 None     HBONE
+    bookinfo     productpage-v1-6c76dd65f7-tk5mr 10.3.0.148 192.168.131.32 None     HBONE
+    bookinfo     ratings-v1-5fd569d7c8-5x778     10.3.0.144 192.168.131.32 None     HBONE
+    ```
+
+3. Test connectivity through the mesh by calling a service from another pod:
+
+    ```bash
+    kubectl exec "$(kubectl get pod -l app=ratings -n bookinfo \
+      -o jsonpath='{.items[0].metadata.name}')" \
+      -c ratings -n bookinfo \
+      -- curl -sS productpage:9080/productpage | grep -o "<title>.*</title>"
+    ```
+
+    **Example output**
+
+    ```html
+    <title>Simple Bookstore App</title>
+    ```
+
+If you deployed waypoint proxies, additionally verify them as described in [Updating waypoint proxies](./updating-waypoint-proxies.mdx).
+
+## Removing update resources from a development environment
+
+After you finish verifying the update procedure in a development environment, remove the mesh components and their namespaces to release the resources:
+
+```bash
+kubectl delete istio/default istiocni/default ztunnel/default
+kubectl delete ns/istio-system ns/istio-cni ns/ztunnel
+```
+
+To remove the Bookinfo application, follow the cleanup steps in [Deploying the Bookinfo application in ambient mode](../../installing/ambient-mode/deploying-ambient-bookinfo.mdx).

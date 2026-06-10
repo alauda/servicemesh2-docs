@@ -1,0 +1,188 @@
+---
+weight: 20
+---
+
+# Updating waypoint proxies
+
+Waypoint proxies are deployed through the Kubernetes Gateway API and are managed by the Istio control plane. When you update the control plane with the `InPlace` strategy, istiod rolls the waypoint deployments to the matching proxy version on its own — you do not update waypoints separately, and the application workloads they serve keep running throughout.
+
+Because a waypoint always follows the active control plane, keep it within one minor version of the control plane (the same version or `n-1`). This matches the Istio support policy, which requires that data plane components never run ahead of the control plane; the same rule applies to the Istio CNI plugin and ZTunnel. The `RevisionBased` strategy is not available in ambient mode — see [Updating Alauda Service Mesh in ambient mode](./index.mdx) for the reasoning.
+
+**Prerequisites**
+
+- You have updated the Istio control plane as described in [Updating ambient mode components](./updating-ambient-components.mdx).
+- The Bookinfo application is deployed in ambient mode; see [Deploying the Bookinfo application in ambient mode](../../installing/ambient-mode/deploying-ambient-bookinfo.mdx).
+- A waypoint proxy named `waypoint` exists in the `bookinfo` namespace; see [Waypoint proxies](../../installing/ambient-mode/waypoint-proxies.mdx).
+
+## Verifying the waypoint proxy version
+
+Confirm that the waypoint proxy reconnected to the updated control plane and runs the new proxy version:
+
+```bash
+istioctl proxy-status | grep waypoint
+```
+
+**Example output**
+
+```text
+waypoint-5d9c8b7f9-abc12.bookinfo     Kubernetes     SYNCED (31s)     SYNCED (31s)     SYNCED (28s)     SYNCED (31s)     IGNORED     istiod-57559f96c4-v2h9g     1.28.6-asm-r0
+```
+
+The output lists the waypoint pod together with its synchronization state for each configuration type, the istiod pod it is connected to, and the proxy version it runs. `SYNCED` in every column confirms that the waypoint receives configuration from the control plane, and the `VERSION` column should now show the updated release.
+
+## Verifying L7 traffic routing
+
+After the waypoint proxies are updated, confirm that Layer 7 (L7) traffic management still behaves as configured. If you route traffic with `HTTPRoute` resources, check that the configured weights are still enforced.
+
+**Prerequisites**
+
+- The `bookinfo-versions` services are created (part of the Bookinfo deployment in ambient mode).
+- An `HTTPRoute` resource splits the `reviews` traffic.
+
+**Procedure**
+
+1. Optional: If it does not exist yet, create the `HTTPRoute` resource that distributes `reviews` traffic 80/20 between `reviews-v1` and `reviews-v2`:
+
+    ```yaml
+    cat <<EOF | kubectl apply -f -
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    metadata:
+      name: reviews
+      namespace: bookinfo
+    spec:
+      parentRefs:
+        - group: ""
+          kind: Service
+          name: reviews
+          port: 9080
+      rules:
+        - backendRefs:
+            - name: reviews-v1
+              port: 9080
+              weight: 80
+            - name: reviews-v2
+              port: 9080
+              weight: 20
+    EOF
+    ```
+
+2. Send repeated requests through the mesh and observe which `reviews` version answers:
+
+    ```bash
+    kubectl exec "$(kubectl get pod -l app=ratings -n bookinfo -o jsonpath='{.items[0].metadata.name}')" \
+      -c ratings -n bookinfo \
+      -- bash -lc '\
+         for i in {0..19}; do \
+           curl -sS productpage:9080/productpage | grep -om1 "reviews-v[12]"; \
+         done'
+    ```
+
+    The responses should approximate the configured split — with an 80/20 weighting, roughly sixteen of twenty requests reach `reviews-v1` and the rest reach `reviews-v2`. Load balancing introduces some variance per run, but the ratio converges on the configured weights over repeated attempts.
+
+## Verifying L7 authorization policies
+
+Confirm that L7 authorization decisions survive the update. The following example uses an `AuthorizationPolicy` named `productpage-waypoint` that permits only `GET` requests issued by the `curl` service account in the `curl` namespace to reach the `productpage` service.
+
+**Prerequisites**
+
+- A curl client runs in the `curl` namespace, and the namespace carries the `istio-discovery=enabled` and `istio.io/dataplane-mode=ambient` labels. For the deployment steps, see [Layer 7 features in ambient mode](../../installing/ambient-mode/ambient-l7-features.mdx).
+
+**Procedure**
+
+1. Optional: If it does not exist yet, create the `AuthorizationPolicy` resource:
+
+    ```yaml
+    cat <<EOF | kubectl apply -f -
+    apiVersion: security.istio.io/v1
+    kind: AuthorizationPolicy
+    metadata:
+      name: productpage-waypoint
+      namespace: bookinfo
+    spec:
+      targetRefs:
+        - kind: Service
+          group: ""
+          name: productpage
+      action: ALLOW
+      rules:
+        - from:
+            - source:
+                principals:
+                  - cluster.local/ns/curl/sa/curl # [!code callout]
+          to:
+            - operation:
+                methods: ["GET"]
+    EOF
+    ```
+
+    <Callouts>
+        1. The principal must match the namespace and service account of your client workload. This example uses the `curl` service account in the `curl` namespace.
+    </Callouts>
+
+2. Confirm that a `GET` request from the allowed client succeeds with an `HTTP 200` response:
+
+    ```bash
+    kubectl -n curl exec deploy/curl -- sh -c '\
+      curl -s -o /dev/null -w "HTTP %{http_code}\n" \
+        -X GET \
+        http://productpage.bookinfo.svc.cluster.local:9080/productpage'
+    ```
+
+    **Expected output**
+
+    ```text
+    HTTP 200
+    ```
+
+3. Confirm that a workload outside the allow list, such as the `ratings` pod, is still rejected:
+
+    ```bash
+    kubectl exec "$(kubectl get pod -l app=ratings -n bookinfo \
+      -o jsonpath='{.items[0].metadata.name}')" \
+      -c ratings -n bookinfo \
+      -- curl -X GET -sS productpage:9080/productpage
+    ```
+
+    **Expected output**
+
+    ```text
+    RBAC: access denied
+    ```
+
+    The denial confirms that the updated waypoint proxy keeps enforcing the L7 authorization rules: the `ratings` service account is not listed in the policy, while the `curl` client matches both the principal and the `GET` operation.
+
+**Clean up the verification resources**
+
+If you created the routing and authorization resources only for this verification, remove them afterwards:
+
+```bash
+kubectl delete -n bookinfo httproute reviews
+kubectl delete -n bookinfo authorizationpolicy productpage-waypoint
+```
+
+## Verifying cross-namespace waypoint configuration
+
+If workloads use a waypoint that lives in a different namespace, make sure the waypoint labels are present and correct before you update, so that traffic keeps flowing through the waypoint afterwards. The following example checks the `bookinfo` namespace, which uses the waypoint `waypoint-common` from the `common-infrastructure` namespace; see [Waypoint proxies](../../installing/ambient-mode/waypoint-proxies.mdx) for the setup.
+
+**Procedure**
+
+1. Inspect the waypoint-related labels on the namespace:
+
+    ```bash
+    kubectl get ns bookinfo --show-labels | grep waypoint
+    ```
+
+2. If either label is missing or points to the wrong waypoint, re-apply them:
+
+    - Set the namespace where the waypoint resides:
+
+        ```bash
+        kubectl label ns bookinfo istio.io/use-waypoint-namespace=common-infrastructure --overwrite
+        ```
+
+    - Set the waypoint to use:
+
+        ```bash
+        kubectl label ns bookinfo istio.io/use-waypoint=waypoint-common --overwrite
+        ```
