@@ -10,6 +10,9 @@ source "$FRAMEWORK_ROOT/framework/common.sh"
 source "$FRAMEWORK_ROOT/framework/verify.sh"
 source "$FRAMEWORK_ROOT/projects/mesh/project.sh"
 
+# 加载 Istio CNI 升级公共步骤（对应文档步骤 5 内链的 istio-cni.mdx）
+source "$DOC_REPO_ROOT/docs/en/updating/update-mesh/istio-cni-update-steps.sh"
+
 test_update_revisionbased_and_istiorevisiontag() {
     log_info "=========================================="
     log_info "开始 RevisionBased + IstioRevisionTag 更新策略测试"
@@ -247,15 +250,22 @@ EOF
     fi
     log_success "sidecar 仍连接旧控制面，验证通过"
 
-    # 20. 重启应用工作负载（IstioRevisionTag 已自动指向新 revision，无需改 istio.io/rev 标签）
-    log_info "步骤 20: 重启 bookinfo 工作负载"
+    # 20. 更新 Istio CNI 插件到新控制面版本（对应文档步骤 5，公共步骤见 istio-cni-update-steps.sh）
+    log_info "步骤 20: 更新 Istio CNI 插件至 v1.28.6"
+    update_istio_cni_and_verify || {
+        log_error "更新 Istio CNI 插件失败"
+        return 1
+    }
+
+    # 21. 重启应用工作负载（IstioRevisionTag 已自动指向新 revision，无需改 istio.io/rev 标签）
+    log_info "步骤 21: 重启 bookinfo 工作负载"
     runme run update-revisionbased-tag:restart-workloads || {
         log_error "重启工作负载失败"
         return 1
     }
 
-    # 21. 等待 bookinfo deployments 就绪（重启后）
-    log_info "步骤 21: 等待 bookinfo deployments 就绪（重启后）"
+    # 22. 等待 bookinfo deployments 就绪（重启后）
+    log_info "步骤 22: 等待 bookinfo deployments 就绪（重启后）"
     _wait_for_deployment bookinfo details-v1
     _wait_for_deployment bookinfo productpage-v1
     _wait_for_deployment bookinfo ratings-v1
@@ -266,8 +276,8 @@ EOF
 
     # ===== 验证 =====
 
-    # 22. 验证 sidecar 已切换到新版本
-    log_info "步骤 22: 验证 sidecar 已切换到新版本"
+    # 23. 验证 sidecar 已切换到新版本
+    log_info "步骤 23: 验证 sidecar 已切换到新版本"
     ps_cmd=$(runme print update-revisionbased-tag:verify-proxy-new)
     ps_cmd="${ps_cmd//<new_revision_name>/$NEW_REV}"
     output=$(eval "$ps_cmd" 2>&1)
@@ -287,15 +297,15 @@ EOF
     fi
     log_success "新版本 sidecar 验证通过"
 
-    # 23. 等待旧 revision 及其控制面被回收（grace period 默认 30s）
-    log_info "步骤 23: 等待旧 revision ($REV) 被回收"
+    # 24. 等待旧 revision 及其控制面被回收（grace period 默认 30s）
+    log_info "步骤 24: 等待旧 revision ($REV) 被回收"
     retry_command "! kubectl get istiorevision 2>/dev/null | grep -q '$REV'" 20 5 || {
         log_error "旧 revision 未在预期时间内被回收"
         return 1
     }
 
-    # 24. 验证旧控制面 Pod 已删除
-    log_info "步骤 24: 验证旧控制面 Pod 已删除"
+    # 25. 验证旧控制面 Pod 已删除
+    log_info "步骤 25: 验证旧控制面 Pod 已删除"
     output=$(runme run update-revisionbased-tag:verify-pods 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
 + istiod-$NEW_REV
@@ -308,15 +318,15 @@ EOF
     fi
     log_success "旧控制面 Pod 已删除，验证通过"
 
-    # 25. 检查 Istio 资源
-    log_info "步骤 25: 检查 Istio 资源"
+    # 26. 检查 Istio 资源
+    log_info "步骤 26: 检查 Istio 资源"
     runme run update-revisionbased-tag:verify-istio || {
         log_error "检查 Istio 资源失败"
         return 1
     }
 
-    # 26. 验证旧 IstioRevision 已删除
-    log_info "步骤 26: 验证旧 IstioRevision 已删除"
+    # 27. 验证旧 IstioRevision 已删除
+    log_info "步骤 27: 验证旧 IstioRevision 已删除"
     output=$(runme run update-revisionbased-tag:verify-istiorevision 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
 + $NEW_REV
