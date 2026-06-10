@@ -176,7 +176,7 @@ This section exists so that you can walk through the update process from a known
 
     ```text
     NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
-    default   istio-system   ambient   1           1       1        default           Healthy   v1.28.6   12m
+    default   istio-system   ambient   1           1       0        default           Healthy   v1.28.6   12m
     ```
 
 ### Updating the Istio CNI plugin
@@ -251,8 +251,8 @@ Replacing a ZTunnel pod can reset long-lived TCP connections on that node. If yo
     **Example output**
 
     ```text
-    NAME      NAMESPACE   PROFILE   READY   STATUS    VERSION   AGE
-    default   ztunnel     ambient   True    Healthy   v1.28.6   18m
+    NAME      NAMESPACE   READY   STATUS    VERSION   AGE
+    default   ztunnel     True    Healthy   v1.28.6   18m
     ```
 
 5. Inspect the per-node ZTunnel pods:
@@ -265,8 +265,9 @@ Replacing a ZTunnel pod can reset long-lived TCP connections on that node. If yo
 
     ```text
     NAME            READY   STATUS    RESTARTS   AGE     IP           NODE
-    ztunnel-4xrhj   1/1     Running   0          2m11s   10.3.0.152   192.168.131.32
-    ztunnel-9kt5n   1/1     Running   0          3m02s   10.3.1.78    192.168.131.33
+    ztunnel-2b6pb   1/1     Running   0          2m11s   10.3.0.202   192.168.136.57
+    ztunnel-2s7m7   1/1     Running   0          2m3s    10.3.0.203   192.168.143.119
+    ztunnel-95g2q   1/1     Running   0          115s    10.3.0.204   192.168.141.97
     ```
 
 ## Verifying ambient workloads
@@ -288,10 +289,13 @@ After all components run the new version, confirm that the workloads still parti
     **Example output**
 
     ```text
-    NAMESPACE    POD NAME                        ADDRESS    NODE           WAYPOINT PROTOCOL
-    bookinfo     details-v1-569946bc86-f5xks     10.3.0.143 192.168.131.32 None     HBONE
-    bookinfo     productpage-v1-6c76dd65f7-tk5mr 10.3.0.148 192.168.131.32 None     HBONE
-    bookinfo     ratings-v1-5fd569d7c8-5x778     10.3.0.144 192.168.131.32 None     HBONE
+    NAMESPACE    POD NAME                        ADDRESS    NODE            WAYPOINT PROTOCOL
+    bookinfo     details-v1-657cf9fcfb-r75r4     10.3.0.192 192.168.141.97  None     HBONE
+    bookinfo     productpage-v1-667466dfd9-k6ddq 10.3.0.197 192.168.141.97  None     HBONE
+    bookinfo     ratings-v1-5bdc95577b-s7n8w     10.3.0.193 192.168.143.119 None     HBONE
+    bookinfo     reviews-v1-8468d47c78-m7fww     10.3.0.194 192.168.143.119 None     HBONE
+    bookinfo     reviews-v2-869977f6f8-jklhm     10.3.0.195 192.168.143.119 None     HBONE
+    bookinfo     reviews-v3-7bcdd7dd74-zdc87     10.3.0.196 192.168.141.97  None     HBONE
     ```
 
 3. Test connectivity through the mesh by calling a service from another pod:
