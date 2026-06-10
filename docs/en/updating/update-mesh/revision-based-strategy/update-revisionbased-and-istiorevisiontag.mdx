@@ -263,7 +263,9 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
 
    The `VERSION` column should match the old control plane version.
 
-5. Restart the application workloads so that the new version of the sidecar gets injected by running the following command:
+5. Update the Istio CNI plugin to the same version as the new control plane revision. The `IstioCNI` resource is updated independently of the `Istio` resource, and the updated CNI plugin keeps redirecting traffic for both control plane revisions during the migration. For the detailed steps, see [The Istio CNI update process](../istio-cni.mdx).
+
+6. Restart the application workloads so that the new version of the sidecar gets injected by running the following command:
 
    ```bash {name=update-revisionbased-tag:restart-workloads}
    kubectl rollout restart deployment -n bookinfo

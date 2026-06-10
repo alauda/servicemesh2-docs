@@ -205,7 +205,9 @@ When updating Istio using the `InPlace` strategy, you can increment the version 
    default   istio-system             1           1       1        default           Healthy   v1.28.6   18m5s
    ```
 
-4. Restart the application workloads so that the new version of the sidecar gets injected by running the following command:
+4. Update the Istio CNI plugin to the same version as the control plane. The `IstioCNI` resource is updated independently of the `Istio` resource, so changing the control plane version does not update the CNI plugin automatically. For the detailed steps, see [The Istio CNI update process](./istio-cni.mdx).
+
+5. Restart the application workloads so that the new version of the sidecar gets injected by running the following command:
 
    ```bash {name=update-inplace:restart-workloads}
    kubectl rollout restart deployment -n bookinfo
