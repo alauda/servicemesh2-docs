@@ -25,7 +25,7 @@ istioctl proxy-status | grep waypoint
 **Example output**
 
 ```text
-waypoint-5d9c8b7f9-abc12.bookinfo     Kubernetes     SYNCED (31s)     SYNCED (31s)     SYNCED (28s)     SYNCED (31s)     IGNORED     istiod-57559f96c4-v2h9g     1.28.6-asm-r0
+waypoint-7b6bcffd55-lj54j.bookinfo     Kubernetes     istiod-85c76b5b66-qgbrv     1.28.6-asm-r3     4 (CDS,LDS,EDS,WDS)
 ```
 
 The output lists the waypoint pod together with its synchronization state for each configuration type, the istiod pod it is connected to, and the proxy version it runs. `SYNCED` in every column confirms that the waypoint receives configuration from the control plane, and the `VERSION` column should now show the updated release.
