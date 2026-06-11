@@ -1,0 +1,47 @@
+---
+weight: 20
+---
+
+# Updating Alauda Service Mesh in ambient mode
+
+In ambient mode, you update Alauda Service Mesh by raising the version of each mesh component resource in place. The Alauda Service Mesh v2 Operator then replaces the running component with the requested version. Application pods switch over to the upgraded ZTunnel proxy without being restarted or rescheduled, which is a key operational difference from sidecar mode, where every workload must be restarted before it picks up a new proxy version.
+
+:::warning
+Ambient mode supports only the `InPlace` update strategy. ZTunnel follows a cluster-wide singleton architecture: a cluster runs exactly one ZTunnel instance at any given time. Running two ZTunnel versions side by side is therefore not possible, which rules out canary-style upgrades with the `RevisionBased` strategy.
+:::
+
+:::note
+Ambient mode remains a Technology Preview feature. For installation instructions, see [Istio ambient mode](../../installing/ambient-mode/index.mdx).
+:::
+
+## Update sequence
+
+Update the mesh components in the following order:
+
+1. **Istio control plane** — change the version in the `Istio` resource.
+2. **Istio CNI** — change the `IstioCNI` resource to the same version.
+3. **ZTunnel** — change the `ZTunnel` resource to the same version.
+
+The order matters because of the supported version skew: the Istio CNI plugin and the ZTunnel proxy at version `1.x` can work with a control plane at version `1.x` or `1.x+1`, but never with an older one. Upgrading the control plane first keeps every component combination that occurs during the update inside the supported range.
+
+For the step-by-step commands, see [Updating ambient mode components](./updating-ambient-components.mdx).
+
+## Connection handling during updates
+
+In ambient mode, the per-node ZTunnel proxy — not each application pod — holds the xDS connection to istiod. As a result, a control plane update does not require any application pod restarts: ZTunnel and the waypoint proxies reconnect to the new control plane on their own.
+
+Replacing the ZTunnel pod itself is the one step that can affect application traffic. Because ZTunnel proxies TCP connections at Layer 4, it cannot hand over established connections to its successor, so long-lived TCP connections on the node being updated may be reset. To understand this behavior and the mitigation options, see [The ZTunnel update process](./ztunnel-update-process.mdx).
+
+## Version compatibility
+
+Apply the following guidance when planning an update:
+
+- Keep the Istio control plane, Istio CNI, and ZTunnel at the same version whenever possible.
+- Data plane components must never run ahead of the control plane. Keep waypoint proxies, the Istio CNI plugin, and ZTunnel within one minor version of the control plane (the same version or `n-1`).
+- Test the intended version combination in a non-production environment before you update production clusters.
+
+## High availability
+
+An `InPlace` update restarts the control plane pods, which can briefly interrupt mesh configuration delivery. This recommendation applies to ambient mode as well: run istiod with multiple replicas to minimize the disruption window. For details, see [Istio High Availability](../../installing/installing-service-mesh/istio-high-availability/index.mdx).
+
+<Overview overviewHeaders={[]} />

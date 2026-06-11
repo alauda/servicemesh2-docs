@@ -10,6 +10,9 @@ source "$FRAMEWORK_ROOT/framework/common.sh"
 source "$FRAMEWORK_ROOT/framework/verify.sh"
 source "$FRAMEWORK_ROOT/projects/mesh/project.sh"
 
+# 加载 Istio CNI 升级公共步骤（对应文档步骤 4 内链的 istio-cni.mdx）
+source "$DOC_REPO_ROOT/docs/en/updating/update-mesh/istio-cni-update-steps.sh"
+
 # runme 命令可以在项目的任意目录中执行
 
 test_update_inplace() {
@@ -76,6 +79,9 @@ test_update_inplace() {
     _wait_for_deployment bookinfo reviews-v3
     log_success "所有 bookinfo deployments 已就绪"
 
+    # (可选) 部署就绪后生成 bookinfo 请求流量（仅 AUTO_GEN_BOOKINFO_TRAFFIC=true）
+    maybe_gen_bookinfo_traffic
+
     # 9. 检查 Istio 资源状态并验证输出（输出包含动态 AGE 值，使用 __cmp_lines 验证关键字段）
     log_info "步骤 9: 检查 Istio 资源状态（安装后）"
     local output
@@ -123,15 +129,22 @@ EOF
     fi
     log_success "Istio 更新状态验证通过"
 
-    # 13. 重启应用工作负载
-    log_info "步骤 13: 重启应用工作负载"
+    # 13. 更新 Istio CNI 插件到与控制面一致的版本（对应文档步骤 4，公共步骤见 istio-cni-update-steps.sh）
+    log_info "步骤 13: 更新 Istio CNI 插件至 v1.28.6"
+    update_istio_cni_and_verify || {
+        log_error "更新 Istio CNI 插件失败"
+        return 1
+    }
+
+    # 14. 重启应用工作负载
+    log_info "步骤 14: 重启应用工作负载"
     runme run update-inplace:restart-workloads || {
         log_error "重启应用工作负载失败"
         return 1
     }
 
-    # 14. 等待 bookinfo deployments 就绪（重启后）
-    log_info "步骤 14: 等待 bookinfo deployments 就绪（重启后）"
+    # 15. 等待 bookinfo deployments 就绪（重启后）
+    log_info "步骤 15: 等待 bookinfo deployments 就绪（重启后）"
     _wait_for_deployment bookinfo details-v1
     _wait_for_deployment bookinfo productpage-v1
     _wait_for_deployment bookinfo ratings-v1
@@ -140,8 +153,11 @@ EOF
     _wait_for_deployment bookinfo reviews-v3
     log_success "所有 bookinfo deployments 已就绪（重启后）"
 
-    # 15. 验证 sidecar 代理状态（输出包含动态 pod 名和时间戳，使用 __cmp_lines 验证关键内容）
-    log_info "步骤 15: 验证 sidecar 代理状态"
+    # (可选) 重启后重新生成 bookinfo 请求流量（原 ratings pod 已随重启销毁，需重新启动）
+    maybe_gen_bookinfo_traffic
+
+    # 16. 验证 sidecar 代理状态（输出包含动态 pod 名和时间戳，使用 __cmp_lines 验证关键内容）
+    log_info "步骤 16: 验证 sidecar 代理状态"
     output=$(runme run update-inplace:verify-proxy-status 2>&1)
 
     if ! __cmp_lines "$output" "$(cat <<'EOF'

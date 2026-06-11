@@ -10,6 +10,9 @@ source "$FRAMEWORK_ROOT/framework/common.sh"
 source "$FRAMEWORK_ROOT/framework/verify.sh"
 source "$FRAMEWORK_ROOT/projects/mesh/project.sh"
 
+# 加载 Istio CNI 升级公共步骤（对应文档步骤 5 内链的 istio-cni.mdx）
+source "$DOC_REPO_ROOT/docs/en/updating/update-mesh/istio-cni-update-steps.sh"
+
 test_update_revisionbased() {
     log_info "=========================================="
     log_info "开始 RevisionBased 更新策略测试"
@@ -100,6 +103,9 @@ EOF
     _wait_for_deployment bookinfo reviews-v2
     _wait_for_deployment bookinfo reviews-v3
     log_success "所有 bookinfo deployments 已就绪"
+
+    # (可选) 部署就绪后生成 bookinfo 请求流量（仅 AUTO_GEN_BOOKINFO_TRAFFIC=true）
+    maybe_gen_bookinfo_traffic
 
     # 10. 检查 Istio 资源状态（安装后）
     log_info "步骤 10: 检查 Istio 资源状态（安装后）"
@@ -228,8 +234,15 @@ EOF
     fi
     log_success "sidecar 仍连接旧控制面，验证通过"
 
-    # 18. 迁移工作负载到新 revision（替换占位符 <new_revision_name>）
-    log_info "步骤 18: 迁移 bookinfo 工作负载到新 revision ($NEW_REV)"
+    # 18. 更新 Istio CNI 插件到新控制面版本（对应文档步骤 5，公共步骤见 istio-cni-update-steps.sh）
+    log_info "步骤 18: 更新 Istio CNI 插件至 v1.28.6"
+    update_istio_cni_and_verify || {
+        log_error "更新 Istio CNI 插件失败"
+        return 1
+    }
+
+    # 19. 迁移工作负载到新 revision（替换占位符 <new_revision_name>）
+    log_info "步骤 19: 迁移 bookinfo 工作负载到新 revision ($NEW_REV)"
     local migrate_cmd
     migrate_cmd=$(runme print update-revisionbased:migrate-workloads)
     migrate_cmd="${migrate_cmd//<new_revision_name>/$NEW_REV}"
@@ -238,15 +251,15 @@ EOF
         return 1
     }
 
-    # 19. 重启应用工作负载
-    log_info "步骤 19: 重启 bookinfo 工作负载"
+    # 20. 重启应用工作负载
+    log_info "步骤 20: 重启 bookinfo 工作负载"
     runme run update-revisionbased:restart-workloads || {
         log_error "重启工作负载失败"
         return 1
     }
 
-    # 20. 等待 bookinfo deployments 就绪（重启后）
-    log_info "步骤 20: 等待 bookinfo deployments 就绪（重启后）"
+    # 21. 等待 bookinfo deployments 就绪（重启后）
+    log_info "步骤 21: 等待 bookinfo deployments 就绪（重启后）"
     _wait_for_deployment bookinfo details-v1
     _wait_for_deployment bookinfo productpage-v1
     _wait_for_deployment bookinfo ratings-v1
@@ -255,10 +268,13 @@ EOF
     _wait_for_deployment bookinfo reviews-v3
     log_success "所有 bookinfo deployments 已就绪（重启后）"
 
+    # (可选) 重启后重新生成 bookinfo 请求流量（原 ratings pod 已随重启销毁，需重新启动）
+    maybe_gen_bookinfo_traffic
+
     # ===== 验证 =====
 
-    # 21. 验证 sidecar 已切换到新版本
-    log_info "步骤 21: 验证 sidecar 已切换到新版本"
+    # 22. 验证 sidecar 已切换到新版本
+    log_info "步骤 22: 验证 sidecar 已切换到新版本"
     ps_cmd=$(runme print update-revisionbased:verify-proxy-new)
     ps_cmd="${ps_cmd//<new_revision_name>/$NEW_REV}"
     output=$(eval "$ps_cmd" 2>&1)
@@ -278,15 +294,15 @@ EOF
     fi
     log_success "新版本 sidecar 验证通过"
 
-    # 22. 等待旧 revision 及其控制面被回收（grace period 默认 30s）
-    log_info "步骤 22: 等待旧 revision ($REV) 被回收"
+    # 23. 等待旧 revision 及其控制面被回收（grace period 默认 30s）
+    log_info "步骤 23: 等待旧 revision ($REV) 被回收"
     retry_command "! kubectl get istiorevision 2>/dev/null | grep -q '$REV'" 20 5 || {
         log_error "旧 revision 未在预期时间内被回收"
         return 1
     }
 
-    # 23. 验证旧控制面 Pod 已删除
-    log_info "步骤 23: 验证旧控制面 Pod 已删除"
+    # 24. 验证旧控制面 Pod 已删除
+    log_info "步骤 24: 验证旧控制面 Pod 已删除"
     output=$(runme run update-revisionbased:verify-pods 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
 + istiod-$NEW_REV
@@ -299,15 +315,15 @@ EOF
     fi
     log_success "旧控制面 Pod 已删除，验证通过"
 
-    # 24. 检查 Istio 资源
-    log_info "步骤 24: 检查 Istio 资源"
+    # 25. 检查 Istio 资源
+    log_info "步骤 25: 检查 Istio 资源"
     runme run update-revisionbased:verify-istio || {
         log_error "检查 Istio 资源失败"
         return 1
     }
 
-    # 25. 验证旧 IstioRevision 已删除
-    log_info "步骤 25: 验证旧 IstioRevision 已删除"
+    # 26. 验证旧 IstioRevision 已删除
+    log_info "步骤 26: 验证旧 IstioRevision 已删除"
     output=$(runme run update-revisionbased:verify-istiorevision 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
 + $NEW_REV

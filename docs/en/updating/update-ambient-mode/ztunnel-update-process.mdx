@@ -1,0 +1,87 @@
+---
+weight: 30
+---
+
+# The ZTunnel update process
+
+ZTunnel works at Layer 4 (L4) of the OSI model: it proxies TCP byte streams and has no visibility into the application protocol above them. An established TCP connection therefore cannot be handed over from one ZTunnel process to its replacement. Because ZTunnel runs as a per-node DaemonSet, replacing it affects, at minimum, all mesh traffic on one node at a time. Understanding this rolling update behavior helps you plan updates for workloads that depend on long-lived connections.
+
+## Rolling update phases
+
+By default, the ZTunnel DaemonSet uses the `RollingUpdate` strategy and processes one node at a time. On each node, the replacement passes through the following phases:
+
+- **Startup** — The new ZTunnel pod starts while the old one keeps serving traffic.
+- **Readiness** — The new ZTunnel establishes its listeners in every pod on the node and reports ready. Both instances briefly run side by side, and because ZTunnel uses `SO_REUSEPORT`, either one may accept a new connection during this window.
+- **Draining** — Kubernetes sends `SIGTERM` to the old ZTunnel, which immediately closes its listeners and begins draining. From this point, only the new ZTunnel accepts connections; at no moment is the node left without a listening ZTunnel.
+- **Connection processing** — The old ZTunnel continues to serve the connections it already holds.
+- **Termination** — When the drain period defined by `terminationGracePeriodSeconds` expires, the old ZTunnel forcefully closes any connection that is still open.
+
+Any connection that outlives the drain period is reset. The two sections below describe how to either extend that period or avoid the forced reset entirely.
+
+## Configuring graceful connection termination
+
+The simplest mitigation is to raise `terminationGracePeriodSeconds` high enough for your applications' connections to finish naturally during the drain phase. Choosing a good value requires knowing the connection lifetimes of the workloads in the mesh. Keep in mind that the DaemonSet processes one node at a time, so a very large value stretches the duration of the whole cluster update — aim for a balanced setting.
+
+Set the value in the `ZTunnel` custom resource (CR):
+
+```yaml
+apiVersion: sailoperator.io/v1
+kind: ZTunnel
+metadata:
+  name: default
+spec:
+  version: v1.28.6
+  namespace: ztunnel
+  values:
+    ztunnel:
+      terminationGracePeriodSeconds: 300 # [!code callout]
+```
+
+<Callouts>
+    1. Five minutes in this example — tune the value to the longest connection lifetime you need to protect.
+</Callouts>
+
+:::note
+Applications that implement retry logic or use short keepalive timeouts recover from a ZTunnel restart much more gracefully than applications holding very long idle TCP connections.
+:::
+
+## Safely updating ZTunnel by draining nodes
+
+Since a TCP connection cannot be transferred between ZTunnel processes, the only reliable way to move an application onto the new ZTunnel is to gracefully restart the application itself. Draining the node achieves this in a controlled way: the applications shut down according to their own termination grace periods, the empty node gets its ZTunnel swapped without any traffic at risk, and the applications reconnect through the new ZTunnel when they return.
+
+**Procedure**
+
+1. Switch the ZTunnel DaemonSet to the `OnDelete` update strategy, so that new pods are created only after you delete the old ones:
+
+    ```yaml
+    apiVersion: sailoperator.io/v1
+    kind: ZTunnel
+    metadata:
+      name: default
+    spec:
+      version: v1.28.6
+      namespace: ztunnel
+      values:
+        ztunnel:
+          updateStrategy:
+            type: OnDelete # [!code callout]
+    ```
+
+    <Callouts>
+        1. With `OnDelete`, updating the `ZTunnel` resource does not replace any running pod by itself; each node updates only when you delete its ZTunnel pod.
+    </Callouts>
+
+2. Set the `spec.version` field of the `ZTunnel` CR to the target version.
+
+3. Drain a node. All applications move to other nodes and close their long-lived connections gracefully, governed by their own `terminationGracePeriodSeconds`.
+
+4. Delete the old ZTunnel pod on the drained node and wait for the new one to start. Because no workloads remain on the node, the swap carries no risk to traffic.
+
+5. Mark the node as schedulable again. Workloads that land back on the node automatically use the new ZTunnel.
+
+6. Repeat steps 3 through 5 for every remaining node in the cluster.
+
+## Additional resources
+
+- [Troubleshoot ZTunnel](https://istio.io/latest/docs/ambient/usage/troubleshoot-ztunnel/) (Istio documentation)
+- [Troubleshoot waypoint proxies](https://istio.io/latest/docs/ambient/usage/troubleshoot-waypoint/) (Istio documentation)
