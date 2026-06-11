@@ -116,19 +116,8 @@ test_deploying_bookinfo() {
     fi
     log_success "应用运行验证通过"
 
-    # 9. (可选) 生成请求流量
-    if [ "${AUTO_GEN_BOOKINFO_TRAFFIC:-false}" == "true" ]; then
-        log_info "步骤 8: 生成请求流量"
-        local ratings_pod
-        ratings_pod=$(kubectl get pod -l app=ratings -n bookinfo -o jsonpath='{.items[0].metadata.name}')
-        if [ -n "$ratings_pod" ]; then
-            log_info "在 ratings pod ($ratings_pod) 中启动流量生成..."
-            kubectl exec "$ratings_pod" -c ratings -n bookinfo -- bash -lc "(while true; do curl -sS productpage:9080/productpage >/dev/null; sleep 9.9; done) >/dev/null 2>&1 & disown"
-            log_success "流量生成已启动"
-        else
-            log_warn "未找到 ratings pod, 跳过流量生成"
-        fi
-    fi
+    # 9. (可选) 生成请求流量（AUTO_GEN_BOOKINFO_TRAFFIC=true 时在 ratings pod 后台起流量）
+    maybe_gen_bookinfo_traffic
         
     # TODO: 网关部分测试
     # 注:网关部分的测试需要根据实际部署方式(Gateway Injection 或 Gateway API)来实现

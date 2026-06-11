@@ -159,7 +159,7 @@ When updating Istio using the `InPlace` strategy, you can increment the version 
 
 - You are logged in to the Alauda Container Platform web console as **cluster-admin**.
 - You have installed the Alauda Container Platform Networking for Multus plugin, and kube-ovn must be v4.1.5 or later.
-- You have installed the Alauda Service Mesh v2 Operator, and deployed Istio.
+- You have deployed Istio, and upgraded the Alauda Service Mesh v2 Operator to a version that provides the new target Istio version. For more information, see [Understanding Operator updates and channels](./index.mdx#understanding-operator-updates-and-channels).
 - You have installed `istioctl` on your local machine.
 - You have configured the Istio control plane to use the `InPlace` update strategy. In this example, the `Istio` resource named `default` is deployed in the `istio-system` namespace.
 - You have installed the Istio CNI plugin with the desired version. In this example, the `IstioCNI` resource named `default` is deployed in the `istio-cni` namespace.
@@ -205,7 +205,9 @@ When updating Istio using the `InPlace` strategy, you can increment the version 
    default   istio-system             1           1       1        default           Healthy   v1.28.6   18m5s
    ```
 
-4. Restart the application workloads so that the new version of the sidecar gets injected by running the following command:
+4. Update the Istio CNI plugin to the same version as the control plane. The `IstioCNI` resource is updated independently of the `Istio` resource, so changing the control plane version does not update the CNI plugin automatically. For the detailed steps, see [The Istio CNI update process](./istio-cni.mdx).
+
+5. Restart the application workloads so that the new version of the sidecar gets injected by running the following command:
 
    ```bash {name=update-inplace:restart-workloads}
    kubectl rollout restart deployment -n bookinfo
