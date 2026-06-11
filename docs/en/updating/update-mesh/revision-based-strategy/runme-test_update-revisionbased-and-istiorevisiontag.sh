@@ -108,6 +108,9 @@ EOF
     _wait_for_deployment bookinfo reviews-v3
     log_success "所有 bookinfo deployments 已就绪"
 
+    # (可选) 部署就绪后生成 bookinfo 请求流量（仅 AUTO_GEN_BOOKINFO_TRAFFIC=true）
+    maybe_gen_bookinfo_traffic
+
     # 11. 检查 IstioRevisionTag 资源状态（安装后）
     log_info "步骤 11: 检查 IstioRevisionTag 资源状态（安装后）"
     output=$(runme run update-revisionbased-tag:get-revisiontag-install 2>&1)
@@ -273,6 +276,9 @@ EOF
     _wait_for_deployment bookinfo reviews-v2
     _wait_for_deployment bookinfo reviews-v3
     log_success "所有 bookinfo deployments 已就绪（重启后）"
+
+    # (可选) 重启后重新生成 bookinfo 请求流量（原 ratings pod 已随重启销毁，需重新启动）
+    maybe_gen_bookinfo_traffic
 
     # ===== 验证 =====
 

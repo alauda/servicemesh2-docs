@@ -113,6 +113,10 @@ test_updating_ambient_components() {
         return 1
     }
 
+    # (可选) 纳入 ambient 网格后生成 bookinfo 请求流量（仅 AUTO_GEN_BOOKINFO_TRAFFIC=true）
+    # ambient 模式数据面为 per-node ztunnel，组件升级不会重启 bookinfo 应用 pod，故无需重启后重新生成
+    maybe_gen_bookinfo_traffic
+
     # ==========================================
     # Section 2: 升级 Istio 控制面 → v1.28.6
     # ==========================================
