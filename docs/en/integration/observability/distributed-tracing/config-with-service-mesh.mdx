@@ -35,6 +35,22 @@ The Jaeger v2 instance and the OpenTelemetry Collector are not service-mesh-spec
 **Procedure**
 
 <Steps>
+  ### (Optional) Label the `jaeger-system` namespace when the mesh uses discovery selectors
+
+  If the mesh limits the namespaces that the control plane watches by setting `discoverySelectors` on the `Istio` resource, the namespace that hosts the OpenTelemetry Collector (the `jaeger-system` namespace by default) must also match one of those selectors. Otherwise the control plane does not push the Collector Service to the sidecar proxies, and the proxies cannot export spans to it.
+
+  Apply the label that your `discoverySelectors` match to the `jaeger-system` namespace. For example, if the selectors match the `istio-discovery=enabled` label:
+
+  ```bash {name=mesh-tracing:label-jaeger-system-discovery}
+  kubectl label namespace jaeger-system istio-discovery=enabled
+  ```
+
+  :::note
+  Skip this step when the mesh does not use `discoverySelectors`. By default the control plane discovers every namespace, so the Collector is already visible and no extra label is required. Adding the label when discovery selectors are not in use has no effect.
+  :::
+
+  For more information about discovery selectors, see [Using `DiscoverySelectors`](../../../installing/installing-service-mesh/scoping-the-service-mesh/using-discovery-selectors.mdx) for sidecar mode, and [Discovery selectors in ambient mode](../../../installing/ambient-mode/ambient-discovery-selectors.mdx) for ambient mode.
+
   ### Update the `Istio` resource to enable tracing and define the OpenTelemetry tracing provider
 
   **Example: Enabling tracing via `meshConfig`**
