@@ -129,13 +129,13 @@ This section exists so that you can walk through the update process from a known
     b. Deploy the Bookinfo application:
 
     ```shell {name=update-ambient:deploy-bookinfo}
-    kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
+    kubectl apply -n bookinfo -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.28/samples/bookinfo/platform/kube/bookinfo.yaml
     ```
 
     c. Deploy the per-version services of the Bookinfo application:
 
     ```shell {name=update-ambient:deploy-bookinfo-versions}
-    kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo-versions.yaml
+    kubectl apply -n bookinfo -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.28/samples/bookinfo/platform/kube/bookinfo-versions.yaml
     ```
 
     d. Enroll all workloads of the namespace in the ambient mesh:

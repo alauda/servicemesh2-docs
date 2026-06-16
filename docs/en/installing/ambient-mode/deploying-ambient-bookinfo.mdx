@@ -31,13 +31,13 @@ You can deploy the Bookinfo sample application in ambient mode without sidecar i
 3. Deploy the `Bookinfo` application:
 
     ```bash {name=ambient-bookinfo:deploy-application}
-    kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
+    kubectl apply -n bookinfo -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.28/samples/bookinfo/platform/kube/bookinfo.yaml
     ```
 
     Apply the `bookinfo-versions` YAML file to create multiple versions of the `Bookinfo` services:
 
     ```bash {name=ambient-bookinfo:deploy-versions}
-    kubectl apply -n bookinfo -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo-versions.yaml
+    kubectl apply -n bookinfo -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.28/samples/bookinfo/platform/kube/bookinfo-versions.yaml
     ```
 
 4. Verify that the Bookinfo pods are running:

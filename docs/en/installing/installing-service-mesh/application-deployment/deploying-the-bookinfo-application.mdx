@@ -78,7 +78,7 @@ Additional details can be found in the upstream Istio documentation for the [Boo
 4.  Deploy the `bookinfo` application by applying its YAML file with the following command:
 
     ```shell {name=bookinfo:deploy-application}
-    kubectl -n bookinfo apply -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/platform/kube/bookinfo.yaml
+    kubectl -n bookinfo apply -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.28/samples/bookinfo/platform/kube/bookinfo.yaml
     ```
 
 ### Verification
@@ -157,7 +157,7 @@ The gateway injection technique leverages the same mechanism as Istio sidecar in
 2.  Configure the `bookinfo` application to use the newly created gateway by running this command:
 
     ```shell
-    kubectl -n bookinfo apply -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/networking/bookinfo-gateway.yaml
+    kubectl -n bookinfo apply -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.28/samples/bookinfo/networking/bookinfo-gateway.yaml
     ```
 
     :::note
@@ -250,7 +250,7 @@ With the Kubernetes Gateway API, a gateway is deployed through the creation of a
 1.  Create and configure a gateway with the `Gateway` and `HTTPRoute` resources by executing the command below:
 
     ```shell
-    kubectl -n bookinfo apply -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/bookinfo/gateway-api/bookinfo-gateway.yaml 
+    kubectl -n bookinfo apply -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.28/samples/bookinfo/gateway-api/bookinfo-gateway.yaml 
     ```
 
     :::note
