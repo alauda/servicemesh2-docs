@@ -6,6 +6,10 @@ weight: 20
 
 This guide demonstrates using Istio `Gateway` and `VirtualService` resources to configure a gateway deployed via gateway injection. These resources set up the gateway to expose a service inside the mesh to traffic from outside. Afterward, you expose the gateway to traffic external to the cluster by changing the gateway's `Service` to type `LoadBalancer`.
 
+:::note
+Use this approach for sidecar-based deployments where you already use Istio `Gateway` and `VirtualService` resources and do not plan to migrate to ambient mode. For ambient mode, use the Kubernetes Gateway API instead.
+:::
+
 ## Prerequisites
 
   - An Istio gateway has been installed using [gateway injection](../gateway-installation/installing-a-gateway-via-injection.mdx).
