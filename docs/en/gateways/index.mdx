@@ -11,11 +11,16 @@ A **gateway** is a dedicated Envoy proxy deployment paired with a Kubernetes Ser
 In Alauda Service Mesh, you can install gateways in two ways:
 
 - **Gateway injection** — Apply labels and annotations to Kubernetes `Deployment` and `Service` resources so the Istio control plane injects and configures the gateway proxy. See [Gateway installation](./gateway-installation/index.mdx).
-- **Kubernetes Gateway API** — Deploy gateways declaratively with Kubernetes Gateway API resources. See [Directing Traffic into the Mesh](./directing-traffic-into-the-mesh/index.mdx) for ingress and [Directing Outbound Traffic](./directing-outbound-traffic/index.mdx) for egress.
+- **Kubernetes Gateway API** — Deploy gateways declaratively with Kubernetes Gateway API resources.
 
 The supported gateway configuration depends on the deployment mode:
 
 - **Sidecar mode** — Configure gateways with Istio `Gateway` and `VirtualService` resources, or with Kubernetes Gateway API resources.
 - **Ambient mode** — Configure gateways with Kubernetes Gateway API resources.
+
+After installing a gateway, you configure it to manage traffic at the mesh edge. Both installation methods support directing traffic in either direction:
+
+- **Ingress** — Route external traffic into the mesh. See [Directing Traffic into the Mesh](./directing-traffic-into-the-mesh/index.mdx).
+- **Egress** — Route traffic from the mesh to external services. See [Directing Outbound Traffic](./directing-outbound-traffic/index.mdx).
 
 <Overview overviewHeaders={[]} />
