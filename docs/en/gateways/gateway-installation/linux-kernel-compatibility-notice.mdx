@@ -28,7 +28,7 @@ Skip this section if your kernel version is 4.11 or later.
    <details>
      <summary>Click to expand</summary>
 
-     ```yaml title="gateway-injection-template.txt"
+     ```yaml title="gateway-injection-template.txt" {name=kernel-compat:istio-injection-template}
      {{- $containers := list }}
      {{- range $index, $container := .Spec.Containers }}{{ if not (eq $container.Name "istio-proxy") }}{{ $containers = append $containers $container.Name }}{{end}}{{- end}}
      metadata:
@@ -323,7 +323,7 @@ If the gateway still cannot listen on ports below 1024 after adding the `NET_BIN
 
 2. Patch the default `gateway` injection template for `Istio` resource:
 
-   ```bash
+   ```bash {name=kernel-compat:patch-istio-template}
    TEMPLATE_CONTENT=$(cat gateway-injection-template.txt)
    PATCH_DATA=$(jq -n \
      --arg template "${TEMPLATE_CONTENT}" \
@@ -344,7 +344,7 @@ If the gateway still cannot listen on ports below 1024 after adding the `NET_BIN
 
 3. Wait for the control plane to return the `Ready` status condition by running the following command:
 
-   ```bash
+   ```bash {name=kernel-compat:wait-istio-ready}
    kubectl wait --for condition=Ready istio/default --timeout=3m
    ```
 
@@ -360,7 +360,7 @@ If the gateway still cannot listen on ports below 1024 after adding the `NET_BIN
 
 1. Create a ConfigMap named `asm-kube-gateway-options` in the same namespace where you plan to deploy your Gateway:
 
-   ```yaml
+   ```yaml {name=kernel-compat:k8s-gateway-options-scenario1}
    apiVersion: v1
    kind: ConfigMap
    metadata:
@@ -384,7 +384,7 @@ If the gateway still cannot listen on ports below 1024 after adding the `NET_BIN
 
 If your gateway needs to listen on ports below 1024, add the `NET_BIND_SERVICE` capability in the ConfigMap. Modify the `data.deployment` field to include container-level security context:
 
-```yaml
+```yaml {name=kernel-compat:k8s-gateway-options-scenario2}
 apiVersion: v1
 kind: ConfigMap
 metadata:
