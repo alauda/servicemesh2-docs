@@ -26,12 +26,10 @@ test_routing_egress_traffic_via_istio_apis() {
     # 前置：通过 gateway injection 安装 egress 网关（文档前置条件）
     # ==========================================
 
-    # 步骤 1: (仅 ENABLE_GW_LINUX_KERNEL_COMPAT=true 生效) egress 网关监听 80 特权端口，
-    #         先按 Scenario 2 修补 mesh 级注入模板（去 sysctls + root），须在装网关前完成
-    apply_kernel_compat_istio_gateway true || return 1
-
-    # 步骤 2: 通过 gateway injection 安装 egress 网关（含去 infra 调度；内核兼容时 Deployment 以 root 运行）
-    install_gateway_via_injection "$GW_NAME" "$GW_NS" || return 1
+    # 通过 gateway injection 安装 egress 网关（忠实下发文档 YAML）。egress 网关监听 80 特权端口，
+    # 故传 run_as_root=true：install_gateway_via_injection 内部按 Scenario 2 处理内核 < 4.11 兼容
+    # （开关开时先修补 mesh 级 gateway 注入模板再装网关，关时为 no-op）。
+    install_gateway_via_injection "$GW_NAME" "$GW_NS" true || return 1
 
     # ==========================================
     # Section 1: Procedure（配置 ServiceEntry / Gateway / DestinationRule / VirtualService）
