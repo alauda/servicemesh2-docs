@@ -17,6 +17,9 @@ test_exposing_a_service_via_k8s_gateway_api_in_ambient_mode() {
     log_info "开始 Ambient Gateway API 暴露服务测试"
     log_info "=========================================="
 
+    # 步骤 0: (仅 ENABLE_METALLB=true 生效) 为单集群创建外部 IP 地址池，供后续 LoadBalancer 取址
+    setup_external_ip_pools "$SINGLE_CLUSTER_NAME" || return 1
+
     # ==========================================
     # Section 1: Procedure（配置命名空间和部署服务）
     # ==========================================
@@ -261,11 +264,16 @@ cleanup_exposing_a_service_via_k8s_gateway_api_in_ambient_mode() {
     log_info "清理 Ambient Gateway API 测试资源"
     log_info "=========================================="
 
+    local rc=0
+
     runme run ambient-gw-api:cleanup || {
         log_error "清理资源失败"
-        return 1
+        rc=1
     }
 
-    log_success "测试资源清理完成"
-    return 0
+    # 回收外部 IP 地址池（仅 ENABLE_METALLB=true 生效）
+    teardown_external_ip_pools "$SINGLE_CLUSTER_NAME" || rc=1
+
+    [ "$rc" -eq 0 ] && log_success "测试资源清理完成"
+    return "$rc"
 }

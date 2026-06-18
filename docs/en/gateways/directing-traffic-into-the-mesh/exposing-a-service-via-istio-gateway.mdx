@@ -19,13 +19,13 @@ Use this approach for sidecar-based deployments where you already use Istio `Gat
 
 1.  Create a new namespace named `httpbin` by executing the command below:
 
-    ```shell
+    ```shell {name=istio-gw:create-httpbin-ns}
     kubectl create namespace httpbin
     ```
 
 2.  Enable sidecar injection for the namespace. If your setup uses the `InPlace` upgrade strategy, run this command:
 
-    ```shell
+    ```shell {name=istio-gw:label-injection}
     kubectl label namespace httpbin istio-injection=enabled
     ```
 
@@ -56,13 +56,13 @@ Use this approach for sidecar-based deployments where you already use Istio `Gat
 
 3.  Deploy the `httpbin` sample service by running the following command:
 
-    ```shell
+    ```shell {name=istio-gw:deploy-httpbin}
     kubectl apply -n httpbin -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/httpbin/httpbin.yaml
     ```
 
 4.  Create a file named `httpbin-gw.yaml` that contains an Istio `Gateway` resource definition. This resource configures the gateway proxies to open port 80 (HTTP) for the host `httpbin.example.com`.
 
-    ```yaml
+    ```yaml {name=istio-gw:gateway-yaml}
     apiVersion: networking.istio.io/v1
     kind: Gateway
     metadata:
@@ -87,13 +87,13 @@ Use this approach for sidecar-based deployments where you already use Istio `Gat
 
 5.  Apply the YAML file with this command:
 
-    ```shell
+    ```shell {name=istio-gw:apply-gateway}
     kubectl apply -f httpbin-gw.yaml
     ```
 
 6.  Create another YAML file named `httpbin-vs.yaml` for a `VirtualService`. This `VirtualService` will define rules to route traffic from the gateway proxy to the `httpbin` service.
 
-    ```yaml
+    ```yaml {name=istio-gw:virtualservice-yaml}
     apiVersion: networking.istio.io/v1
     kind: VirtualService
     metadata:
@@ -124,7 +124,7 @@ Use this approach for sidecar-based deployments where you already use Istio `Gat
 
 7.  Apply the YAML file using this command:
 
-    ```shell
+    ```shell {name=istio-gw:apply-virtualservice}
     kubectl apply -f httpbin-vs.yaml
     ```
 
@@ -133,25 +133,25 @@ Use this approach for sidecar-based deployments where you already use Istio `Gat
 
 1.  Create a namespace for a `curl` client by executing this command:
 
-    ```shell
+    ```shell {name=istio-gw:create-curl-ns}
     kubectl create namespace curl
     ```
 
 2.  Deploy the `curl` client with the following command:
 
-    ```shell
+    ```shell {name=istio-gw:deploy-curl}
     kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/curl/curl.yaml
     ```
 
 3. Store the name of the `curl` pod in a `CURL_POD` variable by running this command:
 
-    ```shell
+    ```shell {name=istio-gw:get-curl-pod}
     CURL_POD=$(kubectl get pods -n curl -l app=curl -o jsonpath='{.items[*].metadata.name}')
     ```
 
 4. From the `curl` client, send a request to the `/headers` endpoint of the `httpbin` application via the ingress gateway `Service`. Set the `Host` header to `httpbin.example.com` to align with the host specified in the Istio `Gateway` and `VirtualService`. Execute the following `curl` command:
 
-    ```shell
+    ```shell {name=istio-gw:test-headers}
     kubectl exec $CURL_POD -n curl -- \
       curl -sS -I \
         -H Host:httpbin.example.com \
@@ -162,15 +162,16 @@ Use this approach for sidecar-based deployments where you already use Istio `Gat
 
     **Example output**
 
-    ```shell
+    ```shell {name=istio-gw:test-headers-output}
     HTTP/1.1 200 OK
+    ...
     server: istio-envoy
     ...
     ```
 
 6. Send another request to an endpoint that lacks a corresponding URI prefix match in the `httpbin` `VirtualService` by running this command:
 
-    ```shell
+    ```shell {name=istio-gw:test-get}
     kubectl exec $CURL_POD -n curl -- \
       curl -sS -I \
         -H Host:httpbin.example.com \
@@ -181,15 +182,16 @@ Use this approach for sidecar-based deployments where you already use Istio `Gat
 
     **Example output**
 
-    ```shell
+    ```shell {name=istio-gw:test-get-output}
     HTTP/1.1 404 Not Found
+    ...
     server: istio-envoy
     ...
     ```
 
 7. Expose the gateway proxy to traffic from outside the cluster by changing its `Service` type to `LoadBalancer`:
 
-    ```shell
+    ```shell {name=istio-gw:expose-lb}
     kubectl patch service <gateway_name> -n <gateway_namespace> -p '{"spec": {"type": "LoadBalancer"}}'
     ```
 
@@ -197,34 +199,43 @@ Use this approach for sidecar-based deployments where you already use Istio `Gat
 
     a.  Set the `INGRESS_HOST` variable with this command:
 
-        ```shell
-        INGRESS_HOST=$(kubectl get service <gateway_name> -n <gateway_namespace> -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-        echo "INGRESS_HOST=$INGRESS_HOST"
-        ```
+    ```shell {name=istio-gw:get-ingress-host}
+    INGRESS_HOST=$(kubectl get service <gateway_name> -n <gateway_namespace> -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    echo "INGRESS_HOST=$INGRESS_HOST"
+    ```
 
-        <Directive type="danger" title=" ">
+    <Directive type="danger" title=" ">
 
-        In certain environments, the load balancer may be exposed using a host name, instead of an IP address. In this case, the ingress gateway's `EXTERNAL-IP` value will not be an IP address, but rather a host name, and the above command will have failed to set the `INGRESS_HOST` environment variable. Use the following command to correct the `INGRESS_HOST` value:
+    In certain environments, the load balancer may be exposed using a host name, instead of an IP address. In this case, the ingress gateway's `EXTERNAL-IP` value will not be an IP address, but rather a host name, and the above command will have failed to set the `INGRESS_HOST` environment variable. Use the following command to correct the `INGRESS_HOST` value:
 
-        ```shell
-        INGRESS_HOST=$(kubectl get service <gateway_name> -n <gateway_namespace> -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-        echo "INGRESS_HOST=$INGRESS_HOST"
-        ```
+    ```shell {name=istio-gw:get-ingress-host-fallback}
+    INGRESS_HOST=$(kubectl get service <gateway_name> -n <gateway_namespace> -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+    echo "INGRESS_HOST=$INGRESS_HOST"
+    ```
 
-        </Directive>
+    </Directive>
 
     b.  Send a `curl` request to the `httpbin` service using the gateway's host by running this command:
 
-        :::info
-        If `$INGRESS_HOST` is an IPv6 address, enclose it in square brackets when constructing the URL. For example:
+    :::info
+    If `$INGRESS_HOST` is an IPv6 address, enclose it in square brackets when constructing the URL. For example:
 
-        ```shell
-        curl -sS -g -I -H Host:httpbin.example.com http://[$INGRESS_HOST]/headers
-        ```
-        :::
+    ```shell {name=istio-gw:test-external-ipv6}
+    curl -sS -g -I -H Host:httpbin.example.com http://[$INGRESS_HOST]/headers
+    ```
+    :::
 
-        ```shell
-        curl -sS -g -I -H Host:httpbin.example.com http://$INGRESS_HOST/headers
-        ```
+    ```shell {name=istio-gw:test-external}
+    curl -sS -g -I -H Host:httpbin.example.com http://$INGRESS_HOST/headers
+    ```
 
 9. Check that the response includes the `HTTP/1.1 200 OK` status, which confirms the request succeeded.
+
+## Cleanup
+
+Remove the resources created in this procedure:
+
+```shell {name=istio-gw:cleanup}
+kubectl delete namespace curl
+kubectl delete namespace httpbin
+```
