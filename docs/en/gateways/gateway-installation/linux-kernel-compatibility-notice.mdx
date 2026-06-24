@@ -319,6 +319,12 @@ If the gateway still cannot listen on ports below 1024 after adding the `NET_BIN
 2. **Run the gateway as root** — Set `runAsUser: 0`, `runAsGroup: 0`, and `runAsNonRoot: false` in the container's `securityContext`. This grants full privileges to the gateway process. Evaluate the security implications carefully before using this approach.
 :::
 
+:::note
+If you run the gateway as root, the gateway `Deployment` you create when [installing a gateway via gateway injection](./installing-a-gateway-via-injection.mdx) must use a `securityContext` that stays **consistent** with this compatibility configuration. A container-level `runAsNonRoot: true` on the `istio-proxy` container in `gateway-deployment.yaml` takes precedence over this patched injection template: if it remains `true` while the template runs the proxy as root (`runAsUser: 0`), the gateway pod is rejected and the rollout never completes, with an error similar to `container's runAsUser breaks non-root policy (container: istio-proxy)`.
+
+To avoid this, set `runAsNonRoot: false` on the `istio-proxy` container in `gateway-deployment.yaml` (or remove the field) so that it matches the root configuration applied here. This consistency requirement applies only to the Istio gateway injection method; the Kubernetes Gateway API method described below is configured entirely through the `asm-kube-gateway-options` ConfigMap and is not affected.
+:::
+
 ### Apply the injection template
 
 2. Patch the default `gateway` injection template for `Istio` resource:

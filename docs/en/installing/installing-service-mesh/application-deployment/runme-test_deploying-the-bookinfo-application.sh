@@ -168,6 +168,16 @@ test_deploying_bookinfo() {
         return 1
     }
 
+    # 步骤 9.5: 内核兼容(root) 一致性修正——注入网关（上游 ingress-gateway.yaml）的 istio-proxy 容器
+    # 含容器级 runAsNonRoot: true，其优先级高于被修补注入模板的 runAsUser: 0，会触发
+    # kubelet "container's runAsUser breaks non-root policy"，致 pod 无法创建、rollout 卡住；
+    # 仅 ENABLE_GW_LINUX_KERNEL_COMPAT=true 时生效，否则 no-op
+    # （详见 gateways/gateway-installation/linux-kernel-compatibility-notice.mdx）。
+    reconcile_injected_gateway_runasroot bookinfo istio-ingressgateway true || {
+        log_error "注入网关内核兼容(root) 一致性修正失败"
+        return 1
+    }
+
     # 步骤 10: 等待 istio-ingressgateway 就绪（要求：脚本内 wait，文档不补此步）
     log_info "步骤 10: 等待 istio-ingressgateway deployment 就绪"
     _wait_for_deployment bookinfo istio-ingressgateway || {
