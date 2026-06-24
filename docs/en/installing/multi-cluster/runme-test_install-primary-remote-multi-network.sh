@@ -107,6 +107,7 @@ test_install_primary_remote_multi_network() {
 
     log_info "步骤 1.4a: East 应用 Linux 内核兼容处理 (仅 ENABLE_GW_LINUX_KERNEL_COMPAT=true 生效；东西向网关高端口，非 root)"
     apply_kernel_compat_istio_gateway false "$CTX_CLUSTER1" || return 1
+    sleep 3
 
     log_info "步骤 1.5: East 部署东西向网关"
     runme run primary-remote-multi-network:create-eastwest-gw-east || {
@@ -161,6 +162,7 @@ test_install_primary_remote_multi_network() {
 
     log_info "步骤 1.13a: West 应用 Linux 内核兼容处理 (仅 ENABLE_GW_LINUX_KERNEL_COMPAT=true 生效；东西向网关高端口，非 root)"
     apply_kernel_compat_istio_gateway false "$CTX_CLUSTER2" || return 1
+    sleep 3
 
     log_info "步骤 1.14: West 部署东西向网关"
     runme run primary-remote-multi-network:create-eastwest-gw-west || {
