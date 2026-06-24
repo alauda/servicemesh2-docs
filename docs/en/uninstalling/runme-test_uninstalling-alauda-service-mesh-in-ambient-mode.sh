@@ -79,6 +79,9 @@ EOF
     fi
 
     # 3. 列出 ambient 命名空间
+    # 说明：仅当有应用部署到 ambient 数据面时，才会有 namespace 打上
+    #       istio.io/dataplane-mode=ambient 标签。未部署应用时该命令输出
+    #       "No resources found" 且退出码为 0，应跳过命名空间输出断言。
     log_info "步骤 3: 列出 ambient 命名空间"
     local list_ambient_ns_output
     list_ambient_ns_output=$(runme run uninstall-ambient:list-ambient-ns 2>&1) || {
@@ -87,16 +90,27 @@ EOF
         return 1
     }
 
-    # 输出包含动态值（AGE 等），使用 __cmp_lines 验证关键字段
-    if ! __cmp_lines "$list_ambient_ns_output" "$(cat <<'EOF'
+    # 判断是否存在已纳入 ambient 数据面的命名空间（无则输出 No resources found）
+    local ambient_ns_deployed=false
+    if ! echo "$list_ambient_ns_output" | grep -q "No resources found"; then
+        ambient_ns_deployed=true
+    fi
+
+    if [ "$ambient_ns_deployed" = true ]; then
+        # 输出包含动态值（AGE 等），使用 __cmp_lines 验证关键字段
+        if ! __cmp_lines "$list_ambient_ns_output" "$(cat <<'EOF'
 + Active
 EOF
 )"; then
-        log_error "列出 ambient 命名空间验证失败"
-        log_error "实际输出: $list_ambient_ns_output"
-        return 1
+            log_error "列出 ambient 命名空间验证失败"
+            log_error "实际输出: $list_ambient_ns_output"
+            return 1
+        fi
+        log_success "列出 ambient 命名空间成功"
+    else
+        log_warn "未检测到已纳入 ambient 数据面的命名空间（未部署应用），跳过命名空间列出输出验证"
+        log_info "list-ambient-ns 输出: $list_ambient_ns_output"
     fi
-    log_success "列出 ambient 命名空间成功"
 
     # 4. 移除 ambient 标签
     log_info "步骤 4: 移除 ambient 数据面标签"
