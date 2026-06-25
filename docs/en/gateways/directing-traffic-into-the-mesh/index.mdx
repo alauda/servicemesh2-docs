@@ -4,7 +4,10 @@ weight: 20
 
 # Directing Traffic into the Mesh
 
-By using Istio APIs, you can set up gateway proxies installed through gateway injection. This allows them to receive traffic originating from outside the mesh and route it to internal services.
+Alauda Service Mesh provides two approaches for routing ingress traffic to services in the mesh. The approach you choose depends on the deployment mode and your traffic management requirements.
+
+- **Gateway injection with Istio APIs** — When you install a gateway through gateway injection, you configure ingress routing by combining the Istio `Gateway` and `VirtualService` resources. This approach suits sidecar-based deployments, where sidecar injection is enabled with the `istio-injection=enabled` or `istio.io/rev=<revision>` label.
+- **Kubernetes Gateway API** — The Kubernetes Gateway API offers a standardized way to configure ingress routing with native Kubernetes resources. You use `Gateway` and `HTTPRoute` (or `GRPCRoute`) resources to control how traffic enters the mesh and reaches services. This approach is recommended for ambient mode and is also supported for sidecar-based deployments.
 
 :::note
 For the purpose of this document, which shows how to use a gateway to control ingress traffic into your “Kubernetes cluster”, you can start the internal service with or without sidecar injection enabled (i.e., the internal service can be either inside or outside of the Istio mesh).

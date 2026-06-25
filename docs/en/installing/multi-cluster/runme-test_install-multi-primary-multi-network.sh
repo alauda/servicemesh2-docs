@@ -77,6 +77,10 @@ test_install_multi_primary_multi_network() {
         log_error "East Istio 等待 Ready 失败"; return 1
     }
 
+    log_info "步骤 1.3a: East 应用 Linux 内核兼容处理 (仅 ENABLE_GW_LINUX_KERNEL_COMPAT=true 生效；东西向网关高端口，非 root)"
+    apply_kernel_compat_istio_gateway false "$CTX_CLUSTER1" || return 1
+    sleep 3
+
     log_info "步骤 1.4: East 部署东西向网关"
     runme run multi-primary-multi-network:create-eastwest-gw-east || {
         log_error "East 东西向网关部署失败"; return 1
@@ -104,6 +108,10 @@ test_install_multi_primary_multi_network() {
     runme run multi-primary-multi-network:wait-istio-west || {
         log_error "West Istio 等待 Ready 失败"; return 1
     }
+
+    log_info "步骤 1.8a: West 应用 Linux 内核兼容处理 (仅 ENABLE_GW_LINUX_KERNEL_COMPAT=true 生效；东西向网关高端口，非 root)"
+    apply_kernel_compat_istio_gateway false "$CTX_CLUSTER2" || return 1
+    sleep 3
 
     log_info "步骤 1.9: West 部署东西向网关"
     runme run multi-primary-multi-network:create-eastwest-gw-west || {

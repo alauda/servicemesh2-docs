@@ -17,6 +17,9 @@ test_exposing_a_service_via_k8s_gateway_api_in_ambient_mode() {
     log_info "开始 Ambient Gateway API 暴露服务测试"
     log_info "=========================================="
 
+    # 步骤 0: (仅 ENABLE_METALLB=true 生效) 为单集群创建外部 IP 地址池，供后续 LoadBalancer 取址
+    setup_external_ip_pools "$SINGLE_CLUSTER_NAME" || return 1
+
     # ==========================================
     # Section 1: Procedure（配置命名空间和部署服务）
     # ==========================================
@@ -61,6 +64,9 @@ test_exposing_a_service_via_k8s_gateway_api_in_ambient_mode() {
         return 1
     }
 
+    # 步骤 5a: (仅 ENABLE_GW_LINUX_KERNEL_COMPAT=true 生效) waypoint 监听高端口，按 Scenario 1 非 root 处理
+    apply_kernel_compat_k8s_gateway_api httpbin httpbin-waypoint false || return 1
+
     # 步骤 6: 标记 service 走 waypoint
     log_info "步骤 6: 标记 httpbin service 走 waypoint"
     runme run ambient-gw-api:label-svc-waypoint || {
@@ -85,6 +91,9 @@ test_exposing_a_service_via_k8s_gateway_api_in_ambient_mode() {
         log_error "应用 gateway 失败"
         return 1
     }
+
+    # 步骤 8a: (仅 ENABLE_GW_LINUX_KERNEL_COMPAT=true 生效) ingress gateway 监听 80 特权端口，按 Scenario 2 以 root 处理
+    apply_kernel_compat_k8s_gateway_api httpbin httpbin-gateway || return 1
 
     # 步骤 9: 写入 ingress HTTPRoute YAML + 应用
     log_info "步骤 9: 部署 ingress HTTPRoute"
@@ -255,11 +264,16 @@ cleanup_exposing_a_service_via_k8s_gateway_api_in_ambient_mode() {
     log_info "清理 Ambient Gateway API 测试资源"
     log_info "=========================================="
 
+    local rc=0
+
     runme run ambient-gw-api:cleanup || {
         log_error "清理资源失败"
-        return 1
+        rc=1
     }
 
-    log_success "测试资源清理完成"
-    return 0
+    # 回收外部 IP 地址池（仅 ENABLE_METALLB=true 生效）
+    teardown_external_ip_pools "$SINGLE_CLUSTER_NAME" || rc=1
+
+    [ "$rc" -eq 0 ] && log_success "测试资源清理完成"
+    return "$rc"
 }

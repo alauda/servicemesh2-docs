@@ -2,7 +2,7 @@
 weight: 20
 ---
 
-# Routing egress traffic via a gateway with the Kubernetes Gateway API
+# Routing egress traffic via a gateway with the Kubernetes Gateway API in sidecar mode
 
 This section describes how to use the Kubernetes Gateway API to route outbound HTTP traffic through an egress gateway.
 
@@ -16,7 +16,7 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
 
 1.  Create a namespace named `egress-gateway` with the following command:
 
-    ```shell
+    ```shell {name=sidecar-egress:create-namespace}
     kubectl create namespace egress-gateway
     ```
 
@@ -25,7 +25,7 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
     <details>
     <summary>**Example egress gateway CR file**</summary>
 
-    ```yaml
+    ```yaml {name=sidecar-egress:gateway-cr-yaml}
     # ServiceEntry to allow traffic to httpbin.org
     apiVersion: networking.istio.io/v1
     kind: ServiceEntry
@@ -98,13 +98,13 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
 
     Apply this YAML file by executing the following command:
 
-    ```shell
+    ```shell {name=sidecar-egress:apply-gateway-cr}
     kubectl -n egress-gateway apply -f egress-gateway-cr.yaml
     ```
 
 3.  Check the status of the gateway configuration by running this command:
 
-    ```shell
+    ```shell {name=sidecar-egress:verify-gateway}
     kubectl -n egress-gateway get gtw httpbin-egress-gateway
     ```
 
@@ -112,7 +112,7 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
 
     **Example output**
 
-    ```shell
+    ```shell {name=sidecar-egress:verify-gateway-output}
     NAME                     CLASS   ADDRESS                                                         PROGRAMMED   AGE
     httpbin-egress-gateway   istio   httpbin-egress-gateway-istio.egress-gateway.svc.cluster.local   True         68s
     ```
@@ -183,13 +183,13 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
 
 1.  Create a namespace named `curl` by executing the following command:
 
-    ```shell
+    ```shell {name=sidecar-egress:create-curl-ns}
     kubectl create namespace curl
     ```
 
 2.  Enable sidecar injection for the namespace. If your setup uses the `InPlace` upgrade strategy, run this command:
 
-    ```shell
+    ```shell {name=sidecar-egress:label-injection}
     kubectl label namespace curl istio-injection=enabled
     ```
 
@@ -220,20 +220,20 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
 
 3.  Deploy the `curl` application by running this command:
 
-    ```shell
+    ```shell {name=sidecar-egress:deploy-curl}
     kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/curl/curl.yaml
     ```
 
 4.  Initialize and export a `CURL_POD` environment variable containing the name of the curl pod:
 
-    ```shell
+    ```shell {name=sidecar-egress:get-curl-pod}
     export CURL_POD=$(kubectl get pod -n curl -l app=curl -o jsonpath='{.items[0].metadata.name}')
     echo "CURL_POD=$CURL_POD"
     ```
 
 5.  Using the `curl` client, confirm that you can reach `httpbin.org` via the egress gateway by entering this command:
 
-    ```shell
+    ```shell {name=sidecar-egress:verify-egress}
     kubectl exec "$CURL_POD" -n curl -c curl -- curl -sS -v http://httpbin.org/get
     ```
 
@@ -241,7 +241,7 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
 
      **Example output**
 
-    ```shell
+    ```shell {name=sidecar-egress:verify-egress-output}
     ...
     {
       "headers": {
@@ -256,3 +256,12 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
     < server: envoy
     ...
     ```
+
+## Cleanup
+
+Remove the resources created in this procedure:
+
+```shell {name=sidecar-egress:cleanup}
+kubectl delete namespace curl
+kubectl delete namespace egress-gateway
+```

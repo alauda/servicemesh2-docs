@@ -135,7 +135,7 @@ Additional details can be found in the upstream Istio documentation for the [Boo
 
 Gateways are not deployed by the Alauda Service Mesh v2 Operator because they are not considered part of the control plane. For security, it is a best practice to deploy Ingress and Egress gateways in a separate namespace from the control plane.
 
-There are two methods for deploying gateways: [using the Gateway API](../../../gateways/directing-traffic-into-the-mesh/exposing-a-service-via-k8s-gateway-api.mdx) or [the gateway injection technique](../../../gateways/gateway-installation/installing-a-gateway-via-injection.mdx).
+There are two methods for deploying gateways: [using the Gateway API](../../../gateways/directing-traffic-into-the-mesh/exposing-a-service-via-k8s-gateway-api-in-sidecar-mode.mdx) or [the gateway injection technique](../../../gateways/gateway-installation/installing-a-gateway-via-injection.mdx).
 
 ### Accessing the Bookinfo Application with Istio Gateway Injection
 
@@ -150,13 +150,13 @@ The gateway injection technique leverages the same mechanism as Istio sidecar in
 
 1.  Execute the following command to create the `istio-ingressgateway` deployment and service:
 
-    ```shell
+    ```shell {name=bookinfo:gw-inject-create-gateway}
     kubectl -n bookinfo apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/refs/heads/main/chart/samples/ingress-gateway.yaml
     ```
 
 2.  Configure the `bookinfo` application to use the newly created gateway by running this command:
 
-    ```shell
+    ```shell {name=bookinfo:gw-inject-configure}
     kubectl -n bookinfo apply -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.28/samples/bookinfo/networking/bookinfo-gateway.yaml
     ```
 
@@ -168,7 +168,7 @@ The gateway injection technique leverages the same mechanism as Istio sidecar in
 
     **Example configuration**
 
-    ```yaml
+    ```yaml {name=bookinfo:gw-inject-hpa-yaml}
     apiVersion: autoscaling/v2
     kind: HorizontalPodAutoscaler
     metadata:
@@ -201,7 +201,7 @@ The gateway injection technique leverages the same mechanism as Istio sidecar in
 
     **Example configuration**
 
-    ```yaml
+    ```yaml {name=bookinfo:gw-inject-pdb-yaml}
     apiVersion: policy/v1
     kind: PodDisruptionBudget
     metadata:
@@ -249,7 +249,7 @@ With the Kubernetes Gateway API, a gateway is deployed through the creation of a
 
 1.  Create and configure a gateway with the `Gateway` and `HTTPRoute` resources by executing the command below:
 
-    ```shell
+    ```shell {name=bookinfo:gw-api-create-gateway}
     kubectl -n bookinfo apply -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.28/samples/bookinfo/gateway-api/bookinfo-gateway.yaml 
     ```
 
@@ -259,20 +259,20 @@ With the Kubernetes Gateway API, a gateway is deployed through the creation of a
 
 3.  Ensure the Gateway API service is ready and has an address by running the following command:
 
-    ```shell
+    ```shell {name=bookinfo:gw-api-wait-programmed}
     kubectl wait --for=condition=programmed gtw bookinfo-gateway -n bookinfo
     ```
 
 4.  Retrieve the host with this command:
 
-    ```shell
+    ```shell {name=bookinfo:gw-api-get-host}
     export INGRESS_HOST=$(kubectl get gtw bookinfo-gateway -n bookinfo -o jsonpath='{.status.addresses[0].value}')
     echo "INGRESS_HOST=$INGRESS_HOST"
     ```
 
 5.  Retrieve the port with this command:
 
-    ```shell
+    ```shell {name=bookinfo:gw-api-get-port}
     export INGRESS_PORT=$(kubectl get gtw bookinfo-gateway -n bookinfo -o jsonpath='{.spec.listeners[?(@.name=="http")].port}')
     echo "INGRESS_PORT=$INGRESS_PORT"
     ```
@@ -282,18 +282,18 @@ With the Kubernetes Gateway API, a gateway is deployed through the creation of a
     :::info
     If `$INGRESS_HOST` is an IPv6 address, enclose it in square brackets when constructing the URL. For example:
 
-    ```shell
+    ```shell {name=bookinfo:gw-api-get-url-ipv6}
     export GATEWAY_URL=[$INGRESS_HOST]:$INGRESS_PORT
     ```
     :::
 
-    ```shell
+    ```shell {name=bookinfo:gw-api-get-url}
     export GATEWAY_URL=$INGRESS_HOST:$INGRESS_PORT
     ```
 
 7.  Get the full URL for the product page by running the following command:
 
-    ```shell
+    ```shell {name=bookinfo:gw-api-echo-url}
     echo "http://${GATEWAY_URL}/productpage"
     ```
 
@@ -301,13 +301,13 @@ With the Kubernetes Gateway API, a gateway is deployed through the creation of a
 
   - Confirm that the **productpage** is accessible with the `curl` command:
     
-    ```shell
+    ```shell {name=bookinfo:gw-api-verify}
     curl -sS -g "http://${GATEWAY_URL}/productpage" | grep -o "<title>.*</title>"
     ```
 
     **Example output**
 
-    ```html
+    ```html {name=bookinfo:gw-api-verify-output}
     <title>Simple Bookstore App</title>
     ```
 
@@ -316,3 +316,11 @@ With the Kubernetes Gateway API, a gateway is deployed through the creation of a
     Point your browser to `http://${GATEWAY_URL}/productpage` to view the Bookinfo web page.
     
     When you refresh the page several times, you should see different versions of reviews shown in `productpage`, presented in a round robin style (red stars, black stars, no stars), since we haven't yet used Istio to control the version routing.
+
+## Removing the Bookinfo Application
+
+When you are finished exploring the Bookinfo application, remove the application and all of its associated gateway resources by deleting the `bookinfo` namespace:
+
+```shell {name=bookinfo:cleanup}
+kubectl delete namespace bookinfo
+```
