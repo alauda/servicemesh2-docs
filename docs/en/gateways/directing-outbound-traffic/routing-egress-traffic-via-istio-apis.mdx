@@ -6,6 +6,10 @@ weight: 10
 
 This section explains how to use Istio APIs to route outbound HTTP traffic via a gateway installed with gateway injection.
 
+:::note
+Use this approach for sidecar-based deployments. In ambient mode, configure egress routing with the Kubernetes Gateway API instead.
+:::
+
 ## Prerequisites
 
   - An Istio gateway has been installed using [gateway injection](../gateway-installation/installing-a-gateway-via-injection.mdx).
@@ -14,13 +18,13 @@ This section explains how to use Istio APIs to route outbound HTTP traffic via a
 
 1.  Create a namespace named `curl` by executing the following command:
 
-    ```shell
+    ```shell {name=istio-egress:create-curl-ns}
     kubectl create namespace curl
     ```
 
 2.  Enable sidecar injection for the namespace. If your setup uses the `InPlace` upgrade strategy, run this command:
 
-    ```shell
+    ```shell {name=istio-egress:label-injection}
     kubectl label namespace curl istio-injection=enabled
     ```
 
@@ -51,13 +55,13 @@ This section explains how to use Istio APIs to route outbound HTTP traffic via a
 
 3.  Deploy the `curl` application by running this command:
 
-    ```shell
+    ```shell {name=istio-egress:deploy-curl}
     kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/curl/curl.yaml
     ```
 
 4.  Initialize and export a `CURL_POD` environment variable containing the name of the curl pod:
 
-    ```shell
+    ```shell {name=istio-egress:get-curl-pod}
     export CURL_POD=$(kubectl get pod -n curl -l app=curl -o jsonpath='{.items[0].metadata.name}')
     echo "CURL_POD=$CURL_POD"
     ```
@@ -66,7 +70,7 @@ This section explains how to use Istio APIs to route outbound HTTP traffic via a
 
     **Example configuration**
 
-    ```yaml
+    ```yaml {name=istio-egress:service-entry-yaml}
     apiVersion: networking.istio.io/v1
     kind: ServiceEntry
     metadata:
@@ -85,13 +89,13 @@ This section explains how to use Istio APIs to route outbound HTTP traffic via a
 
 6.  Apply this YAML file by executing the command:
 
-    ```shell
+    ```shell {name=istio-egress:apply-service-entry}
     kubectl apply -f http-se.yaml
     ```
 
 7.  Confirm that the `ServiceEntry` configuration has been applied successfully. Send an HTTP request to the host specified in the previous step by running this command:
 
-    ```shell
+    ```shell {name=istio-egress:verify-se-direct}
     kubectl exec "$CURL_POD" -n curl -c curl -- curl -sSL -o /dev/null -D - http://docs.alauda.io
     ```
 
@@ -101,7 +105,7 @@ This section explains how to use Istio APIs to route outbound HTTP traffic via a
 
     **Example configuration**
 
-    ```yaml
+    ```yaml {name=istio-egress:gateway-yaml}
     apiVersion: networking.istio.io/v1alpha3
     kind: Gateway
     metadata:
@@ -131,7 +135,7 @@ This section explains how to use Istio APIs to route outbound HTTP traffic via a
 
 9.  Apply the YAML file by executing the command:
 
-    ```shell
+    ```shell {name=istio-egress:apply-gateway}
     kubectl apply -f http-egress-gw.yaml
     ```
 
@@ -139,7 +143,7 @@ This section explains how to use Istio APIs to route outbound HTTP traffic via a
 
     **Example configuration**
 
-    ```yaml
+    ```yaml {name=istio-egress:virtualservice-yaml}
     apiVersion: networking.istio.io/v1alpha3
     kind: VirtualService
     metadata:
@@ -177,13 +181,13 @@ This section explains how to use Istio APIs to route outbound HTTP traffic via a
 
 11. Apply this YAML file by running the following command:
 
-    ```shell
+    ```shell {name=istio-egress:apply-virtualservice}
     kubectl apply -f http-egress-vs.yaml
     ```
 
 12. Reissue the HTTP request to the URL:
 
-    ```shell
+    ```shell {name=istio-egress:verify-egress}
     kubectl exec "$CURL_POD" -n curl -c curl -- curl -sSL -o /dev/null -D - http://docs.alauda.io
     ```
 
@@ -191,7 +195,7 @@ This section explains how to use Istio APIs to route outbound HTTP traffic via a
 
     **Example output**
 
-    ```shell
+    ```shell {name=istio-egress:verify-egress-output}
     ...
     HTTP/1.1 302 Found
     server: envoy
@@ -208,7 +212,7 @@ This section explains how to use Istio APIs to route outbound HTTP traffic via a
     <Directive type="info" title="Enable access logging">
     Access logging must be active for this verification step to function correctly. You can enable it by creating the following `Telemetry` resource.
     
-    ```shell
+    ```shell {name=istio-egress:telemetry}
     kubectl apply -f - <<EOF
     apiVersion: telemetry.istio.io/v1
     kind: Telemetry
@@ -226,7 +230,7 @@ This section explains how to use Istio APIs to route outbound HTTP traffic via a
     ```
     </Directive>
 
-    ```shell
+    ```shell {name=istio-egress:verify-gateway-log}
     kubectl logs deployment/<gateway_name> -n <gateway_namespace> | tail -1
     ```
 
@@ -234,6 +238,14 @@ This section explains how to use Istio APIs to route outbound HTTP traffic via a
 
     **Example output**
 
-    ```shell
+    ```shell {name=istio-egress:verify-gateway-log-output}
     [2025-09-21T07:45:45.331Z] "GET / HTTP/2" 302 - via_upstream - "-" 0 137 107 105 "10.3.0.56" "curl/8.15.0" "1503bbf4-1571-4d16-9d2b-c9817355284e" "docs.alauda.io" "119.28.207.230:80" outbound|80||docs.alauda.io 10.3.0.41:55194 10.3.0.41:80 10.3.0.56:60876 - -
     ```
+
+## Cleanup
+
+Remove the resources created in this procedure:
+
+```shell {name=istio-egress:cleanup}
+kubectl delete namespace curl
+```

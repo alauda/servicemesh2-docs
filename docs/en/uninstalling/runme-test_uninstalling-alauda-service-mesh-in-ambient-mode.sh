@@ -19,6 +19,9 @@ test_uninstalling_alauda_service_mesh_in_ambient_mode() {
     log_info "=========================================="
 
     # 1. 列出 waypoint Gateway 资源
+    # 说明：waypoint 在 ambient 模式下是可选的（仅 L7 流量治理特性需要）。
+    #       未部署 waypoint 时，kubectl 会输出 "No resources found" 并以退出码 0 返回，
+    #       此时应跳过 waypoint 相关的输出断言，但仍执行文档中的列出/删除命令。
     log_info "步骤 1: 列出 waypoint Gateway 资源"
     local list_waypoints_output
     list_waypoints_output=$(runme run uninstall-ambient:list-waypoints 2>&1) || {
@@ -27,17 +30,28 @@ test_uninstalling_alauda_service_mesh_in_ambient_mode() {
         return 1
     }
 
-    # 输出包含动态值（IP、AGE 等），使用 __cmp_lines 验证关键字段
-    if ! __cmp_lines "$list_waypoints_output" "$(cat <<'EOF'
+    # 判断当前环境是否部署了 waypoint（输出包含 istio-waypoint 即视为已部署）
+    local waypoint_deployed=false
+    if echo "$list_waypoints_output" | grep -q "istio-waypoint"; then
+        waypoint_deployed=true
+    fi
+
+    if [ "$waypoint_deployed" = true ]; then
+        # 输出包含动态值（IP、AGE 等），使用 __cmp_lines 验证关键字段
+        if ! __cmp_lines "$list_waypoints_output" "$(cat <<'EOF'
 + waypoint
 + istio-waypoint
 EOF
 )"; then
-        log_error "列出 waypoint Gateway 验证失败"
-        log_error "实际输出: $list_waypoints_output"
-        return 1
+            log_error "列出 waypoint Gateway 验证失败"
+            log_error "实际输出: $list_waypoints_output"
+            return 1
+        fi
+        log_success "列出 waypoint Gateway 成功"
+    else
+        log_warn "未检测到 waypoint Gateway（ambient 模式未使用 waypoint），跳过 waypoint 列出输出验证"
+        log_info "list-waypoints 输出: $list_waypoints_output"
     fi
-    log_success "列出 waypoint Gateway 成功"
 
     # 2. 删除 waypoint Gateway 资源
     log_info "步骤 2: 删除 waypoint Gateway 资源"
@@ -48,18 +62,26 @@ EOF
         return 1
     }
 
-    # 删除输出中的 gateway 名称和命名空间可能因环境而异，验证关键字段
-    if ! __cmp_lines "$delete_waypoints_output" "$(cat <<'EOF'
+    if [ "$waypoint_deployed" = true ]; then
+        # 删除输出中的 gateway 名称和命名空间可能因环境而异，验证关键字段
+        if ! __cmp_lines "$delete_waypoints_output" "$(cat <<'EOF'
 + deleted
 EOF
 )"; then
-        log_error "删除 waypoint Gateway 验证失败"
-        log_error "实际输出: $delete_waypoints_output"
-        return 1
+            log_error "删除 waypoint Gateway 验证失败"
+            log_error "实际输出: $delete_waypoints_output"
+            return 1
+        fi
+        log_success "删除 waypoint Gateway 成功"
+    else
+        log_warn "无 waypoint Gateway 需要删除，跳过删除输出验证"
+        log_info "delete-waypoints 输出: $delete_waypoints_output"
     fi
-    log_success "删除 waypoint Gateway 成功"
 
     # 3. 列出 ambient 命名空间
+    # 说明：仅当有应用部署到 ambient 数据面时，才会有 namespace 打上
+    #       istio.io/dataplane-mode=ambient 标签。未部署应用时该命令输出
+    #       "No resources found" 且退出码为 0，应跳过命名空间输出断言。
     log_info "步骤 3: 列出 ambient 命名空间"
     local list_ambient_ns_output
     list_ambient_ns_output=$(runme run uninstall-ambient:list-ambient-ns 2>&1) || {
@@ -68,16 +90,27 @@ EOF
         return 1
     }
 
-    # 输出包含动态值（AGE 等），使用 __cmp_lines 验证关键字段
-    if ! __cmp_lines "$list_ambient_ns_output" "$(cat <<'EOF'
+    # 判断是否存在已纳入 ambient 数据面的命名空间（无则输出 No resources found）
+    local ambient_ns_deployed=false
+    if ! echo "$list_ambient_ns_output" | grep -q "No resources found"; then
+        ambient_ns_deployed=true
+    fi
+
+    if [ "$ambient_ns_deployed" = true ]; then
+        # 输出包含动态值（AGE 等），使用 __cmp_lines 验证关键字段
+        if ! __cmp_lines "$list_ambient_ns_output" "$(cat <<'EOF'
 + Active
 EOF
 )"; then
-        log_error "列出 ambient 命名空间验证失败"
-        log_error "实际输出: $list_ambient_ns_output"
-        return 1
+            log_error "列出 ambient 命名空间验证失败"
+            log_error "实际输出: $list_ambient_ns_output"
+            return 1
+        fi
+        log_success "列出 ambient 命名空间成功"
+    else
+        log_warn "未检测到已纳入 ambient 数据面的命名空间（未部署应用），跳过命名空间列出输出验证"
+        log_info "list-ambient-ns 输出: $list_ambient_ns_output"
     fi
-    log_success "列出 ambient 命名空间成功"
 
     # 4. 移除 ambient 标签
     log_info "步骤 4: 移除 ambient 数据面标签"

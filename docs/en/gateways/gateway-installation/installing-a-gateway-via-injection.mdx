@@ -14,6 +14,7 @@ The following procedure applies to both ingress and egress gateway deployments.
 
 - Alauda Service Mesh v2 Operator is installed.
 - An Istio control plane is deployed.
+- An `IstioCNI` resource is created.
 - Confirm [Linux kernel compatibility](./linux-kernel-compatibility-notice.mdx#linux-kernel-compatibility-notice).
 - Confirm [Namespace requirements](../../installing/installing-service-mesh/application-deployment/namespace-requirements.mdx).
 
@@ -21,7 +22,7 @@ The following procedure applies to both ingress and egress gateway deployments.
 
 1. Create a namespace for the gateway:
 
-   ```bash
+   ```bash {name=install-gateway-injection:create-namespace}
    kubectl create namespace <gateway_namespace>
    ```
 
@@ -36,7 +37,7 @@ The following procedure applies to both ingress and egress gateway deployments.
 
 2. Create a YAML file named `secret-reader.yaml` that defines the service account, role, and role binding for the gateway deployment. These settings enable the gateway to read the secrets, which is required for obtaining TLS credentials.
 
-   ```yaml title="secret-reader.yaml"
+   ```yaml title="secret-reader.yaml" {name=install-gateway-injection:secret-reader-yaml}
    apiVersion: v1
    kind: ServiceAccount
    metadata:
@@ -68,13 +69,13 @@ The following procedure applies to both ingress and egress gateway deployments.
    ```
 
 4. Apply the YAML file by running the following command:
-   ```bash
+   ```bash {name=install-gateway-injection:apply-secret-reader}
    kubectl apply -f secret-reader.yaml
    ```
 
 5. Create a YAML file named `gateway-deployment.yaml` that defines the Kubernetes `Deployment` object for the gateway.
 
-   ```yaml title="gateway-deployment.yaml"
+   ```yaml title="gateway-deployment.yaml" {name=install-gateway-injection:gateway-deployment-yaml}
    apiVersion: apps/v1
    kind: Deployment
    metadata:
@@ -115,13 +116,13 @@ The following procedure applies to both ingress and egress gateway deployments.
                  cpu: 100m
                  memory: 128Mi
          serviceAccountName: secret-reader  # [!code callout]
-         nodeSelector:  # [!code callout]
-           node-role.kubernetes.io/infra: ""
-         tolerations:  # [!code callout]
-           - effect: NoSchedule
-             key: node-role.kubernetes.io/infra
-             value: reserved
-             operator: Equal
+         # nodeSelector:  # [!code callout]
+         #   node-role.kubernetes.io/infra: ""
+         # tolerations:  # [!code callout]
+         #   - effect: NoSchedule
+         #     key: node-role.kubernetes.io/infra
+         #     value: reserved
+         #     operator: Equal
    ```
 
    <Callouts>
@@ -132,19 +133,19 @@ The following procedure applies to both ingress and egress gateway deployments.
         If the name of the Istio resource is not default you must use the `istio.io/rev: <istio_revision>` label instead, where the revision represents the active revision of the Istio resource.
      4. Sets the image field to `auto` so that the image automatically updates each time the pod starts.
      5. Sets the `serviceAccountName` to the name of the `ServiceAccount` created previously.
-     6. (Optional) Sets node selectors to schedule the gateway pods on <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />.
-     7. (Optional) Sets tolerations to allow the gateway pods to be scheduled on <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />.
+     6. (Optional) Uncomment to set node selectors that schedule the gateway pods on <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />.
+     7. (Optional) Uncomment to set tolerations that allow the gateway pods to be scheduled on <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />.
    </Callouts>
 
 6. Apply the YAML file by running the following command:
 
-   ```bash
+   ```bash {name=install-gateway-injection:apply-gateway-deployment}
    kubectl apply -f gateway-deployment.yaml
    ```
 
 7. Verify that the gateway `Deployment` rollout was successful by running the following command:
 
-   ```bash
+   ```bash {name=install-gateway-injection:verify-rollout}
    kubectl rollout status deployment/<gateway_name> -n <gateway_namespace>
    ```
 
@@ -159,7 +160,7 @@ The following procedure applies to both ingress and egress gateway deployments.
 
 8. Create a YAML file named `gateway-service.yaml` that contains the Kubernetes `Service` object for the gateway.
 
-   ```yaml title="gateway-service.yaml"
+   ```yaml title="gateway-service.yaml" {name=install-gateway-injection:gateway-service-yaml}
    apiVersion: v1
    kind: Service
    metadata:
@@ -191,13 +192,13 @@ The following procedure applies to both ingress and egress gateway deployments.
    </Callouts>
 
 9.  Apply the YAML file by running the following command:
-    ```bash
+    ```bash {name=install-gateway-injection:apply-gateway-service}
     kubectl apply -f gateway-service.yaml
     ```
 
 10. Verify that the gateway service is targeting the endpoint of the gateway pods by running the following command:
 
-    ```bash
+    ```bash {name=install-gateway-injection:verify-endpoints}
     kubectl get endpoints <gateway_name> -n <gateway_namespace>
     ```
 
@@ -214,7 +215,7 @@ NAME              ENDPOINTS                                             AGE
     The following example sets the minimum replicas to `2` and the maximum replicas to `5` and scales the replicas up when average CPU utilization exceeds 80% of the CPU resource limit.
     This limit is specified in the pod template of the deployment for the gateway.
 
-    ```yaml title="gateway-hpa.yaml"
+    ```yaml title="gateway-hpa.yaml" {name=install-gateway-injection:gateway-hpa-yaml}
     apiVersion: autoscaling/v2
     kind: HorizontalPodAutoscaler
     metadata:
@@ -242,14 +243,14 @@ NAME              ENDPOINTS                                             AGE
 
 11. *Optional* : Apply the YAML file by running the following command:
     
-    ```bash
+    ```bash {name=install-gateway-injection:apply-gateway-hpa}
     kubectl apply -f gateway-hpa.yaml
     ```
 
 12. *Optional* : Create a YAML file named `gateway-pdb.yaml` that defines a pod disruption budget for the gateway.
     The following example allows gateway pods to be evicted only when at least `1` healthy gateway pod will remain on the cluster after the eviction.
 
-    ```yaml title="gateway-pdb.yaml"
+    ```yaml title="gateway-pdb.yaml" {name=install-gateway-injection:gateway-pdb-yaml}
     apiVersion: policy/v1
     kind: PodDisruptionBudget
     metadata:
@@ -268,6 +269,6 @@ NAME              ENDPOINTS                                             AGE
 
 13. *Optional* : Apply the YAML file by running the following command:
 
-    ```bash
+    ```bash {name=install-gateway-injection:apply-gateway-pdb}
     kubectl apply -f gateway-pdb.yaml
     ```

@@ -66,6 +66,9 @@ test_ambient_egress_gateway() {
         return 1
     }
 
+    # 步骤 7a: (仅 ENABLE_GW_LINUX_KERNEL_COMPAT=true 生效) waypoint 监听高端口，按 Scenario 1 非 root 处理
+    apply_kernel_compat_k8s_gateway_api egress-gateway waypoint false || return 1
+
     # 步骤 8: 等待 waypoint 部署就绪
     log_info "步骤 8: 等待 waypoint 部署就绪"
     _wait_for_deployment egress-gateway waypoint
