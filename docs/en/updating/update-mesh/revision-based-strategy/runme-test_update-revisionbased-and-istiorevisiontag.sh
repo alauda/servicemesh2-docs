@@ -155,6 +155,11 @@ EOF
         log_error "更新 Istio 版本失败"
         return 1
     }
+    sleep 1
+    kubectl wait --for=condition=Ready istio/default --timeout=5m || {
+        log_error "等待 Istio 控制面就绪失败"
+        return 1
+    }
 
     # 14. 解析新 revision 名称并等待新控制面就绪
     log_info "步骤 14: 等待新版本控制面就绪"
