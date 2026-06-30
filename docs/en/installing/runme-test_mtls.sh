@@ -23,7 +23,7 @@ test_mtls() {
     local ns="${MTLS_TEST_NAMESPACE:-bookinfo}"
 
     log_info "=========================================="
-    log_info "开始 mTLS 严格模式测试（命名空间: $ns）"
+    log_info "开始 mTLS 严格模式测试，命名空间: ${ns}"
     log_info "=========================================="
 
     # 前置检查：目标命名空间必须存在（由编排中的 bookinfo 部署步骤保证）
@@ -68,7 +68,7 @@ cleanup_mtls() {
     local ns="${MTLS_TEST_NAMESPACE:-bookinfo}"
 
     log_info "=========================================="
-    log_info "清理 mTLS 严格模式测试资源（命名空间: $ns）"
+    log_info "清理 mTLS 严格模式测试资源，命名空间: ${ns}"
     log_info "=========================================="
 
     # 网格卸载后 PeerAuthentication CRD 可能已不存在（如 ambient 编排中先卸网格再清 bookinfo），
