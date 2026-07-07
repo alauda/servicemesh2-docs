@@ -65,7 +65,7 @@ Create the root and intermediate certificate authority (CA) certificates for two
 
   4. Create a shared root certificate by running the following command:
      ```bash {name=multi-cluster-config:create-root-cert}
-     openssl x509 -req -sha256 -days 3650 \
+     openssl x509 -req -sha256 -days 7300 \
          -signkey root-key.pem \
          -extensions req_ext -extfile root-ca.conf \
          -in root-cert.csr \
