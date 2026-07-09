@@ -85,7 +85,7 @@ spec:
 
 `Gateway` 资源直接复用该节“如果……还没有面向 15443 端口的东西向 Gateway 资源”处给出的示例，selector 同样使用 `istio: eastwestgateway`。
 
-<Directive type=”note” title="此时集群内只有 Mesh v2 一个控制面">
+<Directive type="note" title="此时集群内只有 Mesh v2 一个控制面">
 [迁移多网络多集群网格](./migrating-a-multi-network-mesh.mdx)中的东西向网关部署发生在 v1、v2 控制面并存阶段，其中关于“v1、v2 网关并存是安全的”的说明在本文场景下不适用——本文的前提是迁移已经完成，集群内不存在 v1 控制面，按上文的资源定义直接部署即可，不需要关注并存相关的说明。
 </Directive>
 
