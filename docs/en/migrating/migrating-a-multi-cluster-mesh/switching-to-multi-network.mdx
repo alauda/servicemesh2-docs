@@ -27,9 +27,65 @@ weight: 30
 
 两个集群此前处于单网络拓扑，都不存在东西向网关（见[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)“与多网络路径的差异”一节 P2.5 行）。本步骤需要为两个集群从零创建东西向网关的完整资源集合（Service、`Gateway`、Deployment），而不是像[迁移多网络多集群网格](./migrating-a-multi-network-mesh.mdx)“P2.5 部署东西向网关”一节那样只需将 v2 Pod 加入一个已经由 Mesh v1 创建好的 Service。
 
-Deployment 的资源形态——gateway injection 注入方式、容器安全上下文、资源限额——与该节展示的定义完全相同，直接复用即可；由于这里的 Service、`Gateway` 都是全新创建，不需要该节中“取并集覆盖既有 selector”的额外标签，Pod 只需携带 `app: istio-eastwestgateway`、`istio: eastwestgateway`、`topology.istio.io/network: <network-1>`（cluster2 上下文替换为 `<network-2>`）、`istio.io/rev: <v2-revision>` 四个标签，`<v2-revision>` 使用迁移阶段已经获取到的取值；独立 `ServiceAccount` 的创建方式同样复用该节说明（名称改为 `istio-eastwestgateway`），具体定义见 [Installing a gateway via gateway injection](../../gateways/gateway-installation/installing-a-gateway-via-injection.mdx)。`Gateway` 资源直接复用该节“如果……还没有面向 15443 端口的东西向 Gateway 资源”处给出的示例，selector 同样使用 `istio: eastwestgateway`。
+Deployment 的资源形态——gateway injection 注入方式、容器安全上下文、资源限额——与该节展示的定义完全相同，直接复用即可；由于这里的 Service、`Gateway` 都是全新创建，不需要该节中”取并集覆盖既有 selector”的额外标签，Pod 只需携带 `app: istio-eastwestgateway`、`istio: eastwestgateway`、`topology.istio.io/network: <network-1>`（cluster2 上下文替换为 `<network-2>`）、`istio.io/rev: <v2-revision>` 四个标签，`<v2-revision>` 使用迁移阶段已经获取到的取值；独立 `ServiceAccount` 的创建方式同样复用该节说明（名称改为 `istio-eastwestgateway`），具体定义见 [Installing a gateway via gateway injection](../../gateways/gateway-installation/installing-a-gateway-via-injection.mdx)。完整的 Deployment 定义如下：
 
-<Directive type="note" title="此时集群内只有 Mesh v2 一个控制面">
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: istio-eastwestgateway
+  namespace: istio-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      istio: eastwestgateway
+  template:
+    metadata:
+      annotations:
+        inject.istio.io/templates: gateway  # [!code callout]
+      labels:
+        app: istio-eastwestgateway  # [!code callout]
+        istio: eastwestgateway  # [!code callout]
+        topology.istio.io/network: <network-1>  # [!code callout]
+        istio.io/rev: <v2-revision>  # [!code callout]
+    spec:
+      serviceAccountName: istio-eastwestgateway
+      containers:
+        - name: istio-proxy
+          image: auto
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+          ports:
+            - containerPort: 15090
+              protocol: TCP
+              name: http-envoy-prom
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 1024Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+```
+
+<Callouts>
+  1. 使用网关注入模板进行 gateway injection 注入。
+  2. 应用标签，标识该网关为 istio-eastwestgateway。
+  3. Istio 通过此标签匹配东西向网关 Pod。
+  4. 本集群的 network 取值：cluster1 上下文使用 `<network-1>`，cluster2 上下文替换为 `<network-2>`；这个标签是 v2 istiod 判断该网关归属哪个网络的依据。
+  5. 替换为[安装 v2 控制面](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx)中获取到的 `<v2-revision>`；由于 istio-system 命名空间没有 rev 标签，这一行是 Pod 被 Mesh v2 正确注入的唯一依据。
+</Callouts>
+
+`Gateway` 资源直接复用该节”如果……还没有面向 15443 端口的东西向 Gateway 资源”处给出的示例，selector 同样使用 `istio: eastwestgateway`。
+
+<Directive type=”note” title=”此时集群内只有 Mesh v2 一个控制面”>
 [迁移多网络多集群网格](./migrating-a-multi-network-mesh.mdx)中的东西向网关部署发生在 v1、v2 控制面并存阶段，其中关于“v1、v2 网关并存是安全的”的说明在本文场景下不适用——本文的前提是迁移已经完成，集群内不存在 v1 控制面，按上文的资源定义直接部署即可，不需要关注并存相关的说明。
 </Directive>
 
