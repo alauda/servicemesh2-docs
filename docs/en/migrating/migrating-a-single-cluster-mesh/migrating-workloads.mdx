@@ -1,0 +1,126 @@
+---
+weight: 20
+---
+
+# 迁移工作负载
+
+本文对应[迁移概览](../migration-overview.mdx)路线图中的 P3 迁移工作负载阶段：按命名空间将 sidecar 注入逐步从 Mesh v1 切换到 Mesh v2，每完成一个命名空间的切换与验证，再进入下一个，业务流量在整个过程中不中断。开始操作前，请确认已经完成[安装 v2 控制面](./installing-the-v2-control-plane.mdx)中的全部步骤，并已按照该文"获取 v2 revision 名称"一步获取本文将要使用的 `<v2-revision>`。
+
+## 切换原理
+
+Mesh v1 与 Mesh v2 对同一个命名空间的注入归属，由命名空间上的 `istio.io/rev` 标签精确匹配决定：一个命名空间在同一时刻只会被标签值对应的那一个控制面注入 sidecar。Mesh v1 本身也是以 istio 原生 revision 机制部署的（revision 名固定为 `1-22`），因此把命名空间的 `istio.io/rev` 标签从 `1-22` 改写为 `<v2-revision>`，再触发一次滚动重启，新建的 Pod 就会被 Mesh v2 的 webhook 注入，不需要额外的迁移动作。
+
+Mesh v1 的控制器（`asm-controller`、`asm-operator`、`global-asm-controller`）不会将命名空间上已经修改的 `istio.io/rev` 标签调和回 `1-22`，也不会主动拉起被冻结的副本数量。因此常规场景下，可以直接按照下文的步骤逐命名空间切换，不需要预先冻结 Mesh v1 控制器。
+
+### （可选）冻结 v1 控制器
+
+只有在实际操作中观察到命名空间的 `istio.io/rev` 标签被自动改回 `1-22`，或者工作负载副本数被意外调和等异常情况时，才需要执行本节操作；常规场景可以跳过本节，直接进入下一节的命名空间切换。
+
+冻结按照编排链自上而下的顺序，依次将以下三个 Deployment 缩容到 0 个副本：
+
+```bash
+# global 集群（先冻结编排源头，防止其重建业务集群组件）
+kubectl -n cpaas-system scale deploy global-asm-controller --replicas=0
+# 业务集群：先冻结 asm-operator（避免其把已发布的副本数重新调和回来），再冻结 asm-controller
+kubectl -n istio-system scale deploy asm-operator --replicas=0
+kubectl -n cpaas-system scale deploy asm-controller --replicas=0
+```
+
+冻结期间，`MicroService` 等 Mesh v1 自研 CR 不需要删除，保留即可。确认不再需要冻结、或者需要回滚时，将三个 Deployment 恢复到冻结前的副本数（建议在冻结前先记录原始副本数，替换下面的 `<original-replica-count>`）：
+
+```bash
+kubectl -n cpaas-system scale deploy global-asm-controller --replicas=<original-replica-count>
+kubectl -n istio-system scale deploy asm-operator --replicas=<original-replica-count>
+kubectl -n cpaas-system scale deploy asm-controller --replicas=<original-replica-count>
+```
+
+## 逐命名空间切换
+
+<Steps>
+
+### 切换单个命名空间
+
+一次只切换一个命名空间：完成当前命名空间的切换与验证之后，再开始下一个命名空间。待切换的命名空间列表来自[迁移准备与前置检查](../preparing-for-migration.mdx)阶段的资源盘点结果。
+
+```bash
+kubectl label ns <mesh-namespace> istio.io/rev=<v2-revision> --overwrite
+kubectl -n <mesh-namespace> rollout restart deploy
+kubectl -n <mesh-namespace> rollout status deploy --timeout=300s
+istioctl proxy-status --revision <v2-revision> -n <mesh-namespace>
+```
+
+**输出示例**
+
+```
+NAME                                               CLUSTER      CDS      LDS      EDS      RDS      ECDS      ISTIOD                                   VERSION
+productpage-v1-7f4c5d8b6-abcde.<mesh-namespace>    Kubernetes   SYNCED   SYNCED   SYNCED   SYNCED   IGNORED   istiod-<v2-revision>-6f9c7d5b4c-xyz12   1.28.6-asm-r0
+```
+
+命名空间内全部 Pod 的 `ISTIOD` 列都应指向 `istiod-<v2-revision>-*`，代表其配置来自 Mesh v2 控制面。
+
+<Directive type="note" title="Mesh v2 使用 RevisionBased 策略，istioctl 命令必须携带 --revision">
+Mesh v2 的 `Istio` 资源采用 `RevisionBased` 更新策略，不存在不带 revision 后缀的默认 Pilot 部署。执行 `istioctl proxy-status` 等需要定位控制面的 istioctl 子命令时，如果省略 `--revision <v2-revision>`，会返回类似 `no running Istio pods` 的报错，这并不代表 Mesh v2 数据面工作异常，按上文命令补上 `--revision` 参数重新执行即可。
+</Directive>
+
+命名空间上原有的 `cpaas.io/serviceMesh=enabled` 标签本阶段不需要删除：该标签只被 Mesh v1 的 webhook 用来给 Pod 追加 ASM 专属配置，对 Mesh v2 注入的 Pod 没有影响；保留这个标签也便于按[回滚指引](../rollback.mdx)执行单命名空间回滚。它会在 P5 下线 Mesh v1 阶段与其他 Mesh v1 遗留标签一并统一清除。
+
+### 跨控制面互通验证
+
+命名空间切换后，Mesh v1 与 Mesh v2 会在集群内短暂并存：已切换的命名空间使用 Mesh v2 sidecar，尚未切换的命名空间仍然使用 Mesh v1 sidecar。每切换一个命名空间，建议验证两侧仍然可以正常互相调用，再继续切换下一个命名空间。
+
+从已切换命名空间的一个工作负载发起一次到尚未切换命名空间中某个服务的调用，再反向发起一次：
+
+```bash
+# 从已切换命名空间的 Pod 内，调用尚未切换命名空间中的服务
+kubectl -n <mesh-namespace> exec deploy/<workload-name> -- curl -sf -o /dev/null -w '%{http_code}\n' http://<peer-service>.<peer-namespace>.svc.cluster.local
+```
+
+将命令中的命名空间与服务对调，验证反方向的调用；两个方向都应当返回预期的 HTTP 状态码，且不出现 mTLS 握手失败。
+
+两个方向的调用之所以能够成立，是因为 Mesh v1 与 Mesh v2 的 sidecar 共享同一个根证书。可以通过以下命令核实这一点：
+
+```bash
+istioctl proxy-config secret <pod-name> -n <mesh-namespace> -o json
+```
+
+在输出中找到 `name` 为 `ROOTCA` 的条目，其证书的 subject 应当包含 `ASM Istio Root CA`，与 Mesh v1 sidecar 加载的根证书 subject 一致，说明两个控制面签发的工作负载证书同根、mTLS 握手可以成功。如果需要直接提取证书 subject 而不逐条翻阅 JSON，可以使用以下管道：
+
+```bash
+istioctl proxy-config secret <pod-name> -n <mesh-namespace> -o json | jq -r '.dynamicActiveSecrets[] | select(.name=="ROOTCA") | .secret.validationContext.trustedCa.inlineBytes' | base64 -d | openssl x509 -noout -subject
+```
+
+期望输出中包含 `CN = ASM Istio Root CA`。
+
+</Steps>
+
+:::note native sidecar 形态
+Mesh v2 使用 native sidecar 注入方式：`istio-proxy` 容器以 `restartPolicy: Always` 的 init 容器形式注入，不同于 Mesh v1 使用的普通 sidecar 容器形式。切换后 `kubectl get pod` 显示的容器计数、`kubectl describe pod` 中 init containers 与 containers 的分类，都会与 Mesh v1 时期不同，这是预期变化，不代表注入异常。
+:::
+
+## 中断预期
+
+:::note
+副本数 ≥2 且已配置 PodDisruptionBudget 的服务，本阶段切换预期为零中断。副本数为 1 的服务，会在 `rollout restart` 触发的滚动窗口内经历一次秒级中断——这是单副本滚动重启的固有窗口，与 Mesh v1/v2 切换机制本身无关。如果[迁移准备与前置检查](../preparing-for-migration.mdx)阶段发现存在未能提前扩容的单副本服务，请提前告知相关业务方。
+:::
+
+## 纯 OTel 命名空间无需处理
+
+部分命名空间可能只注入了 OTel Java Agent、没有 mesh sidecar（[迁移准备与前置检查](../preparing-for-migration.mdx)中已经甄别出这类场景）。这些命名空间与 `istio.io/rev` 标签无关，本阶段不需要做任何切换操作；它们的可观测性迁移安排在[迁移可观测栈](../migrating-observability.mdx)中统一处理。
+
+## 验证
+
+完成计划范围内全部命名空间的切换后，确认以下检查点：
+
+```bash
+# 核对全部已切换命名空间的 sidecar 是否都已指向 v2 修订
+istioctl proxy-status --revision <v2-revision>
+```
+
+输出列表应当覆盖全部已切换的命名空间；如果某个目标命名空间的工作负载没有出现在列表中，请检查该命名空间的 `istio.io/rev` 标签是否已正确设置，以及对应 Deployment 是否已完成 `rollout restart`。
+
+同时确认：
+
+- 业务探测器（见[迁移准备与前置检查](../preparing-for-migration.mdx)）在整个切换过程中没有出现预期之外的失败记录（单副本服务的秒级中断除外）；
+- Kiali 拓扑中，已切换命名空间的服务流量与调用关系显示正常，与切换前一致。
+
+全部检查点通过后，可以继续切换下一个命名空间；全部目标命名空间完成切换后，即可进入 P4 迁移网关阶段，见[迁移网关](./migrating-gateways.mdx)。
