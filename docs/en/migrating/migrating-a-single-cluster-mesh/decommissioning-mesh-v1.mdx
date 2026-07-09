@@ -268,7 +268,7 @@ kubectl get asms.operator.alauda.io
 
 期望输出 `No resources found`。
 
-finalizer 摘除后，asm-operator 通常会继续按照它自己的 Helm 卸载逻辑，自动清理 `cluster-asm` 这个 Helm release 名下的资源（`asm-controller`、`asm-core`、`asm-otel` 采集器、Jaeger CR、oauth2-proxy 等）。定位该 Helm release 对应的 Secret，确认清理是否已经完成：
+finalizer 摘除后，asm-operator 通常会继续按照它自己的 Helm 卸载逻辑，自动清理 Helm release `asm`（cluster-asm chart）下的资源（`asm-controller`、`asm-core`、`asm-otel` 采集器、Jaeger CR、oauth2-proxy 等）。定位该 Helm release 对应的 Secret，确认清理是否已经完成：
 
 ```bash
 kubectl -n cpaas-system get secret -l owner=helm,name=asm
