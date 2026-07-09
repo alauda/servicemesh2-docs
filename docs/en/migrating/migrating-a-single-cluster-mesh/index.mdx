@@ -1,0 +1,20 @@
+---
+weight: 30
+---
+
+# 单集群网格迁移
+
+本章介绍单集群场景下，将 Mesh v1 并存灰度迁移到 Mesh v2 的完整操作流程，按 P1 至 P6 六个阶段依次执行；开始之前，请确认已经完成[迁移准备与前置检查](../preparing-for-migration.mdx)中的 P0 阶段工作。
+
+## 迁移阶段
+
+1. **[P1 准备可观测性](./installing-the-v2-control-plane.mdx)**：安装 Kiali 并接入现有监控数据源，创建 v2 的指标采集资源。回滚点：可回滚。
+2. **[P2 并存安装 v2 控制面](./installing-the-v2-control-plane.mdx)**：安装 servicemesh-operator2，创建 IstioCNI 与 Istio CR，与 Mesh v1 控制面并存运行、对其零扰动。回滚点：可回滚（删除 v2 `Istio`/`IstioCNI` CR）。
+3. **[P3 迁移工作负载](./migrating-workloads.mdx)**：按命名空间将 sidecar 注入切换到 v2 修订，验证后再处理下一个命名空间。回滚点：可回滚（标签改回 + 滚动重启）。
+4. **[P4 迁移网关](./migrating-gateways.mdx)**：在网关命名空间部署 v2 金丝雀网关，验证后将流量从 v1 旧网关切换过去。回滚点：可回滚（v1 旧网关在 P5 之前始终保留）。
+5. **[P5 下线 Mesh v1](./decommissioning-mesh-v1.mdx)**：按手工序列下线 Mesh v1 的全部组件。回滚点：不可回退点，进入本阶段前必须完成 Go/No-Go 检查单。
+6. **[P6 完成迁移](./finalizing-the-migration.mdx)**：收编 default 修订、完成 CA 生命周期交接、切换可观测性到最终形态。回滚点：不适用（Mesh v1 已下线）。
+
+P5 是本方案中唯一的不可回退点；各阶段具体的回滚动作与限制，见[回滚指引](../rollback.mdx)。
+
+<Overview overviewHeaders={[]} />

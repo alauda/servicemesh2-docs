@@ -1,0 +1,364 @@
+---
+weight: 10
+---
+
+# 安装 v2 控制面（并存部署）
+
+本文对应[迁移概览](../migration-overview.mdx)路线图中的 P1 准备可观测性与 P2 并存安装 v2 控制面两个阶段：先为即将并存运行的 v2 控制面准备好可观测性能力，再创建 v2 的 `IstioCNI`/`Istio` 等资源，使其与 Mesh v1 控制面在同一个集群内并存运行、对 Mesh v1 零扰动。开始操作前，请确认已经完成[迁移准备与前置检查](../preparing-for-migration.mdx)中的全部检查项；本文使用的占位符延续[迁移概览](../migration-overview.mdx)"约定"小节中的约定，不再重复说明。
+
+## 准备可观测性
+
+本节对应路线图中的 P1 阶段：在创建 v2 控制面之前，先安装 Kiali 并接入 ACP 现有的监控数据源，同时为即将上线的 v2 数据面准备好指标采集资源，使新旧两个控制面从一开始就处于可观测状态。
+
+<Steps>
+
+### 安装 kiali-operator
+
+完成 [Alauda Build of Kiali](../../integration/observability/kiali.mdx) 页面 **Installing Alauda Build of Kiali** 一节中的步骤（通过 Web 控制台或 CLI 均可），在集群中安装 kiali-operator。
+
+### 获取监控数据源地址与凭据
+
+Kiali 需要接入 ACP 现有的监控数据源（Prometheus 或 VictoriaMetrics）。权威的获取方式是读取业务集群的 `Feature` 资源（`infrastructure.alauda.io/v1alpha1`，`name=monitoring`），而不是凭经验猜测地址：
+
+```bash
+kubectl get feature monitoring -o jsonpath='{.spec.accessInfo.database.address}'
+kubectl get feature monitoring -o jsonpath='{.spec.accessInfo.database.basicAuth.secretName}'
+```
+
+第一条命令的输出是监控数据源的访问地址，用作后面 Kiali 资源中的 `<monitoring-url>`；第二条命令的输出是 cpaas-system 命名空间下 basic auth 凭据 Secret 的名称，下一步会用到。
+
+单集群环境接入 Prometheus 或 VictoriaMetrics 均可；多集群环境必须接入 VictoriaMetrics，并在 Kiali 资源中开启 `thanos_proxy.enabled: true`。
+
+### 将监控凭据复制到 Kiali 部署命名空间
+
+Kiali 资源引用监控凭据时使用 `secret:<secret-name>:username`/`secret:<secret-name>:password` 语法，引用的 Secret 必须与 Kiali 部署在同一个命名空间（istio-system），因此需要把 cpaas-system 下的凭据复制过去：
+
+```bash
+# 将 Feature CR 指向的监控凭据复制为 istio-system 下的 Secret
+SECRET_NAME=$(kubectl get feature monitoring -o jsonpath='{.spec.accessInfo.database.basicAuth.secretName}')
+AUTH_USERNAME=$(kubectl -n cpaas-system get secret "$SECRET_NAME" -o jsonpath='{.data.username}' | base64 -d)
+AUTH_PASSWORD=$(kubectl -n cpaas-system get secret "$SECRET_NAME" -o jsonpath='{.data.password}' | base64 -d)
+
+kubectl create secret generic kiali-monitoring-basic-auth \
+  --from-literal="username=$AUTH_USERNAME" \
+  --from-literal="password=$AUTH_PASSWORD" \
+  -n istio-system
+```
+
+### 创建 Kiali 资源
+
+Kiali 资源中 OIDC 登录相关的字段（`auth.openid` 及配套 Secret），与 [Alauda Build of Kiali](../../integration/observability/kiali.mdx) 页面 **Configuring Monitoring with Kiali** 一节中除 **Create a `Secret` for monitoring database credentials** 之外的其余步骤完全一致，请先完成那些步骤，取得 `PLATFORM_URL`、`CLUSTER_NAME`、`OIDC_ISSUER`、`OIDC_CLIENT_ID` 等变量与 `kiali` Secret。
+
+调用链数据源暂时指向 Mesh v1 现有的 Jaeger 查询 Service（默认名为 `jaeger-prod-query`，与 istiod 同在 istio-system 命名空间）；如果不确定实际名称，先执行以下命令核实：
+
+```bash
+# 确认 Mesh v1 现有 Jaeger 查询 Service 的实际名称
+kubectl -n istio-system get svc | grep -i jaeger
+```
+
+确认名称后，下面的 `Kiali` 资源在 OIDC 配置的基础上，补充本次迁移场景特有的监控与调用链数据源配置：
+
+```yaml
+apiVersion: kiali.io/v1alpha1
+kind: Kiali
+metadata:
+  name: kiali
+  namespace: istio-system
+spec:
+  auth:
+    strategy: openid  # [!code callout]
+  external_services:
+    grafana:
+      enabled: false
+    prometheus:
+      auth:
+        type: basic
+        username: secret:kiali-monitoring-basic-auth:username
+        password: secret:kiali-monitoring-basic-auth:password
+        insecure_skip_verify: true
+      thanos_proxy:  # [!code callout]
+        enabled: true
+        retention_period: 7d
+        scrape_interval: 60s
+      url: <monitoring-url>  # [!code callout]
+    tracing:
+      enabled: true
+      provider: jaeger
+      use_grpc: true
+      internal_url: http://jaeger-prod-query.istio-system:16685/jaeger  # [!code callout]
+      disable_version_check: true
+```
+
+<Callouts>
+  1. `auth.strategy: openid` 的完整 OIDC 配置字段（`issuer_uri`/`client_id`/`api_proxy` 等），按上文引用的 **Configuring Monitoring with Kiali** 一节补全。
+  2. 仅当监控数据源需要经 Thanos/VictoriaMetrics 代理访问时才需要 `thanos_proxy`（多集群环境必须开启）；单集群环境直连 Prometheus 时可以省略这一段。
+  3. `url` 替换为前面发现命令返回的监控数据源地址。
+  4. `internal_url` 指向 Mesh v1 现有的 Jaeger 查询服务（如上一步核实的名称与 `jaeger-prod-query` 不同，请替换为实际值），保证 Kiali 在并存期间仍可展示调用链；完成[迁移可观测栈](../migrating-observability.mdx)后再切换到 Jaeger v2。
+</Callouts>
+
+将以上内容保存为 `kiali.yaml`，替换 `<monitoring-url>` 并补全 `auth.openid` 相关字段后执行：
+
+```bash
+# 应用 Kiali 资源
+kubectl apply -f kiali.yaml
+```
+
+### 创建 v2 指标采集资源
+
+v2 数据面的指标需要单独的 `ServiceMonitor`/`PodMonitor` 才能被 ACP 平台监控组件采集：
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: istiod-monitor
+  namespace: istio-system
+  labels:
+    prometheus: kube-prometheus  # [!code callout]
+spec:
+  selector:
+    matchLabels:
+      istio: pilot
+  endpoints:
+    - port: http-monitoring
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: istio-proxy-monitor
+  namespace: istio-system
+  labels:
+    prometheus: kube-prometheus  # [!code callout]
+spec:
+  selector: {}
+  namespaceSelector:
+    matchNames:
+      - <mesh-namespace>  # [!code callout]
+  podMetricsEndpoints:
+    - path: /stats/prometheus
+      port: http-envoy-prom
+      interval: 15s
+```
+
+<Callouts>
+  1. `prometheus: kube-prometheus` 标签使该 `ServiceMonitor` 被 ACP 平台监控组件的 `serviceMonitorSelector` 选中，具体取值需要与平台监控的实际配置保持一致；`istio: pilot` 选择器同时匹配 Mesh v1 与 Mesh v2 的 istiod Service，并存期间两个控制面的指标会一并被采集，属预期行为。
+  2. 同理，`prometheus: kube-prometheus` 标签使该 `PodMonitor` 被平台监控组件的 `podMonitorSelector` 选中。
+  3. `matchNames` 需要列出全部参与迁移的业务命名空间（`<mesh-namespace>`，可以重复多项），确保 v2 数据面的 Envoy 指标被采集；随着后续阶段命名空间陆续切换，可以按需追加。
+</Callouts>
+
+将以上内容保存为 `v2-monitors.yaml` 后执行：
+
+```bash
+# 应用 v2 指标采集资源
+kubectl apply -f v2-monitors.yaml
+```
+
+### 验证
+
+打开 Kiali 控制台（`<platform-url>/clusters/<cluster-name>/kiali`），在命名空间选择器中选择 Mesh v1 已经纳管的业务命名空间，进入 **Graph** 页面，确认可以看到现有的服务拓扑与实时流量。这说明 Kiali 已经正确接入了监控数据源；如果 Graph 页面没有数据，请重新核对前面创建的 Secret 与 `Kiali` 资源中 `prometheus` 字段是否正确。
+
+</Steps>
+
+## 安装 v2 控制面
+
+本节对应路线图中的 P2 阶段：创建 v2 的 `IstioCNI` 与 `Istio` 等资源，使 v2 控制面与 Mesh v1 控制面在同一个集群内并存运行。
+
+开始之前，请确认：ACP Networking for Multus 插件已经安装（`IstioCNI` 依赖其提供的 `cniConfDir: /etc/cni/multus/net.d`，检查方法见[迁移准备与前置检查](../preparing-for-migration.mdx)）；servicemesh-operator2（Mesh v2 的 Operator）已经安装——如果尚未安装，请先完成 [Installing Alauda Service Mesh](../../installing/installing-service-mesh/install-mesh.mdx) 中 Operator 的安装部分，本节从创建 `IstioCNI`/`Istio` 资源开始。
+
+<Steps>
+
+### （条件步骤）降级 Mesh v1 istiod 的反亲和规则
+
+<Directive type="warning" title="仅适用于单节点集群，或 Mesh v1 istiod 所在节点是唯一可调度节点的场景">
+判定方法见[迁移准备与前置检查](../preparing-for-migration.mdx)"单节点或 istiod 节点重合的集群识别"一节；多节点集群通常不受影响，可以跳过本步骤，直接从下一步开始创建 `IstioCNI` 资源。
+
+执行本步骤会触发 v1 istiod 滚动一次；滚动期间数据面代理已经建立的连接不受影响，业务探测应保持零中断。
+</Directive>
+
+Mesh v1 的 istiod pod 携带硬反亲和规则，拒绝把带有 `istio=istiod` 标签的 pod 调度到同一节点。这条规则写死在 Mesh v1 控制面的 `IstioOperator` CR 中，因此必须直接对该 CR 做出调整，才能让 v2 istiod 在单节点集群上完成调度。
+
+先获取 Mesh v1 控制面 `IstioOperator` CR 的名称：
+
+```bash
+# 获取 Mesh v1 控制面 IstioOperator CR 名称
+kubectl -n istio-system get istiooperators.install.istio.io
+```
+
+对该 CR 执行以下 JSON-patch，将反亲和规则由 required 降级为 preferred，并同时调整滚动策略（`<control-plane-iop>` 替换为上一步获取的名称）：
+
+```bash
+kubectl -n istio-system patch istiooperator <control-plane-iop> --type=json -p='[
+  {"op":"replace","path":"/spec/components/pilot/k8s/affinity","value":{"podAntiAffinity":{"preferredDuringSchedulingIgnoredDuringExecution":[{"weight":100,"podAffinityTerm":{"labelSelector":{"matchExpressions":[{"key":"istio","operator":"In","values":["istiod"]}]},"topologyKey":"kubernetes.io/hostname"}}]}},
+  {"op":"add","path":"/spec/components/pilot/k8s/strategy","value":{"rollingUpdate":{"maxSurge":0,"maxUnavailable":1}}}
+]'
+```
+
+必须使用 JSON-patch 的 `replace` 操作整体替换 `affinity` 字段。如果改用 merge patch，Kubernetes 会把新旧内容合并，原有的 `requiredDuringSchedulingIgnoredDuringExecution` 反亲和条目不会被移除，v2 istiod 仍然无法调度。滚动策略设置为 `maxSurge: 0`、`maxUnavailable: 1`，避免在单节点集群上因为扩容式（surge）滚动而卡死——单节点无法同时容纳新旧两个 istiod pod。
+
+### 创建 IstioCNI 资源
+
+`IstioCNI` 的配置与全新安装时完全相同，字段说明见 [Installing Alauda Service Mesh](../../installing/installing-service-mesh/install-mesh.mdx)。
+
+```bash
+# 创建 IstioCNI 所在的命名空间
+kubectl create namespace istio-cni
+```
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: sailoperator.io/v1
+kind: IstioCNI
+metadata:
+  name: default
+spec:
+  namespace: istio-cni
+  values:
+    cni:
+      cniConfDir: /etc/cni/multus/net.d
+      excludeNamespaces:
+        - istio-cni
+        - kube-system
+EOF
+```
+
+```bash
+# 等待 IstioCNI 就绪
+kubectl wait --for condition=Ready istiocni/default --timeout=3m
+```
+
+### 创建 Istio 资源
+
+与全新安装不同，istio-system 命名空间已经由 Mesh v1 创建并在使用中，这里不需要再创建命名空间。
+
+v2 的 `meshID` 必须与 Mesh v1 当前使用的值保持一致，运行以下命令读取 Mesh v1 的现有配置：
+
+```bash
+# 读取 Mesh v1 当前的 MeshConfig，其中包含 meshId 字段
+kubectl -n istio-system get cm istio-1-22 -o jsonpath='{.data.mesh}'
+```
+
+从输出中找到 `meshId` 字段的取值并记录下来，用于替换下面 YAML 中的 `<v1-mesh-id>`：
+
+```yaml
+apiVersion: sailoperator.io/v1
+kind: Istio
+metadata:
+  name: default
+spec:
+  namespace: istio-system
+  version: v1.28.6
+  updateStrategy:
+    type: RevisionBased
+    inactiveRevisionDeletionGracePeriodSeconds: 2592000  # [!code callout]
+  values:
+    global:
+      meshID: <v1-mesh-id>  # [!code callout]
+    meshConfig:
+      enableTracing: true
+      extensionProviders:  # [!code callout]
+        - name: otel
+          opentelemetry:
+            port: 4317
+            service: asm-otel-collector.cpaas-system.svc.cluster.local
+```
+
+<Callouts>
+  1. `inactiveRevisionDeletionGracePeriodSeconds` 在迁移期间调大（示例为 30 天，即 2592000 秒），避免旧修订在迁移过程中被过早回收；迁移完成后可以调回默认值。
+  2. `meshID` 必须与 Mesh v1 当前使用的 meshID 保持一致，取值来自上一步发现命令的输出。
+  3. `extensionProviders` 在并存期间指向 Mesh v1 现有的 OTel Collector（`asm-otel-collector.cpaas-system.svc.cluster.local`），保证调用链在切换过程中不中断；完成[迁移可观测栈](../migrating-observability.mdx)后再切换到 v2 的 Collector。
+</Callouts>
+
+将以上内容保存为 `istio.yaml`，替换 `<v1-mesh-id>` 后执行：
+
+```bash
+# 创建 v2 Istio 资源
+kubectl apply -f istio.yaml
+```
+
+<Directive type="warning" title="并存期间不要创建 default 的 IstioRevisionTag">
+Mesh v1 占用了 default 位置的 webhook 配置。只要并存期间不为 v2 创建 default 的 `IstioRevisionTag`，v2 的 webhook 就都带 revision 后缀，与 Mesh v1 的 webhook 互不重叠；如果提前创建，会与 Mesh v1 的 webhook 产生冲突，导致注入行为异常。default 的 `IstioRevisionTag` 被安排在[完成迁移](./finalizing-the-migration.mdx)阶段再创建。
+</Directive>
+
+### 创建 Telemetry 资源
+
+在 istio-system 命名空间创建 rootNamespace 级别的 `Telemetry` 资源，为 v2 数据面开启调用链采集：
+
+```yaml
+apiVersion: telemetry.istio.io/v1
+kind: Telemetry
+metadata:
+  name: asm-default
+  namespace: istio-system
+spec:
+  tracing:
+    - providers:
+        - name: otel
+      randomSamplingPercentage: <trace-sampling-percentage>  # [!code callout]
+```
+
+<Callouts>
+  1. 采样率需要与 Mesh v1 现有的调用链采样配置保持一致，避免迁移前后采样比例发生变化。v1 侧的取值可能配置在其 `Telemetry` 资源的 `spec.tracing[].randomSamplingPercentage` 字段，也可能配置在控制面 `IstioOperator` 的 `spec.meshConfig.defaultConfig.tracing.sampling` 字段，请先核实 v1 的实际配置来源，再替换 `<trace-sampling-percentage>`。
+</Callouts>
+
+将以上内容保存为 `telemetry.yaml` 后执行：
+
+```bash
+# 创建 v2 Telemetry 资源
+kubectl apply -f telemetry.yaml
+```
+
+### 获取 v2 revision 名称
+
+servicemesh-operator2 会为 `Istio` 资源创建对应的 `IstioRevision` 资源，其名称即为本文档后续所有页面使用的 `<v2-revision>` 占位符：
+
+```bash
+# 列出 v2 控制面的 IstioRevision，NAME 列即为 <v2-revision>
+kubectl get istiorevisions.sailoperator.io
+```
+
+**输出示例**
+
+```
+NAME              NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
+default-v1-28-6   istio-system             True    Healthy   False    v1.28.6   40s
+```
+
+`NAME` 列即为 `<v2-revision>`；在业务命名空间切换到该修订之前，`IN USE` 列会一直显示 `False`，属预期。修订命名规则的完整说明见 [Identifying the revision name](../../installing/sidecar-injection/identifying-the-revision-name.mdx)。
+
+### 验证
+
+安装完成后，依次确认以下检查点：
+
+```bash
+# 确认 v2 istiod 已经 Ready
+kubectl -n istio-system wait --for=condition=Ready istio/default --timeout=5m
+```
+
+```bash
+# 确认 v2 istiod 加载的是 Mesh v1 现有的 cacerts（并存期 mTLS 互通的基础）
+kubectl -n istio-system logs deploy/istiod-<v2-revision> | grep -i "root cert"
+```
+
+期望输出中包含 `Use root cert from etc/cacerts`，说明 v2 istiod 是从 istio-system 命名空间已有的 `cacerts` Secret 加载签发证书，而不是生成了一套独立的根证书。
+
+```bash
+# 确认 v2 修订状态正常
+kubectl get istiorevisions.sailoperator.io
+```
+
+新创建的 v2 修订应显示 `READY=True`、`STATUS=Healthy`。
+
+最后确认 Mesh v1 数据面与业务探测未受影响：业务探测器在整个安装过程中不应出现新增的失败记录；如果本次执行了前面的条件步骤（降级 v1 istiod 反亲和），v1 istiod 会因为该步骤滚动一次，属预期变化，其余 v1 数据面 Pod 不应发生非预期重建。
+
+</Steps>
+
+## 重要提醒
+
+完成以上步骤后，v2 `Istio` CR 已经在 istio-system 命名空间创建完成，Mesh v1 与 Mesh v2 两个控制面正式进入并存阶段。从这一刻起，[迁移概览](../migration-overview.mdx)中预告的红线正式生效：
+
+:::danger 严禁通过平台 UI 删除 Mesh v1 网格
+**v2 `Istio` CR 创建后，严禁通过平台 UI 删除 Mesh v1 网格，或删除 `ServiceMesh` CR 后等待控制器处理。** Mesh v1 的删除流程会删除整个 istio-system 命名空间，v2 控制面与网格配置将随之一并被摧毁。Mesh v1 的下线必须按照 [下线 Mesh v1](./decommissioning-mesh-v1.mdx) 的手工序列执行。
+:::
+
+在完成后续[迁移工作负载](./migrating-workloads.mdx)与[迁移网关](./migrating-gateways.mdx)之前，请始终通过 kubectl 直接操作 v1/v2 的原生资源，不要在平台 UI 中对 Mesh v1 网格执行任何删除类操作。
