@@ -1,0 +1,260 @@
+---
+weight: 50
+---
+
+# 迁移可观测栈
+
+本文承接[完成迁移](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx)「可观测终态」一节，覆盖 P6 完成迁移阶段中可观测栈切换到最终形态的完整操作：部署 v2 版调用链采集栈（OTel v2 + Jaeger v2）、把 Istio 与 Kiali 的调用链配置从并存灰度期间使用的过渡态切换到最终态，并处理 OTel Java 自动注入这一独立于 mesh sidecar 之外的迁移动作。本文同时适用于单集群与多集群场景，多集群场景的额外配置以行内说明标注，并链接到对应小节。
+
+开始操作前，请确认已经完成[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)的全部步骤——v1 时期的 OTel 采集链路与 Jaeger v1 组件已经在该阶段「删除 asm CR」一节中随 asm 的 Helm release 一并移除。
+
+:::warning 遥测中断窗口
+调用链遥测的中断从[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)阶段删除 v1 时期的 OTel 采集链路与 Jaeger v1 组件时就已经开始——这不是本文引入的新中断，而是延续自上一阶段、此刻仍在持续的状态；完成本文全部步骤后，遥测恢复正常。中断期间只影响调用链数据的产生与查询，网格本身的流量转发不受影响。这一行为与 OpenTelemetry 官方的 v1 到 v2 迁移路径一致：该路径同样存在从卸载旧 Collector 到新 Collector 就绪之间的遥测中断窗口。
+:::
+
+## 部署 OTel v2 与 Jaeger v2
+
+Mesh v2 的调用链采集栈由 `Alauda Build of OpenTelemetry v2` Operator（推荐命名空间 `opentelemetry-operator2`）与 `Alauda Build of Jaeger v2`（默认命名空间 `jaeger-system`，以 `OpenTelemetryCollector` 自定义资源形态运行）组成。这套组件与 Service Mesh 之间没有强绑定关系，可以同时服务网格内外的工作负载，完整的安装步骤不在本文重复，请参考 <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-elasticsearch.html" children="Installing Alauda Distributed Tracing with Elasticsearch" />（如果存储后端是 OpenSearch，改用对应的 OpenSearch 版本安装文档），依次完成 Operator 安装、Jaeger v2 实例部署、OpenTelemetry Collector 部署三个部分。
+
+:::note
+Operator 与它管理的 Collector/Jaeger 实例必须部署在不同的命名空间——这一点与 Mesh v1 时期两者可以共享命名空间不同；按上述安装文档的默认命名空间划分（`opentelemetry-operator2` 与 `jaeger-system`）即可满足这一要求，不需要额外调整。
+:::
+
+规划 Elasticsearch/OpenSearch 索引前缀（安装文档中的 `JAEGER_ES_INDEX_PREFIX` 变量）时，选择与 Mesh v1 遗留索引前缀 `asm-mesh-<v1-mesh-id>` 明显区分的取值，避免新旧两代索引在存储层混淆；按安装文档的默认建议以 meshID 结尾（例如 `acp-mesh-<v1-mesh-id>`）即可天然满足这一点。这里的 `<v1-mesh-id>` 需要与 v1 保持一致——[安装 v2 控制面](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx)阶段已经据此设置了 v2 `Istio` 资源的 `global.meshID`，此时可以直接从该资源读取，不需要再依赖此刻可能已经不存在的 v1 资源：
+
+```bash
+kubectl get istio default -o jsonpath='{.spec.values.global.meshID}'
+```
+
+多集群网格中，各业务集群仍然各自独立部署一套 Jaeger v2 与 Collector 实例，如果它们共享同一个 Elasticsearch/OpenSearch 存储后端，还需要让各集群的索引前缀相互区分，具体做法见[迁移多网络多集群网格](./migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx)「Jaeger 索引前缀按集群区分」一节。
+
+## 将 Istio 调用链导出切换到 Jaeger v2
+
+目前 Istio 的 `meshConfig.extensionProviders` 仍然指向并存灰度期间使用的过渡地址——[安装 v2 控制面](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx)阶段配置为 Mesh v1 的 `asm-otel-collector.cpaas-system.svc.cluster.local`，现在切换到上一步部署的 v2 Collector。
+
+<Steps>
+
+### 翻转 extensionProviders 出口
+
+```bash
+kubectl patch istio default --type=merge -p '
+spec:
+  values:
+    meshConfig:
+      enableTracing: true
+      extensionProviders:
+      - name: otel
+        opentelemetry:
+          port: 4317
+          service: otel-collector.jaeger-system.svc.cluster.local
+'
+```
+
+<Directive type="warning" title="merge patch 会整体替换 extensionProviders 数组">
+这条命令使用 JSON merge patch，会整体替换 `meshConfig.extensionProviders` 数组。如果 `Istio` 资源中除了 `otel` 之外还定义了其他 provider，改用 `kubectl edit istio default` 交互式编辑追加，或使用 JSON Patch（`--type=json`）向 `/spec/values/meshConfig/extensionProviders/-` 追加，避免覆盖其他条目。
+</Directive>
+
+`port: 4317` 是 OTLP gRPC 的默认端口——Istio 的 `opentelemetry` provider 固定通过 gRPC 向 Collector 导出 span；这与下一节 OTel Java Agent 使用的 `4318`（OTLP HTTP 端口）是同一个 Collector 上两个相互独立的协议入口，配置时不要混用。`Telemetry` 资源不需要改动，它通过 provider 名称（`otel`）引用配置，与 Collector 的实际地址无关。
+
+验证：
+
+```bash
+kubectl get istio default -o jsonpath='{.spec.values.meshConfig.extensionProviders}'
+```
+
+预期输出中 `service` 字段已经变为 `otel-collector.jaeger-system.svc.cluster.local`。
+
+### （可选）为 discoverySelectors 场景标注 jaeger-system 命名空间
+
+如果网格通过 `Istio` 资源的 `discoverySelectors` 限制了控制面可以发现的命名空间范围，还需要让 `jaeger-system` 命名空间匹配这些选择器，否则控制面不会把 Collector 的 Service 下发给 sidecar 代理，代理也就无法导出 span。完整原理见 [Configuring distributed tracing platform with Service Mesh](../integration/observability/distributed-tracing/config-with-service-mesh.mdx)「(Optional) Label the `jaeger-system` namespace when the mesh uses discovery selectors」一节；为该命名空间打上与 `discoverySelectors` 匹配的标签，例如：
+
+```bash
+kubectl label namespace jaeger-system istio-discovery=enabled
+```
+
+<Directive type="note" title="未使用 discoverySelectors 时可以跳过本步骤">
+如果网格没有配置 `discoverySelectors`，控制面默认发现全部命名空间，Collector 天然可见，不需要执行本步骤；执行了也不会产生副作用。
+</Directive>
+
+</Steps>
+
+## 迁移 OTel Java 自动注入
+
+本节处理 OTel Java Agent 的自动注入，这是一条独立于 mesh sidecar 之外的迁移动作序列：既覆盖已经完成 sidecar 切换、同时又使用了 Java Agent 的网格工作负载，也覆盖[迁移工作负载](./migrating-a-single-cluster-mesh/migrating-workloads.mdx)「纯 OTel 命名空间无需处理」一节中提到的、只使用 Java Agent、没有 mesh sidecar 的命名空间——这两类工作负载在本节中的处理方式完全一致，与是否注入 sidecar 无关。下文用 `<workload-namespace>` 统一指代这两类目标命名空间；网格命名空间时，其取值就是 `<mesh-namespace>`。
+
+:::warning 关键差异：注入注解必须显式写回 deployment template
+Mesh v1 环境中，`instrumentation.opentelemetry.io/inject-java` 注解并不写在 Deployment 的 Pod 模板里，而是由已经随[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)一并移除的 asm 专属 webhook，在 Pod 创建时动态打上去的——Deployment 的 `spec.template.metadata` 本身是「干净」的，不包含这条注解。这个 webhook 消失后，动态打注解的机制随之断裂：不做任何改动的话，新建的 Pod 不会再被注入 Java Agent。迁移时必须把 `instrumentation.opentelemetry.io/inject-java` 与 `instrumentation.opentelemetry.io/container-names` 两条注解显式写回每个受影响 Deployment 的 `spec.template.metadata.annotations`，成为 v2 OTel Operator webhook 可以识别的静态配置。
+:::
+
+完整的 OTel Java Agent 版本升级背景（1.x 到 2.x 系列的差异、镜像获取方式的完整对比等）请参考 <ExternalSiteLink name="opentelemetry" href="/migrating/migrating-to-v2.html" children="Migrating from Alauda Build of OpenTelemetry to Alauda Build of OpenTelemetry v2" />；本节只给出与本次网格迁移强相关的关键差异点与目标态配置。
+
+<Steps>
+
+### 确认需要处理的工作负载范围
+
+回顾[迁移准备与前置检查](./preparing-for-migration.mdx)阶段 `kubectl get opentelemetrycollectors,instrumentations -A` 的盘点结果，以及「带 rev 标签但未实际注入的命名空间甄别」一节记录下来的纯 OTel 命名空间清单，确定当前环境中实际使用 OTel Java Agent 的命名空间与工作负载范围。
+
+### 重建 Instrumentation 资源
+
+在每个 `<workload-namespace>` 中创建（或覆盖同名的）`Instrumentation` 资源：
+
+```yaml
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: java-instrumentation
+  namespace: <workload-namespace>
+spec:
+  exporter:
+    endpoint: http://otel-collector.jaeger-system:4318  # [!code callout]
+  env:
+    - name: OTEL_EXPORTER_OTLP_PROTOCOL  # [!code callout]
+      value: http/protobuf
+  java:
+    image: registry.alauda.cn:60070/asm/opentelemetry-operator/autoinstrumentation-java:2.26.1  # [!code callout]
+```
+
+<Callouts>
+  1. `endpoint` 指向前面部署的 v2 Collector，端口 `4318` 是 OTLP HTTP 接收端口，与下面的协议声明配套；如果 Collector 部署在不同的命名空间或使用了不同的实例名，替换为实际地址。
+  2. `autoinstrumentation-java` 2.x 系列默认导出协议已经是 `http/protobuf`，此处显式声明，避免隐式依赖默认值。如果改用 gRPC，需要同时把 `endpoint` 的端口改为 `4317`。
+  3. `spec.java.image` 必须显式指定——v2 版 Operator 不再随 Operator 自带 Java Agent 镜像，缺省该字段不会注入任何 Agent。镜像版本号 `2.26.1` 决定了下一步验证时应该看到的 agent 版本标记。
+</Callouts>
+
+<Directive type="note" title="先确认镜像仓库可达性与凭据">
+应用以上资源前，确认工作负载所在集群的节点可以拉取 `registry.alauda.cn:60070/asm/opentelemetry-operator/autoinstrumentation-java:2.26.1`；如果该仓库需要认证，还要确认目标命名空间下已经配置了对应的 `imagePullSecrets`。镜像不可达会导致下一步滚动更新后 Pod 卡在 `Init:ImagePullBackOff`，且不会有任何 admission 层面的报错提示问题根源，排查时容易被忽略。
+</Directive>
+
+将以上内容保存为 `instrumentation.yaml`，替换 `<workload-namespace>` 后执行：
+
+```bash
+kubectl apply -f instrumentation.yaml
+```
+
+### 将注入注解显式补到 deployment template
+
+先确认需要注入的实际业务容器名（不是 `istio-proxy`）：
+
+```bash
+kubectl -n <workload-namespace> get deploy <workload-name> -o jsonpath='{.spec.template.spec.containers[*].name}{"\n"}'
+```
+
+再把注入注解合并写入该 Deployment 的 Pod 模板：
+
+```yaml
+# 仅展示 spec.template.metadata.annotations 片段，与现有 Deployment 定义合并，不是完整清单
+spec:
+  template:
+    metadata:
+      annotations:
+        instrumentation.opentelemetry.io/inject-java: "true"  # [!code callout]
+        instrumentation.opentelemetry.io/container-names: "<container-name>"  # [!code callout]
+```
+
+<Callouts>
+  1. 开启 Java Agent 自动注入；v2 的 OTel Operator webhook 默认引用同一命名空间下的 `Instrumentation` 资源（上一步已创建），不需要额外指定资源名称。
+  2. 替换为上一条命令返回的实际业务容器名；如果 Pod 内有多个容器都需要注入，用逗号分隔多个容器名。
+</Callouts>
+
+```bash
+kubectl -n <workload-namespace> patch deploy <workload-name> --type=merge -p '
+spec:
+  template:
+    metadata:
+      annotations:
+        instrumentation.opentelemetry.io/inject-java: "true"
+        instrumentation.opentelemetry.io/container-names: "<container-name>"
+'
+```
+
+`annotations` 字段是键值映射，merge patch 只会补充或覆盖这两条注解，不影响 Pod 模板上已有的其他注解。
+
+### 滚动更新并验证
+
+以上补丁修改了 Pod 模板，会自动触发一次滚动更新；确认这次更新已经完成：
+
+```bash
+kubectl -n <workload-namespace> rollout status deploy/<workload-name>
+```
+
+新 Pod 就绪后，在 Jaeger v2 UI（`<platform-url>/clusters/<cluster-name>/jaeger`）中查询该服务最新的一条调用链，展开任意一个 span 的 Process/Tags，确认其中包含：
+
+```
+telemetry.distro.version=2.26.1
+```
+
+这个标记由 Java Agent 自动附加在每个 span 上，取值与前面 `spec.java.image` 中的镜像版本号一致，是确认新 Agent 已经生效、而不是旧 Pod 残留流量的最直接依据。
+
+</Steps>
+
+## 把 Kiali 调用链数据源切换到 Jaeger v2
+
+[安装 v2 控制面](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx)阶段创建的 `Kiali` 资源，其 `external_services.tracing` 暂时指向并存期间使用的 Mesh v1 Jaeger query Service，现在切换到 Jaeger v2。以下 patch 中只有 `internal_url` 相比原有配置发生了变化，其余字段维持不变，完整列出是为了让 patch 可以直接执行。
+
+<Steps>
+
+### 更新 Kiali 资源的 tracing 数据源
+
+```yaml
+spec:
+  external_services:
+    tracing:
+      enabled: true
+      provider: jaeger
+      use_grpc: true
+      internal_url: http://jaeger-collector.jaeger-system:16685/jaeger  # [!code callout]
+      disable_version_check: true
+```
+
+<Callouts>
+  1. `jaeger-collector.jaeger-system` 是 Jaeger v2 默认部署下提供查询能力的 Service 名称与命名空间，`16685` 是它对外提供的 gRPC 查询端口，与 `use_grpc: true` 配套。如果部署时使用了不同的实例名或命名空间，替换为实际地址。
+</Callouts>
+
+```bash
+kubectl -n istio-system patch kiali kiali --type=merge -p '
+spec:
+  external_services:
+    tracing:
+      enabled: true
+      provider: jaeger
+      use_grpc: true
+      internal_url: http://jaeger-collector.jaeger-system:16685/jaeger
+      disable_version_check: true
+'
+```
+
+多集群场景下，这段配置需要与[迁移多网络多集群网格](./migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx)「Kiali 多集群配置」一节中新增的 `query_scope` 字段合并成同一次 patch，两者共同构成 P6 阶段完整的 `tracing` 数据源配置。
+
+### 验证
+
+打开 Kiali 控制台的 **Graph** 页面，选中任意一条有实时调用的边（edge），确认能看到跳转到调用链详情的入口并成功跳转；跳转后的 trace 详情应当来自 Jaeger v2，而不是已经不存在的 Mesh v1 Jaeger。
+
+</Steps>
+
+## 处置历史调用链数据
+
+[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)阶段只删除了 v1 时期的 Jaeger/OTel 工作负载，并没有清理它们此前写入 Elasticsearch/OpenSearch 的历史数据——这些数据仍然保留在旧的索引前缀 `asm-mesh-<v1-mesh-id>` 下，按存储集群已有的生命周期管理策略自然过期。如果这套过期策略此前由 v1 组件负责调度，需要评估是否要在存储侧单独安排清理，避免旧索引无限增长。
+
+如果在旧索引过期之前，仍然需要查询迁移前的历史调用链，有两种思路：
+
+- 给 Jaeger v2 的 Elasticsearch/OpenSearch 存储配置临时增加一个指向旧索引前缀 `asm-mesh-<v1-mesh-id>` 的只读查询源，与新索引并存查询；
+- 保留一个只读的旧 Jaeger query 组件，直至旧索引过期后再下线。
+
+由于[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)的标准序列已经把 v1 时期的 Jaeger 部署（含 query 组件）整体移除，到本阶段实际只有第一种思路可行；如果确有保留只读旧 query 组件的需求，需要在执行下线序列之前调整该阶段的操作范围，不在本文档标准序列的覆盖范围内。两种思路都只涉及查询侧的只读配置，具体的存储与部署方式请参考 Elasticsearch/OpenSearch 与 Jaeger v2 各自的配置文档，本文不展开。
+
+## 验证
+
+完成以上全部步骤后，确认以下检查点。
+
+打开 Kiali 控制台，选择全部业务命名空间进入 **Graph** 页面，确认已经完成 sidecar 切换的网格服务之间的调用关系正常显示（纯 OTel 命名空间不产生 mesh 侧遥测，不会出现在 Kiali 拓扑中，这属于预期行为）。
+
+打开 Jaeger v2 UI（`<platform-url>/clusters/<cluster-name>/jaeger`），从 **Service** 下拉列表中确认能同时看到网格工作负载与纯 OTel 工作负载对应的服务名，并且能查询到最近产生的调用链——这标志着上文的遥测中断窗口已经结束：
+
+```bash
+# 可选：通过 Jaeger v2 的查询接口核对服务清单，与预期的业务服务范围对比
+kubectl -n jaeger-system port-forward svc/jaeger-collector 16686:16686 &
+curl -s http://localhost:16686/api/services | jq -r '.data[]'
+```
+
+JVM 运行时指标与调用链数据经由同一个 OTel Java Agent、同一个 OTLP exporter/endpoint 发送，一旦上一步确认新 trace 已经携带 `telemetry.distro.version=2.26.1`，即代表 Java Agent 已经用新配置正常工作，JVM 指标（如 `jvm.memory.used`、`jvm.thread.count` 等 OTel 标准指标）会经由同一条链路恢复上报；如果监控侧已经接入了 Collector 的 metrics 导出管道，可以在对应的监控看板中确认这些指标序列相应恢复。
+
+全部检查点通过后，Mesh v2 的可观测栈正式进入终态；返回[完成迁移](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx)继续「终态验收」小节，完成 P6 阶段的整体收尾。
