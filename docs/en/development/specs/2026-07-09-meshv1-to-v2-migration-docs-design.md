@@ -171,7 +171,7 @@ P2 要点：
 ### 6.6 migrating-gateways.mdx —— 源：设计 §6 P4、10.1 P4 修订（D-8 三教训）、V-9/V-10
 
 1. 顺序总则：**先将网关 ns 的 `istio.io/rev` 切到 v2，再部署 v2 金丝雀网关**（ns 仍为 v1 rev 时，v2 网关 Deployment 会被 v1 webhook 注入 1.22 proxy）；网关 ns 的 rev 切换不触碰在跑 pod，安全。
-2. `:::warning` 单向门：网关 ns rev 切到 v2 后，v1 旧网关**不可再重建**（其 pod 模板的 `inject.istio.io/templates: asm-gateway` 在 v2 无对应模板，pod 创建被拒）；因此切换前必须完成 v2 网关就绪验证；回滚预案不能依赖旧网关扩容（详见 rollback 页）。
+2. `:::warning` 单向门：网关 ns rev 切到 v2 后，v1 旧网关**不可再重建**（其 pod 模板的 `inject.istio.io/templates: asm-gateway` 在 v2 无对应模板，pod 创建被拒）；v2 网关就绪验证是缩容 v1 旧网关（切流）的前置门槛；ns rev 切换后应立即部署并验证 v2 网关，缩短 v1 不可重建的暴露窗口；回滚预案不能依赖旧网关扩容（详见 rollback 页）。
 3. 前置：检查网关 Service ownerReferences（属主可能为 GatewayDeploy）；采集 Service selector 与 Gateway CR selector（两条发现命令）。
 4. 部署 v2 金丝雀网关 Deployment：`inject.istio.io/templates: gateway` + `image: auto` + `istio.io/rev: <v2-revision>`；**pod 标签必须取 Service selector 与 Gateway CR selector 的并集**（缺 Gateway CR selector 标签 → listener 不绑定 → 404），用 `<Callouts>` 标注模板关键字段；ServiceAccount/RBAC 链接 `installing-a-gateway-via-injection.mdx`。
 5. 金丝雀切流：v2 扩容 → 验证 listener 绑定与实际流量 → 旧网关逐步缩容 → 缩 0 **保留**（回滚用，下线阶段才删）。
