@@ -1,0 +1,444 @@
+---
+weight: 40
+---
+
+# 下线 Mesh v1
+
+本文对应[迁移概览](../migration-overview.mdx)路线图中的 P5 下线 Mesh v1 阶段：按手工序列逐步删除 Mesh v1 的控制面、数据面与全部治理资源，使目标集群成为 Mesh v2 独占的终态；这是并存灰度迁移方案中唯一的不可回退点，也是全书操作风险最高的一篇。开始操作前，请确认已经完成[迁移网关](./migrating-gateways.mdx)中的全部步骤，全部业务命名空间与网关均已经由 Mesh v2 承载。
+
+从[安装 v2 控制面](./installing-the-v2-control-plane.mdx)阶段开始生效的红线，在本阶段仍然完全适用，再次重申：
+
+:::danger 严禁通过平台 UI 删除 Mesh v1 网格
+**v2 `Istio` CR 创建后，严禁通过平台 UI 删除 Mesh v1 网格，或删除 `ServiceMesh` CR 后等待控制器处理。** Mesh v1 的删除流程会删除整个 istio-system 命名空间，v2 控制面与网格配置将随之一并被摧毁。Mesh v1 的下线必须按照本文的手工序列执行。
+:::
+
+下文的 Go/No-Go 检查单用于确认是否具备进入手工下线序列的条件；确认全部通过后，再开始执行后面的步骤。
+
+## Go/No-Go 检查单
+
+进入手工下线序列之前，确认以下检查项全部通过：
+
+- [ ] 全部业务命名空间的 `istio.io/rev` 标签均已指向 `<v2-revision>`，且集群中不存在任何仍然连接 Mesh v1 istiod 的 proxy；
+- [ ] 全部网关（含出口网关、多集群东西向网关、istio-system 默认网关）均已由 Mesh v2 承载，或已确认未承载业务流量；
+- [ ] [迁移准备与前置检查](../preparing-for-migration.mdx)阶段建立的备份完整可用（含本文步骤 1 的备份复核）；
+- [ ] 已经就"进入本阶段后不可回退"取得干系人的明确确认。
+
+前两项可以用以下命令核实：
+
+```bash
+# 核对是否仍有业务命名空间停留在 Mesh v1 修订
+kubectl get ns -l istio.io/rev=1-22
+
+# 核对是否仍有 proxy 连接 v1 istiod
+istioctl proxy-status | grep 1-22
+```
+
+第一条命令的输出应当为空，或者只包含下文例外清单中记录的命名空间；第二条命令的输出应当为空。
+
+### 例外清单
+
+以下两类场景属于已知例外，不需要按"未完成切换"处理：
+
+- **Mesh v1 自有的默认网关（`istio-ingressgateway`）**：如果在[迁移网关](./migrating-gateways.mdx)阶段已经确认它没有承载真实业务流量（监听器中没有业务端口），可以豁免"无 proxy 连接 v1 istiod"这一项检查——它会在下文步骤 7 删除控制面 `IstioOperator` CR 时随之自动回收，不需要单独处理。
+- **带 `istio.io/rev=1-22` 标签但从未实际注入的命名空间**：[迁移准备与前置检查](../preparing-for-migration.mdx)阶段已经甄别出这类命名空间（例如仅使用 OTel Java Agent、未注入 sidecar 的场景）。它们不需要切换到 Mesh v2 修订，而是在下文步骤 8 中直接摘除标签。
+
+:::warning 本阶段是并存灰度迁移方案中唯一的不可回退点
+下方手工下线序列执行过程中，Mesh v1 的控制面、数据面与全部治理资源会被逐步删除。一旦开始执行，不再存在"改标签""缩容再扩容"这类轻量回滚手段：如果需要恢复 Mesh v1，唯一路径是依据[迁移准备与前置检查](../preparing-for-migration.mdx)阶段建立的备份，按灾难恢复级别重新安装 Mesh v1 的全部组件，恢复所需的物料清单见[回滚指引](../rollback.mdx)。请在确认上方 Go/No-Go 检查单全部通过之后，再开始执行下方步骤。
+:::
+
+## 手工下线序列
+
+除步骤 2、3 需要切换到 global 集群的 kubectl 上下文（命令携带 `--kubeconfig <global-kubeconfig>`）外，其余步骤均在业务集群的默认 kubectl 上下文中执行。请严格按顺序执行，每一步完成后先确认该步的验证结果，再进入下一步；业务探测器应在整个过程中保持运行。
+
+<Steps>
+
+### 复核备份
+
+在开始下线之前，最后确认网关 Service 的独立备份完整可用。下文步骤 4 会摘除网关 Service 的 `ownerReferences`；如果该步骤的操作顺序或验证被跳过，网关 Service 存在被意外级联删除的风险，一旦发生，直接从这份备份重建 Service 是最快的恢复手段。
+
+沿用[迁移准备与前置检查](../preparing-for-migration.mdx)阶段设置的 `$BACKUP_DIR`（如果是新开的终端会话，需要重新赋值为该阶段实际使用的备份目录路径）：
+
+```bash
+# 确认网关 Service 备份文件存在且非空
+ls -la "$BACKUP_DIR/gateway-services.yaml"
+```
+
+多集群场景下，同时确认东西向网关所在命名空间的 Service 备份也已经就绪——如果之前只备份了南北向网关，需要对东西向网关命名空间重复同样的备份命令。
+
+### （global 集群）删除 ServiceMesh CR
+
+global 集群侧的 `ServiceMesh` CR 是 `global-asm-controller` 编排业务集群网格生命周期的入口：只要控制器处于运行状态，对该 CR 的删除请求会被控制器感知并执行完整的删除流程——这正是页首告警中提到的、会摧毁整个 istio-system 命名空间的那条路径。手工下线的核心思路是：先把控制器冻结在停止状态，再删除 CR，让删除请求永远停留在"已标记待删除、无人处理"的状态，从而只清除 global 侧的编排记录，不触发业务集群侧的任何实际删除动作。
+
+global 集群侧有 3 个与网格编排相关的 admission webhook 配置：
+
+- `servicemesh-v1alpha1-mutation`（MutatingWebhookConfiguration）
+- `servicemeshgroup-v1alpha1-mutation`（MutatingWebhookConfiguration）
+- `global-asm-controller-validating-webhook-configuration`（ValidatingWebhookConfiguration）
+
+先删除这 3 个 webhook 配置——它们本来会随下文步骤 3 卸载 Essentials 插件一并删除，这里提前手工删除，为接下来冻结控制器之后的 finalizer 摘除扫清障碍：
+
+```bash
+# 在 global 集群上下文执行
+kubectl --kubeconfig <global-kubeconfig> delete mutatingwebhookconfiguration servicemesh-v1alpha1-mutation servicemeshgroup-v1alpha1-mutation
+kubectl --kubeconfig <global-kubeconfig> delete validatingwebhookconfiguration global-asm-controller-validating-webhook-configuration
+```
+
+冻结 `global-asm-controller`，并确认副本数已经降为 0：
+
+```bash
+# 在 global 集群上下文执行
+kubectl --kubeconfig <global-kubeconfig> -n cpaas-system scale deploy global-asm-controller --replicas=0
+kubectl --kubeconfig <global-kubeconfig> -n cpaas-system get deploy global-asm-controller -o jsonpath='{.spec.replicas}{"\n"}'
+```
+
+第二条命令的输出必须为 `0`，确认后再继续。
+
+删除业务集群对应的 `ServiceMesh` CR（`--wait=false`：不等待控制器处理，因为控制器已经冻结、永远不会处理这个删除请求）：
+
+```bash
+# 在 global 集群上下文执行
+kubectl --kubeconfig <global-kubeconfig> -n cpaas-system delete servicemesh <cluster-name> --wait=false
+```
+
+删除请求会给 CR 打上 `deletionTimestamp`，但 CR 携带的 finalizer 无人摘除，会一直停留在 Terminating 状态。手工摘除 finalizer：
+
+```bash
+# 在 global 集群上下文执行
+kubectl --kubeconfig <global-kubeconfig> -n cpaas-system patch servicemesh <cluster-name> --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]'
+```
+
+<Directive type="warning" title="以上顺序不可颠倒；finalizer 摘除后严禁重新拉起 global-asm-controller">
+必须先删除 webhook 配置、再冻结控制器、最后删除 CR：如果颠倒顺序（例如先删 CR 再删 webhook），冻结后的控制器仍然注册着这些 webhook，`failurePolicy: Fail` 会拦截摘除 finalizer 的 patch 请求，导致 CR 卡在 Terminating 状态无法继续。
+
+摘除 finalizer 之后，**严禁将 `global-asm-controller` 的副本数重新调大**，即使是为了处理其他 CR 或临时排障：只要这个 `ServiceMesh` CR（多集群场景下还有 `ServiceMeshGroup` CR）还带着 `deletionTimestamp`，控制器一旦恢复运行，会立即感知到这个待删除状态并执行完整的删除流程——这正是页首告警描述的、会摧毁 istio-system 命名空间的路径。`global-asm-controller` 应保持冻结状态，直到本文全部下线步骤完成。
+</Directive>
+
+验证：CR 已经消失，且业务集群的 istio-system 命名空间完好无损（本页最重要的断言）：
+
+```bash
+# 在 global 集群上下文执行
+kubectl --kubeconfig <global-kubeconfig> -n cpaas-system get servicemesh <cluster-name>
+```
+
+期望返回 `Error from server (NotFound)`。
+
+```bash
+# 切回业务集群（默认）上下文执行——istio-system 命名空间位于业务集群，不在 global 集群
+kubectl get ns istio-system
+```
+
+期望 `STATUS` 为 `Active`。如果 istio-system 命名空间也随之消失，说明控制器在冻结之前已经执行了删除流程，必须立即停止后续步骤，参考[回滚指引](../rollback.mdx)评估恢复方案。
+
+多集群场景下，`ServiceMeshGroup` CR 按相同方法处理（资源类型替换为 `servicemeshgroup`，名称替换为多集群网格名）。
+
+### （global 集群）卸载 Service Mesh Essentials 插件
+
+通过平台 UI 卸载 global 集群上的 Service Mesh Essentials 插件：登录 global 集群的 ACP 平台 UI，进入 **Marketplace** → **集群插件**，找到 Service Mesh Essentials 并执行卸载。
+
+CLI 等效操作：删除对应的 `ModulePlugin` 与 `AppRelease` 资源（`ModulePlugin` 是集群范围资源，不需要 `-n`）：
+
+```bash
+# 在 global 集群上下文执行
+kubectl --kubeconfig <global-kubeconfig> delete moduleplugin asm-global
+kubectl --kubeconfig <global-kubeconfig> -n cpaas-system delete apprelease asm
+```
+
+验证：global 集群 cpaas-system 命名空间下的 Essentials 相关组件（`hermes`、`mephisto`、`global-asm-controller` 等）已经全部消失：
+
+```bash
+kubectl --kubeconfig <global-kubeconfig> -n cpaas-system get deploy | grep -Ei "hermes|mephisto|global-asm"
+```
+
+期望无输出。
+
+### 删除业务集群自研治理 CR
+
+以下步骤在业务集群的 kubectl 上下文中执行，不再需要 `--kubeconfig` 参数。与上一步 global 集群的处理逻辑相同：webhook 配置必须先于任何 patch/delete 操作删除，否则 `asm-controller` 冻结之后，这些 webhook 会以 `failurePolicy: Fail` 拦截后续对 CR 的全部操作。
+
+发现业务集群侧的 asm webhook 配置：
+
+```bash
+kubectl get mutatingwebhookconfigurations,validatingwebhookconfigurations | grep -Ei 'asm|gatewaydeploy|microservice'
+```
+
+<Directive type="note" title="OTel Java 自动注入 webhook 名称可能带随机后缀">
+如果发现命令的输出中还包含类似 `asm.opentelemetry.mpod-xxxxx` 的 mutating webhook（用于自动注入 OTel Java Agent），一并删除；其名称后缀在不同环境中不固定，以实际发现命令的输出为准。
+</Directive>
+
+确认列表无误后，删除以上发现命令列出的全部 webhook 配置：
+
+```bash
+kubectl get mutatingwebhookconfigurations,validatingwebhookconfigurations -o name | grep -Ei 'asm|gatewaydeploy|microservice' | xargs -r kubectl delete
+```
+
+冻结 `asm-controller`：
+
+```bash
+kubectl -n cpaas-system scale deploy asm-controller --replicas=0
+```
+
+摘除网关 Service 的 `ownerReferences`（每个网关命名空间/网关名重复本步骤，包括出口网关）：
+
+```bash
+kubectl -n <gateway-namespace> patch svc <gateway-name> --type=json -p='[{"op":"remove","path":"/metadata/ownerReferences"}]'
+```
+
+<Directive type="warning" title="patch 返回成功不可信，必须用 get 验证摘除结果">
+如果上一步删除 webhook 配置的动作被跳过、或者删除得不够彻底，这条 patch 命令仍然会返回 `service/<gateway-name> patched`，但 `asm-controller` 侧的 mutating webhook 可能已经把 `ownerReferences` 静默改写了回去——patch 命令的成功返回值不代表摘除已经生效，必须用独立的 `get` 命令核实：
+</Directive>
+
+```bash
+kubectl -n <gateway-namespace> get svc <gateway-name> -o jsonpath='{.metadata.ownerReferences}'
+```
+
+期望输出为空。如果输出仍然包含 `GatewayDeploy` 的属主信息，回到上一步确认 webhook 配置确实已经删除干净，再重新执行 patch 并重新验证，直至输出为空。
+
+删除业务集群自研治理 CR（遍历 `asm.alauda.io` API 组下的全部 CRD，逐类删除其实例）：
+
+```bash
+for crd in $(kubectl get crd -o name | grep asm.alauda.io | sed 's|.*/||'); do
+  kubectl delete "$crd" --all -A --wait=false
+done
+```
+
+部分 CR 会因为 finalizer 卡在 Terminating 状态（`asm-controller` 已冻结，无人摘除 finalizer）。列出仍然存在的实例并逐个摘除 finalizer：
+
+```bash
+for crd in $(kubectl get crd -o name | grep asm.alauda.io | sed 's|.*/||'); do
+  kubectl get "$crd" -A -o jsonpath='{range .items[*]}{.metadata.namespace} {.metadata.name}{"\n"}{end}' |
+    while read -r ns name; do
+      kubectl -n "$ns" patch "$crd" "$name" --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]'
+    done
+done
+```
+
+立即验证网关 Service 仍然在位——本步骤风险最高的断言：`GatewayDeploy` CR 真正消失的瞬间，如果 `ownerReferences` 未摘除干净，Service 会被级联删除：
+
+```bash
+kubectl -n <gateway-namespace> get svc <gateway-name>
+```
+
+期望正常返回 Service 信息，而不是 `NotFound`。如果 Service 意外消失，立即使用步骤 1 确认过的备份重建：`kubectl apply -f "$BACKUP_DIR/gateway-services.yaml"`，重建后确认 Service 的 endpoints 已经重新挂载到 v2 网关 Pod。
+
+最后确认全部治理 CR 已经清空：
+
+```bash
+for crd in $(kubectl get crd -o name | grep asm.alauda.io | sed 's|.*/||'); do
+  kubectl get "$crd" -A
+done
+```
+
+期望每一类都输出 `No resources found`。
+
+### 删除 asm CR
+
+`asms.operator.alauda.io` 是集群范围（cluster-scoped）资源，不属于任何命名空间，删除时不需要、也不应该携带 `-n` 参数。
+
+如果在[迁移工作负载](./migrating-workloads.mdx)阶段执行过（可选）冻结 v1 控制器一节、且尚未恢复 `asm-operator` 的副本数，需要先恢复，否则本步骤删除 asm CR 之后不会有 Operator 处理后续的资源清理：
+
+```bash
+kubectl -n istio-system get deploy asm-operator -o jsonpath='{.spec.replicas}{"\n"}'
+```
+
+如果输出为 `0`，恢复到冻结前的副本数（通常为 `1`）：
+
+```bash
+kubectl -n istio-system scale deploy asm-operator --replicas=1
+```
+
+删除 asm CR：
+
+```bash
+kubectl delete asms.operator.alauda.io asm --wait=false
+```
+
+`--wait=false` 是必须的：这条删除命令会触发 asm-operator 执行 Helm 卸载前的预检查钩子，而这个钩子按照"Pod 是否带有 sidecar 容器"清点仍在使用 Mesh v1 的工作负载，而不是按照 Pod 实际连接的控制面判断——在并存灰度迁移场景下，已经切换到 Mesh v2 的 Pod 仍然带着 sidecar 容器，会被钩子持续误判为"仍在使用 Mesh v1"，导致检查永远无法通过、删除操作无限重试。不要额外加 `--wait`/`--timeout` 等待这个删除自然完成。
+
+摘除 finalizer，绕过卡住的预检查钩子：
+
+```bash
+kubectl patch asms.operator.alauda.io asm --type=merge -p='{"metadata":{"finalizers":[]}}'
+```
+
+验证 asm CR 已经消失：
+
+```bash
+kubectl get asms.operator.alauda.io
+```
+
+期望输出 `No resources found`。
+
+finalizer 摘除后，asm-operator 通常会继续按照它自己的 Helm 卸载逻辑，自动清理 `cluster-asm` 这个 Helm release 名下的资源（`asm-controller`、`asm-core`、`asm-otel` 采集器、Jaeger CR、oauth2-proxy 等）。定位该 Helm release 对应的 Secret，确认清理是否已经完成：
+
+```bash
+kubectl -n cpaas-system get secret -l owner=helm,name=asm
+```
+
+如果 Secret 仍然存在、或者 `kubectl -n cpaas-system get deploy | grep -Ei "asm|otel"` 等命令仍能找到残留组件，按该 Secret 中记录的 release manifest 手工清理未被自动移除的资源。
+
+`flaggers.operator.alauda.io` CR 通常不会触发同样的钩子问题，可以正常删除：
+
+```bash
+kubectl delete flaggers.operator.alauda.io --all -A
+```
+
+### 删除 v1 系 OLM 订阅与 CSV
+
+不同环境的订阅名可能不同，用发现命令定位，不要假设固定名称：
+
+```bash
+kubectl -n istio-system get subscription
+```
+
+删除 asm/flagger/jaeger/opentelemetry 相关的订阅：
+
+```bash
+kubectl -n istio-system get subscription -o name | grep -Ei "asm|flagger|jaeger-operator|opentelemetry-operator" | xargs -r kubectl -n istio-system delete
+```
+
+对应的 CSV 一并删除——部分 Operator 的 Deployment（`asm-operator`、`flagger-operator`、`jaeger-operator`、`opentelemetry-operator-controller-manager` 等）由 CSV 直接管理，删除 CSV 后会一并回收：
+
+```bash
+kubectl -n istio-system get csv -o name | grep -E "/(asm|flagger|jaeger-operator|opentelemetry-operator)\.v" | xargs -r kubectl -n istio-system delete
+```
+
+验证：
+
+```bash
+kubectl -n istio-system get subscription,csv | grep -Ei "asm|flagger|jaeger-operator|opentelemetry-operator"
+```
+
+期望无输出。
+
+### 删除网关与控制面 IstioOperator CR
+
+先获取业务集群 istio-system 命名空间下全部 `IstioOperator` CR 的名称：
+
+```bash
+kubectl -n istio-system get istiooperators.install.istio.io
+```
+
+输出中除控制面自身的 `<control-plane-iop>` 外，其余条目即为各网关的 IstioOperator CR（下文记作 `<gateway-iop>`，通常与[迁移网关](./migrating-gateways.mdx)中记录的 `<gateway-name>` 同名）。逐个删除网关的 IstioOperator CR，携带 `--cascade=orphan`（如果有多个网关，可以在同一条命令中列出全部名称，空格分隔）：
+
+```bash
+kubectl -n istio-system delete istiooperator <gateway-iop> --cascade=orphan
+```
+
+<Directive type="note" title="--cascade=orphan 阻止不了 istio-operator 自身清理已管理的资源">
+`--cascade=orphan` 只能阻止 Kubernetes 按 `ownerReference` 做原生级联删除，阻止不了 istio-operator 自身的 finalizer 逻辑：处理这个 CR 的删除请求时，istio-operator 仍然会按照它的管理范围清理曾经创建的 Deployment、ServiceAccount 等资源。这正是本步骤希望达到的效果——v1 旧网关的 Deployment 早已缩容到 0 个副本，是待清理的残壳，随 IstioOperator CR 一并消失即可。网关 Service 不会受到影响：它在上一步已经摘除了 `ownerReferences`，不再被 istio-operator 识别为自己管理的对象。
+</Directive>
+
+验证：v1 旧网关的 Deployment 已被自动清理，网关 Service 仍然在位：
+
+```bash
+kubectl -n <gateway-namespace> get deploy <gateway-name>
+kubectl -n <gateway-namespace> get svc <gateway-name>
+```
+
+`get deploy` 期望返回 `NotFound`；`get svc` 期望正常返回。
+
+删除控制面的 IstioOperator CR（不加 `--cascade=orphan`——这一步需要它联动清理旧控制面的全部残留组件）：
+
+```bash
+kubectl -n istio-system delete istiooperator <control-plane-iop>
+```
+
+这条命令会联动回收 `istiod-1-22`、Mesh v1 未使用的默认网关 `istio-ingressgateway`（如果例外清单中判定其未承载业务流量），以及 1-22 系的 sidecar 注入 webhook。验证：
+
+```bash
+kubectl -n istio-system get deploy
+```
+
+输出中不应再包含 `istiod-1-22`、`istio-ingressgateway`；此时应仅剩 Mesh v2 的组件、Kiali，以及 istio-operator 本体（尚未删除，下一步处理）。
+
+最后删除 istio-operator 本体的 Deployment 与配套 RBAC。发现命令：
+
+```bash
+kubectl -n istio-system get deploy,sa | grep -i istio-operator
+kubectl get clusterrole,clusterrolebinding | grep -i istio-operator
+```
+
+逐一删除以上发现命令列出的资源。验证：
+
+```bash
+kubectl -n istio-system get deploy,sa | grep -i istio-operator
+kubectl get clusterrole,clusterrolebinding | grep -i istio-operator
+```
+
+期望均无输出。
+
+### 清理残留标签、webhook 与 CRD
+
+清理以下两个 default 位置的 webhook 配置——通常已经随上一步控制面 IstioOperator CR 的删除一并回收；如果命令仍然找到对应资源，说明当前环境存在历史遗留配置：
+
+```bash
+kubectl delete mutatingwebhookconfiguration istio-revision-tag-default 2>/dev/null
+kubectl delete validatingwebhookconfiguration istiod-default-validator 2>/dev/null
+```
+
+摘除全部业务命名空间上的 `cpaas.io/serviceMesh` 标签，包括 Go/No-Go 检查单例外清单中"带 rev 标签但从未注入"的命名空间：
+
+```bash
+kubectl label ns <mesh-namespace> cpaas.io/serviceMesh-
+```
+
+确认 `asm.alauda.io` API 组下的全部 CRD 已经没有残留实例：
+
+```bash
+for crd in $(kubectl get crd -o name | grep asm.alauda.io | sed 's|.*/||'); do
+  kubectl get "$crd" -A
+done
+```
+
+以上命令的输出应全部为 `No resources found`，确认后再删除 CRD 本身：
+
+```bash
+kubectl get crd -o name | grep asm.alauda.io | xargs kubectl delete
+```
+
+<Directive type="note" title="istio 原生 CRD 予以保留">
+`networking.istio.io`、`security.istio.io`、`telemetry.istio.io` 等 istio 原生 CRD 组不在本步骤的清理范围内：它们已经由 Mesh v2 的 Sail Operator 接管，`Gateway`/`VirtualService`/`DestinationRule`/`AuthorizationPolicy` 等原生资源实例继续有效。删除这些 CRD 会连带清空全部原生资源，是灾难性操作，任何情况下都不要执行。
+</Directive>
+
+验证：
+
+```bash
+kubectl get crd | grep -c asm.alauda.io
+```
+
+期望输出 `0`。
+
+</Steps>
+
+## 验证
+
+完成全部步骤后，确认以下检查点：
+
+```bash
+# ① asm CRD 应为零
+kubectl get crd | grep -c asm.alauda.io
+```
+
+期望输出 `0`。
+
+```bash
+# ② istio-system 命名空间应仅剩 Mesh v2 组件与 Kiali
+kubectl -n istio-system get deploy
+```
+
+输出应仅包含 `istiod-<v2-revision>`、`kiali`，以及仍在使用的 v2 网关 Deployment（如 `<gateway-name>-v2`）；不应再出现任何 Mesh v1 组件（`istiod-1-22`、`istio-operator`、`asm-operator`、`flagger-operator`、`jaeger-operator`、`opentelemetry-operator-controller-manager`、`istio-ingressgateway` 等）。
+
+同时确认：③ 业务探测器（见[迁移准备与前置检查](../preparing-for-migration.mdx)）在整个下线过程中没有出现预期之外的失败记录——如果步骤 4 中按照该步骤的说明触发过网关 Service 的应急重建，重建期间的短暂失败属于已知且已处理的风险，不代表下线序列本身存在缺陷。
+
+```bash
+# ④ global 集群应无 asm 相关组件
+kubectl --kubeconfig <global-kubeconfig> -n cpaas-system get deploy | grep -Ei "asm|hermes|mephisto"
+```
+
+期望无输出。
+
+全部检查点通过后，Mesh v1 下线完成，目标集群进入 Mesh v2 独占的终态。
+
+:::tip 多集群场景
+多集群网格需要对每个业务集群分别执行步骤 1、4–8；global 集群侧的步骤 2、3（含 `ServiceMeshGroup` CR 的处理）只需要执行一次。建议的顺序是：先逐个完成全部业务集群的本地下线步骤，最后再处理 global 集群侧的清理。多集群东西向网关的 Service 属主机制与单集群南北向网关不同，摘除步骤见[多集群网格迁移](../migrating-a-multi-cluster-mesh/index.mdx)。
+:::
