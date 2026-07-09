@@ -1,0 +1,184 @@
+---
+weight: 60
+---
+
+# 停机卸载重装迁移
+
+本文介绍[迁移概览](./migration-overview.mdx)「迁移策略选择」一节中提到的备选路径：停机卸载重装迁移。与本章节其余页面围绕的并存灰度迁移不同，这条路径不追求业务不中断——操作顺序是先完整卸载 Mesh v1，再在同一个集群上全新安装 Mesh v2，全程网格流量与调用链遥测均会中断。开始操作前，请完整阅读下方的适用范围与禁入条件声明，确认当前环境满足条件后再继续。
+
+:::warning 适用范围与验证状态
+本路径仅适用于测试或非生产环境，前提是可接受整段网格流量与遥测中断。本路径基于产品删除流程的行为分析整理，未经全流程演练验证。生产环境请使用并存灰度迁移路径。
+:::
+
+:::danger 仅适用于尚未安装 v2 控制面的集群
+本路径仅适用于**尚未创建 v2 `Istio` CR** 的集群。如果 istio-system 中已存在 v2 控制面，严禁通过 UI 删除网格（删除流程会删除整个 istio-system 命名空间），必须改用并存灰度路径的 [下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) 手工序列。
+:::
+
+## 路径说明
+
+### 适用场景
+
+以下两个条件需要同时满足，才应该考虑本路径：当前环境是测试或非生产集群，可以接受一段时间内网格流量与调用链遥测完全不可用；并且当前集群尚未开始并存灰度迁移——尚未创建任何 v2 `Istio` CR。典型场景包括：需要快速重建一套干净的测试环境、单独验证 Mesh v2 的安装与配置、或者存量 Mesh v1 配置已经没有保留价值，只想尽快切换到 Mesh v2。如果当前集群已经创建了 v2 `Istio` CR——无论是并存灰度迁移进行到一半，还是出于其他原因——本路径不再适用，必须改用[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)的手工序列（见上文告警）。
+
+### 与并存灰度迁移的对比
+
+| 维度 | 停机卸载重装迁移 | 并存灰度迁移 |
+|---|---|---|
+| 业务中断 | 全程中断：网格流量与调用链遥测在卸载 Mesh v1 之后、Mesh v2 就绪之前完全不可用 | 全程不中断：按命名空间与网关粒度灰度切换，两个控制面并存期间业务流量持续正常 |
+| 适用环境 | 仅测试或非生产环境，且当前集群尚未创建 v2 `Istio` CR | 生产及任意环境；本章节其余页面的主线路径，已完成单集群与多集群场景的完整流程演练 |
+| 回滚 | 没有分阶段回滚概念：一旦执行「删除网格」即不可逆，只能依据本文步骤 1 的备份重新执行安装与恢复 | 除下线 Mesh v1 阶段外，各阶段均有明确的回滚动作，见对应页面的说明 |
+| 复杂度 | 步骤较少，但强依赖 UI 删除网格的产品行为；本文步骤基于产品删除流程的行为分析整理，未经端到端演练验证 | 步骤较多，每个阶段都有独立的验证点与告警，已在单集群与多集群环境完成全流程演练 |
+
+## 操作步骤
+
+以下步骤严格按顺序执行。产品的删除网格流程在 CR 层面并不会强制校验「网格内是否还有服务或网关」，带着存量服务与网关直接删除网格在技术上也可能被执行，但这是未经定义、不推荐的路径；只有先清空微服务与网关，才能确保删除网格时触发的清理行为是确定性的。下方步骤 3 的告警说明了顺序颠倒时的具体后果。
+
+<Steps>
+
+### 盘点与备份（P0 同款）
+
+参照[迁移准备与前置检查](./preparing-for-migration.mdx)「资源盘点与备份」一节完成同样的盘点与备份动作，设置好 `$BACKUP_DIR`。该阶段的兼容性审计（`ServiceEntry`/`EnvoyFilter` 1.28 schema 检查）同样建议执行，避免恢复后的原生资源在 v2 数据面上出现兼容性问题；变更冻结与业务探测器两节，由于本路径本身就会造成全网格中断，可以按需简化，但仍建议至少确认没有其他人在同一时间对 Mesh v1 执行变更。
+
+本路径最终能否顺利恢复，完全取决于这一步是否完整——尤其是 `$BACKUP_DIR/istio-native-resources.yaml`（`Gateway`/`VirtualService`/`DestinationRule`/`ServiceEntry`/`Sidecar`/`PeerAuthentication`/`EnvoyFilter` 等原生资源的全量备份）。网格删除之后不会再有任何 Mesh v1 侧的信息可以找回，这份文件是本文步骤 8「恢复 istio 原生资源备份」唯一的数据来源，是整条路径的恢复生命线。
+
+### 通过 UI 移除全部微服务
+
+在 Mesh v1 的网格管理界面中，逐一移除当前网格内全部已纳管的微服务。这一步对应删除每个 `MicroService` CR：产品会为该服务去除 sidecar 注入配置并触发一次滚动重启，使其真正脱离网格数据面。
+
+```bash
+# 核对需要移除的微服务范围（与步骤 1 盘点结果比对，确认逐一处理完毕）
+kubectl get microservices.asm.alauda.io -A
+```
+
+全部微服务移除、滚动重启完成后，以上命令应返回空结果，再进入下一步。
+
+### 通过 UI 删除全部网关
+
+在 Mesh v1 的网格管理界面中，逐一删除全部网关，包括入口网关与出口网关。**这一步必须在下一步删除网格之前完成。**
+
+```bash
+# 核对需要删除的网关范围（与步骤 1 盘点结果比对）
+kubectl get gatewaydeploys.asm.alauda.io,ingressgateways.asm.alauda.io -A
+```
+
+全部网关删除完成后，以上命令应返回空结果；同时确认对应网关命名空间下的 Deployment 与 Service 已经一并清理：
+
+```bash
+kubectl -n <gateway-namespace> get deploy,svc
+```
+
+<Directive type="warning" title="网关必须先于网格删除，否则网关工作负载可能残留为孤儿">
+网关的 Deployment/Service 由 istio-operator 跨命名空间渲染，并不携带指向 istio-system 内网关 `IstioOperator` CR 的 ownerReference，只有在 asm-controller、istio-operator 均处于存活状态时，「删除网关」触发的级联清理才是确定性的。如果先删除网格，istio-system 命名空间连同这两个控制器一起消失，网关的 `IstioOperator` CR 即使被清理，也不再有 operator 处理其 finalizer 去联动删除对应的 Deployment/Service——网关工作负载会以孤儿状态继续运行，且不再受任何控制面管理。因此必须先通过 UI 删除全部网关，确认清理完成后，再进入下一步删除网格。
+</Directive>
+
+istio-system 命名空间内 Mesh v1 自带的默认网关（`istio-ingressgateway`），如果承载真实业务流量，建议同样在本步骤中通过 UI 删除；如果确认它没有承载业务流量，也可以不做处理，它会随下一步删除网格一并回收——因为它本身就在 istio-system 命名空间之内，不存在网关残留为孤儿的风险。
+
+### 复核外部服务绑定等自动生成资源已处置
+
+如果出口网关配置过外部服务绑定，Mesh v1 会在 istio-system 命名空间下自动生成一组关联的 `Gateway`/`VirtualService`（名称形如 `<绑定名>--<gateway-namespace>--<gateway-name>--<哈希>`，携带 `asm.cpaas.io/egress-name`/`asm.cpaas.io/egress-namespace` 标签）。这组资源通常会随上一步对应出口网关的删除一并级联清理；进入下一步删除网格之前，复核确认没有遗留：
+
+```bash
+kubectl get gateways.networking.istio.io,virtualservices.networking.istio.io -A \
+  -l asm.cpaas.io/egress-name,asm.cpaas.io/egress-namespace
+```
+
+期望输出为空。本路径不需要保留任何 Mesh v1 时期的配置（下一步会连同 istio-system 一起删除），如果命令仍有输出，可以直接删除；如果这类资源意外出现在 istio-system 以外的命名空间（例如残留的 `ServiceEntry`），一并手工清理，避免遗留无主配置。
+
+### 通过 UI 删除网格
+
+确认网格内已经没有任何微服务与网关（步骤 2、3 的验证命令均已返回空结果），并再次确认页首红线的前提条件仍然成立——当前集群确实尚未创建 v2 `Istio` CR，再在 Mesh v1 的网格管理界面中执行「删除网格」操作。
+
+根据产品删除流程的行为分析，这一操作会依次删除业务集群侧的 `asm` CR 与整个 istio-system 命名空间；此时网格内已经清空服务与网关，这是一次预期内的、彻底的清场，不同于[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)页首告警描述的、v2 控制面已经存在时那种破坏性场景——这也是全书中唯一一处主动通过 UI 触发该操作的场景。
+
+持续观察命名空间的删除过程，直至完全消失：
+
+```bash
+while kubectl get ns istio-system >/dev/null 2>&1; do
+  echo "istio-system 仍在删除中，5 秒后重试..."
+  sleep 5
+done
+echo "istio-system 命名空间已删除"
+```
+
+如果命名空间长时间停留在 `Terminating` 状态，通常是 istio-system 内 `IstioOperator`/`Flagger` 类 CR 的 finalizer 未被处理——根据产品删除流程分析，这类情况有删除流程自身的兜底逻辑负责强制剥离，通常不需要手工介入；如果观察到命名空间卡滞明显超出预期，再手工核实具体卡在哪个资源的 finalizer 上，按需摘除。
+
+删除完成后，回到步骤 3 处理过的每个网关命名空间，最后复核一次确实没有残留工作负载——这是防御性复核，理应与步骤 3 的验证结果一致（仍为空）：
+
+```bash
+kubectl -n <gateway-namespace> get deploy,svc
+```
+
+如果此刻才第一次发现残留，说明前面某个环节的顺序或验证被跳过，网关工作负载已经成为真正意义上的孤儿——istio-system 消失后不再有任何控制面或 UI 入口可以联动清理它。需要立即停止后续步骤，手工排查并清理残留的 Deployment/Service 后再继续。
+
+### 卸载 v1 残留订阅与 global Essentials 插件
+
+istio-system 命名空间连同其中的 v1 OLM `Subscription`/`CSV`（`asm-operator`、`flagger-operator`、`jaeger-operator`、`opentelemetry-operator-controller-manager` 等）已经随上一步一并删除，不需要再单独处理。仍需要手工清理的是集群范围（cluster-scoped）资源，不受命名空间删除影响：
+
+```bash
+# 确认 asm.alauda.io API 组下已经没有残留实例
+for crd in $(kubectl get crd -o name | grep asm.alauda.io | sed 's|.*/||'); do
+  kubectl get "$crd" -A
+done
+```
+
+以上命令每一类都应返回 `No resources found`；步骤 2、3 已经分别清空微服务与网关对应的 CR 实例，理论上不会再有残留，但灰度发布、全局限流等未在前几步专门处理的自研 CR 如果仍有残留实例，需要先手工删除再继续。确认无残留后删除 CRD 本身，并清理集群范围的 default 位 webhook 配置与业务命名空间上残留的标签，方法与[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)「清理残留标签、webhook 与 CRD」一节完全一致（该节命令均不依赖 istio-system 命名空间是否存在，照做即可）：
+
+```bash
+kubectl get crd -o name | grep asm.alauda.io | xargs -r kubectl delete
+```
+
+最后，通过平台 UI 卸载 global 集群上的 Service Mesh Essentials 插件：登录 global 集群的 ACP 平台 UI，进入 **Marketplace** → **集群插件**，找到 Service Mesh Essentials 并执行卸载；CLI 等效操作与验证方法见[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)「卸载 Service Mesh Essentials 插件」一节。由于本路径下 `ServiceMesh` CR 已经随上一步「删除网格」的正常控制器处理流程一并清除，不需要再执行该文中冻结控制器、手工摘除 finalizer 的那套序列，直接卸载插件即可。
+
+### 全新安装 Mesh v2
+
+网格与 global Essentials 插件都已清空，当前集群相当于一个从未安装过 Mesh v2 的全新环境（如果此前已经安装过 servicemesh-operator2、只是尚未创建 `Istio` CR，从下面的 `IstioCNI`/`Istio` 资源创建开始即可）。按照 [Installing Alauda Service Mesh](../installing/installing-service-mesh/install-mesh.mdx) 完成 servicemesh-operator2 Operator 安装、`IstioCNI` 资源创建、`Istio` 资源创建三个部分，版本选择当前的 Mesh v2 适用版本（istio 1.28.x）。创建完成后，记录本次安装得到的 `<v2-revision>`（`kubectl get istiorevisions.sailoperator.io`），后续步骤会用到。
+
+控制面就绪后，依次完成可观测栈的安装：Kiali 按照 [Alauda Build of Kiali](../integration/observability/kiali.mdx) 安装；OTel v2 与 Jaeger v2 按照[迁移可观测栈](./migrating-observability.mdx)「部署 OTel v2 与 Jaeger v2」一节安装（该节内容本身就是独立于迁移路径的标准安装步骤，同样适用于本路径）。由于本路径没有并存期，Kiali 与 Istio 的调用链配置不需要先配置成过渡态再切换，可以直接按照[迁移可观测栈](./migrating-observability.mdx)「将 Istio 调用链导出切换到 Jaeger v2」与「把 Kiali 调用链数据源切换到 Jaeger v2」两节给出的最终态配置直接创建。
+
+### 恢复 istio 原生资源备份
+
+使用步骤 1 备份的 `$BACKUP_DIR/istio-native-resources.yaml` 重建 `Gateway`/`VirtualService`/`DestinationRule`/`ServiceEntry`/`Sidecar`/`PeerAuthentication`/`EnvoyFilter` 等原生资源。把该文件应用到新安装的 Mesh v2 之前，需要先剥离两类字段：
+
+- **server 端字段**：`status`、`metadata.resourceVersion`、`metadata.uid`、`metadata.creationTimestamp`、`metadata.generation`——这些字段的取值属于上一次集群的历史状态，留在文件中重新创建时并无意义；
+- **asm 属主标注**：部分原生资源（例如由 `ConnectionPool`/`OutlierDetection` 等自研 CR 自动生成的 `DestinationRule`）带有指向对应 asm CR 的 `metadata.ownerReferences`。这些 asm CR 已经随网格删除、CRD 清理一并永久消失；如果不剥离这些引用直接重新创建，垃圾回收器会把恢复出来的资源当作属主已经不存在的孤儿对象，创建后很快被自动删除。
+
+如果环境中已安装 `yq`，可以批量剥离后再 apply：
+
+```bash
+yq eval 'del(.items[].status, .items[].metadata.resourceVersion, .items[].metadata.uid, .items[].metadata.creationTimestamp, .items[].metadata.generation, .items[].metadata.ownerReferences)' -i "$BACKUP_DIR/istio-native-resources.yaml"
+
+kubectl apply -f "$BACKUP_DIR/istio-native-resources.yaml"
+```
+
+如果环境中没有 `yq`，手工编辑该文件删除以上字段后再 apply 同样可行；文件中其余字段（`spec` 全部内容、`metadata.name`/`metadata.namespace`/`metadata.labels`/`metadata.annotations` 中非 asm 属主类的部分）应保持不变。
+
+验证：
+
+```bash
+kubectl get gateways.networking.istio.io,virtualservices,destinationrules,serviceentries,sidecars,peerauthentications,envoyfilters -A
+```
+
+将输出与步骤 1 盘点阶段记录的资源范围比对，确认数量与名称一致。
+
+### 打注入标签、全量重启并重建网关
+
+业务命名空间此前从未被删除，此刻仍然带着 Mesh v1 时期的 `istio.io/rev` 标签，但已经在步骤 2 完成过一次去注入并重启。为每个 `<mesh-namespace>` 切换到 v2 修订并重新触发注入，方法与[迁移工作负载](./migrating-a-single-cluster-mesh/migrating-workloads.mdx)「切换单个命名空间」一节相同：
+
+```bash
+kubectl label ns <mesh-namespace> istio.io/rev=<v2-revision> --overwrite
+kubectl -n <mesh-namespace> rollout restart deploy
+kubectl -n <mesh-namespace> rollout status deploy --timeout=300s
+istioctl proxy-status --revision <v2-revision> -n <mesh-namespace>
+```
+
+这是本文第二次、也是最后一次触发工作负载的滚动重启（第一次发生在步骤 2 去注入时）。
+
+网关此前已经在步骤 3 连同 Deployment/Service 一并删除，此刻需要按 Mesh v2 的原生形态重新创建，而不是恢复 Mesh v1 时期的 `GatewayDeploy` 形态。按照 [Installing a gateway via gateway injection](../gateways/gateway-installation/installing-a-gateway-via-injection.mdx) 完成每个网关的重建，Service 的 selector 与端口按业务实际需要配置——不再需要像[迁移网关](./migrating-a-single-cluster-mesh/migrating-gateways.mdx)中金丝雀切流那样与 Mesh v1 旧网关共享同一个 Service。
+
+</Steps>
+
+## 验收
+
+完成以上全部步骤后，参照[完成迁移](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx)「终态验收」一节的检查点确认迁移结果，包括 `Istio`/`IstioCNI`/`IstioRevisionTag` 健康状态、Kiali 拓扑与调用链、以及 `asm.alauda.io` CRD 与 v1 组件的残留扫描。该文「default 收编」一节（创建 default 修订 `IstioRevisionTag`）同样适用，可以按需执行。「CA 生命周期交接」一节不适用于本路径——本路径从零安装 Mesh v2，v2 istiod 自行生成独立的根证书，不存在与 Mesh v1 共用 CA 需要交接的问题；「可观测终态」一节描述的 OTel v2/Jaeger v2 安装与调用链数据源切换，本路径已经在上文「全新安装 Mesh v2」步骤中一次性配置为最终形态，不需要再单独执行一轮切换。
+
+由于本文步骤基于产品删除流程的行为分析整理、未经端到端演练验证，建议在验收通过后记录实际执行过程中观察到的任何偏差（例如命名空间删除耗时、是否出现非预期的孤儿资源等），作为后续同类操作的参考。
