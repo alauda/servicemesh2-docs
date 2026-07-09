@@ -19,8 +19,8 @@ Mesh v1 的控制器（`asm-controller`、`asm-operator`、`global-asm-controlle
 冻结按照编排链自上而下的顺序，依次将以下三个 Deployment 缩容到 0 个副本：
 
 ```bash
-# global 集群（先冻结编排源头，防止其重建业务集群组件）
-kubectl -n cpaas-system scale deploy global-asm-controller --replicas=0
+# global 集群（先冻结编排源头，防止其重建业务集群组件）（在 global 集群上下文执行）
+kubectl --kubeconfig <global-kubeconfig> -n cpaas-system scale deploy global-asm-controller --replicas=0
 # 业务集群：先冻结 asm-operator（避免其把已发布的副本数重新调和回来），再冻结 asm-controller
 kubectl -n istio-system scale deploy asm-operator --replicas=0
 kubectl -n cpaas-system scale deploy asm-controller --replicas=0
@@ -29,7 +29,9 @@ kubectl -n cpaas-system scale deploy asm-controller --replicas=0
 冻结期间，`MicroService` 等 Mesh v1 自研 CR 不需要删除，保留即可。确认不再需要冻结、或者需要回滚时，将三个 Deployment 恢复到冻结前的副本数（建议在冻结前先记录原始副本数，替换下面的 `<original-replica-count>`）：
 
 ```bash
-kubectl -n cpaas-system scale deploy global-asm-controller --replicas=<original-replica-count>
+# global 集群（在 global 集群上下文执行）
+kubectl --kubeconfig <global-kubeconfig> -n cpaas-system scale deploy global-asm-controller --replicas=<original-replica-count>
+# 业务集群
 kubectl -n istio-system scale deploy asm-operator --replicas=<original-replica-count>
 kubectl -n cpaas-system scale deploy asm-controller --replicas=<original-replica-count>
 ```
