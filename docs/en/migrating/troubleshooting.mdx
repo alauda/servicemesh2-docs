@@ -1,0 +1,186 @@
+---
+weight: 80
+---
+
+# 故障排查与常见问题
+
+本文汇总 Mesh v1 迁移到 Mesh v2 过程中较为常见的故障现象及排查思路，并解答几个高频问题。故障排查部分按「症状 / 原因 / 处理」的结构逐条组织，可以直接根据实际遇到的现象定位到对应条目；每条的处理方法都链接回正文对应页面的详细步骤，本文不重复列出完整操作序列。本文使用的占位符与阶段术语延续[迁移概览](./migration-overview.mdx)中的约定，不再重复说明。
+
+:::tip 如何使用本文
+如果不确定当前现象对应下文哪一条，优先复制报错信息中的关键字（资源类型、事件消息、HTTP 状态码等）与下文各条目标题或「症状」描述比对；多数条目都给出了一条可以直接执行的定位命令，用于确认现象与原因是否吻合，再按「处理」段的链接查看完整操作步骤。
+:::
+
+## 故障排查
+
+### v2 istiod 长期处于 Pending 状态
+
+**症状**：创建 v2 `Istio` 资源后，v2 istiod 的 Pod 长期停留在 `Pending`，`kubectl describe` 的事件中出现类似 `0/1 nodes are available: 1 node(s) didn't satisfy existing pods anti-affinity rules` 的调度失败消息。
+
+```bash
+kubectl -n istio-system get pod -l app=istiod,istio.io/rev=<v2-revision>
+kubectl -n istio-system describe pod -l app=istiod,istio.io/rev=<v2-revision> | grep -A5 Events
+```
+
+**原因**：Mesh v1 的 istiod Pod 携带硬反亲和规则，拒绝把带有 `istio=istiod` 标签的 Pod 调度到同一节点；v2 istiod Pod 同样带有这个标签。如果集群是单节点集群，或者 Mesh v1 istiod 所在节点是唯一可调度节点，v2 istiod 就没有其他节点可以调度。
+
+**处理**：先确认是否为单节点集群（`kubectl get nodes --no-headers | wc -l`）；如果是，执行[安装 v2 控制面](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx)「（条件步骤）降级 Mesh v1 istiod 的反亲和规则」一节的操作，将反亲和规则由 required 降级为 preferred，再删除处于 `Pending` 的 v2 istiod Pod 触发重新调度。多节点集群通常不受影响，如果仍然出现本症状，需要另行核实节点资源或其他调度约束是否充足。
+
+### patch ServiceMesh 或治理 CR 报 InternalError（webhook connection refused）
+
+**症状**：[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)阶段冻结控制器之后，对 `ServiceMesh` CR 或业务集群自研治理 CR 的 patch 请求（例如摘除 finalizer）返回 `InternalError`，错误信息中包含类似 `failed calling webhook` 或 `connection refused` 的内容。
+
+```bash
+kubectl get mutatingwebhookconfigurations,validatingwebhookconfigurations | grep -Ei 'asm|servicemesh|gatewaydeploy|microservice'
+```
+
+**原因**：对应的控制器（`global-asm-controller`/`asm-controller`）副本数已经降为 0，但其注册的 admission webhook 配置尚未删除，且 `failurePolicy` 为 `Fail`：后端没有可用 Pod 处理请求，凡是匹配该 webhook 规则的请求都会因连接失败被拦截。
+
+**处理**：先删除对应的 webhook 配置，再重试 patch；完整的删除顺序见[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)「（global 集群）删除 ServiceMesh CR」与「删除业务集群自研治理 CR」两节。**严禁通过重新调大控制器副本数来"解锁" webhook**：如果对应 CR 已经带有 `deletionTimestamp`，控制器一旦恢复运行会立即感知并执行完整删除流程，这正是页首红线要规避的路径。
+
+### asm CR 删除卡住，反复报 proxies still pointing to the control plane
+
+**症状**：执行 `kubectl delete asms.operator.alauda.io asm` 后，CR 长期停留在 `Terminating`，`kubectl describe` 或 Operator 日志中反复出现类似 `there are proxies still pointing to the control plane` 的报错。
+
+```bash
+kubectl get asms.operator.alauda.io asm -o jsonpath='{.metadata.deletionTimestamp}{"\n"}{.metadata.finalizers}{"\n"}'
+```
+
+**原因**：Operator 的卸载前置检查钩子按照"Pod 是否携带 sidecar 容器"清点仍在使用 Mesh v1 的工作负载，而不是按 Pod 实际连接的控制面判断。并存灰度迁移场景下，已经切换到 Mesh v2 的 Pod 仍然带着 sidecar 容器，会被持续误判为"仍在使用 Mesh v1"，检查永远无法通过。
+
+**处理**：见[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)「删除 asm CR」一节：摘除 asm CR 的 finalizer 绕开卡住的检查钩子，再核对对应的 Helm release 是否已被自动清理，未清理的资源按 release manifest 手工删除。
+
+```bash
+kubectl patch asms.operator.alauda.io asm --type=merge -p='{"metadata":{"finalizers":[]}}'
+```
+
+### 创建 default IstioRevisionTag 报 ReconcileError
+
+**症状**：[完成迁移](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx)阶段创建 default 位置的 `IstioRevisionTag` 后，`kubectl get istiorevisiontags.sailoperator.io` 显示 `STATUS` 为 `ReconcileError`，而不是 `Healthy`。
+
+```bash
+kubectl get istiorevisiontags.sailoperator.io default -o jsonpath='{.status}'
+```
+
+**原因**：Mesh v1 的 istio-operator 在最初部署时直接创建了 `istio-reader-service-account` 等基础资源，这些资源不带 Helm 归属标记；sail-operator 的 `base` chart 尝试接管同名资源时，判定为归属冲突而拒绝接管。
+
+**处理**：见[完成迁移](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx)「补齐 Helm 元数据」一节，为报错信息中提到的资源补齐 `app.kubernetes.io/managed-by=Helm` 标签与 `meta.helm.sh/release-name`、`meta.helm.sh/release-namespace` 注解，sail-operator 会在下一次协调时自动重试，不需要手工重建 `IstioRevisionTag`。
+
+### v2 金丝雀网关返回 404，监听器未绑定
+
+**症状**：[迁移网关](./migrating-a-single-cluster-mesh/migrating-gateways.mdx)阶段部署 v2 金丝雀网关后，`istioctl proxy-config listeners` 只能看到 `15021`/`15090` 等固定端口，看不到业务端口对应的监听器；经由该网关的请求返回 404。
+
+```bash
+GW_V2_POD=$(kubectl -n <gateway-namespace> get pod -l gateway-revision=v2 -o jsonpath='{.items[0].metadata.name}')
+istioctl proxy-config listeners "$GW_V2_POD.<gateway-namespace>"
+```
+
+**原因**：v2 金丝雀网关 Pod 的标签只覆盖了 Service 的 selector，遗漏了 `Gateway` 资源 selector 中的部分键值对；Mesh v2 的 istiod 不会把该 Pod 识别为这个 `Gateway` 资源的候选工作负载，监听器因此不会绑定。
+
+**处理**：回到[迁移网关](./migrating-a-single-cluster-mesh/migrating-gateways.mdx)「核对网关 Service 属主并采集 selector 信息」一节，重新采集 Service selector 与 `Gateway` selector 的**并集**，按「部署 v2 金丝雀网关」一节补齐 Pod 标签后重新应用。
+
+### v1 旧网关 Pod 创建被拒，报 template "asm-gateway" not found
+
+**症状**：网关命名空间的 `istio.io/rev` 标签已经切换到 v2 之后，尝试扩容或重建 v1 旧网关 Pod 失败，报错信息中包含类似 `requested template "asm-gateway" not found` 的内容。
+
+```bash
+kubectl get ns <gateway-namespace> -o jsonpath='{.metadata.labels.istio\.io/rev}{"\n"}'
+```
+
+**原因**：v1 旧网关的 Pod 模板携带 `inject.istio.io/templates: asm-gateway` 注解，这是 Mesh v1 专有的注入模板名，在 Mesh v2 的 webhook 中没有对应实现。命名空间的 rev 标签一旦切到 v2，新建 Pod 的注入请求会转交给 Mesh v2 的 webhook 处理，因找不到该模板而拒绝创建——这是[迁移网关](./migrating-a-single-cluster-mesh/migrating-gateways.mdx)「顺序总则」一节告警中描述的预期行为，不是缺陷。
+
+**处理**：不要尝试修复或重建 v1 旧网关。按[回滚指引](./rollback.mdx)中对应阶段的回滚动作二选一：修复 v2 网关问题后继续推进，或者将命名空间的 rev 标签切回 v1 并删除 v2 网关 Pod 以完成回滚。
+
+### 网关 Service 意外消失，DNS 无法解析
+
+**症状**：网关 Service 从 `kubectl get svc` 输出中意外消失；业务探测报 DNS 无法解析（`curl` 返回 exit code 6），经由该网关的请求全部失败。
+
+```bash
+kubectl -n <gateway-namespace> get svc <gateway-name>
+```
+
+**原因**：网关 Service 的 `ownerReferences` 此前指向某个自研治理 CR；如果在删除该 CR 之前没有把 `ownerReferences` 摘除干净（或摘除的 patch 被仍在运行的 webhook 静默回写），CR 真正被删除的瞬间，Kubernetes 会按 `ownerReferences` 对 Service 做级联垃圾回收。
+
+**处理**：立即使用[迁移准备与前置检查](./preparing-for-migration.mdx)阶段单独备份的网关 Service YAML 应急重建，重建后确认 endpoints 已经重新指向 v2 网关 Pod：
+
+```bash
+kubectl apply -f "$BACKUP_DIR/gateway-services.yaml"
+kubectl -n <gateway-namespace> get endpoints <gateway-name>
+```
+
+完整的预防步骤（摘除顺序与验证方法）见[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)「删除业务集群自研治理 CR」一节。
+
+### 切换到 Mesh v2 后部分 EnvoyFilter 不再生效
+
+**症状**：命名空间切换到 Mesh v2 后，原本由某个 `EnvoyFilter` 提供的行为（例如请求头兼容处理、自定义 Lua 逻辑）不再生效，但 `kubectl get envoyfilter` 显示该资源仍然存在，没有被删除。
+
+```bash
+kubectl get envoyfilters -A -o json | jq -r '.items[] | select([.. | objects | has("proxyVersion")] | any) | "\(.metadata.namespace)/\(.metadata.name)"'
+```
+
+**原因**：该 `EnvoyFilter` 的 `spec` 中带有 `proxyVersion` 字段（形如 `^1\.22.*`），生效范围被锁定为 Mesh v1 的 1.22 数据面版本；Mesh v2 数据面运行 1.28，正则不再匹配，过滤器不会下发到新 Pod 的 Envoy 配置中。
+
+**处理**：回到[迁移准备与前置检查](./preparing-for-migration.mdx)「EnvoyFilter 版本锁审计」一节重新核对该资源承载的能力是否仍被业务依赖：仍需要则在 Mesh v2 下以原生资源（如 `AuthorizationPolicy`、`Telemetry`）重新实现；不再需要则可以随该功能一并下线，不需要专门处理。
+
+### Java 应用注入 OTel Agent 后查询不到新的调用链
+
+**症状**：完成[迁移可观测栈](./migrating-observability.mdx)「迁移 OTel Java 自动注入」的操作后，目标工作负载在 Jaeger v2 中查询不到新产生的调用链，或者 Pod 卡在 `Init:ImagePullBackOff`。
+
+**原因**：以下三种情况都可能导致该现象，建议依次排查：
+
+1. `instrumentation.opentelemetry.io/inject-java` 与 `container-names` 注解没有显式写回 Deployment 的 Pod 模板——Mesh v1 时期这两条注解由已经随下线阶段移除的 webhook 动态打上，这条路径已经断裂；
+2. `Instrumentation` 资源中 `spec.java.image` 指定的镜像不可达，或目标命名空间缺少对应的 `imagePullSecrets`；
+3. `Instrumentation` 资源的 `OTEL_EXPORTER_OTLP_PROTOCOL` 与 `exporter.endpoint` 端口不匹配（`http/protobuf` 协议必须搭配 `4318` 端口，`grpc` 协议必须搭配 `4317` 端口）。
+
+```bash
+kubectl -n <mesh-namespace> get deploy <workload-name> -o jsonpath='{.spec.template.metadata.annotations}{"\n"}'
+kubectl -n <mesh-namespace> get pod
+kubectl -n <mesh-namespace> get instrumentation java-instrumentation -o yaml
+```
+
+**处理**：按上述定位命令的输出对照上面三种情况逐项排查，目标态配置见[迁移可观测栈](./migrating-observability.mdx)「迁移 OTel Java 自动注入」一节；确认修复后滚动重启工作负载，在 Jaeger v2 中核对新 trace 是否携带对应的 agent 版本标记。
+
+### Kiali 控制台无数据
+
+**症状**：Kiali 控制台的 **Graph** 页面空白或报错，看不到服务拓扑与实时流量。
+
+```bash
+kubectl get feature monitoring -o jsonpath='{.spec.accessInfo.database.address}{"\n"}'
+kubectl -n istio-system get kiali kiali -o jsonpath='{.spec.external_services.prometheus.url}{"\n"}'
+```
+
+**原因**：常见于两类配置错误：`Kiali` 资源中的 `prometheus.url` 或引用的凭据 Secret 与监控数据源实际地址不一致；或者多集群环境错误接入了 Prometheus 而不是 VictoriaMetrics，遗漏了 `thanos_proxy.enabled` 配置段。
+
+**处理**：以[安装 v2 控制面](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx)「获取监控数据源地址与凭据」一节给出的 `Feature` CR 发现命令的返回值为唯一权威来源，核对 `Kiali` 资源中的地址与凭据引用是否一致；多集群环境额外核对是否已按[迁移多网络多集群网格](./migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx)「Kiali 多集群配置」一节接入 VictoriaMetrics 并开启 `thanos_proxy`。
+
+### istioctl proxy-status 提示 no running Istio pods
+
+**症状**：执行 `istioctl proxy-status`（不带任何参数）返回类似 `no running Istio pods` 的报错或空列表，即使 Mesh v2 数据面工作正常、业务流量没有异常。
+
+**原因**：Mesh v2 的 `Istio` 资源采用 `RevisionBased` 更新策略，不存在不带 revision 后缀的默认 Pilot 部署；`istioctl` 在未指定 revision 时无法定位到具体的控制面实例。
+
+**处理**：补上 `--revision <v2-revision>` 参数重新执行；`<v2-revision>` 的取值见[安装 v2 控制面](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx)「获取 v2 revision 名称」一节：
+
+```bash
+kubectl get istiorevisions.sailoperator.io
+istioctl proxy-status --revision <v2-revision>
+```
+
+完整说明见[迁移工作负载](./migrating-a-single-cluster-mesh/migrating-workloads.mdx)「切换单个命名空间」一节中的相关提示。
+
+## 常见问题
+
+### 是否必须冻结 Mesh v1 控制器才能切换工作负载？
+
+不是必须的。单集群与多集群场景下的迁移验证均确认，Mesh v1 的控制器（`asm-controller`/`asm-operator`/`global-asm-controller`）不会将命名空间上已经切换的 `istio.io/rev` 标签调和回 `1-22`，也不会主动拉起被冻结的副本数量。因此常规场景下，可以直接按[迁移工作负载](./migrating-a-single-cluster-mesh/migrating-workloads.mdx)的步骤逐命名空间切换，不需要预先冻结控制器。只有在实际操作中观察到标签被自动改回、或工作负载副本数被意外调和等异常情况时，才需要执行该文「（可选）冻结 v1 控制器」一节给出的操作。
+
+### `cpaas.io/serviceMesh` 标签什么时候需要清除？
+
+命名空间切换到 Mesh v2 之后，不需要立即清除该标签：它只被 Mesh v1 的 webhook 用来给 Pod 追加 ASM 专属配置，对已经由 Mesh v2 注入的 Pod 没有影响，保留它也便于按[回滚指引](./rollback.mdx)执行单命名空间回滚。这个标签会在[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)阶段「清理残留标签、webhook 与 CRD」一节中随其他 Mesh v1 遗留标签一并统一清除，不需要在迁移过程中提前处理。
+
+### istio CRD 升级到 1.28 会影响仍在运行的 Mesh v1 吗？
+
+不会。单集群与多集群场景下的迁移验证过程中，Mesh v2 控制面创建后 istio 原生 CRD（`networking.istio.io`、`security.istio.io`、`telemetry.istio.io` 等）随之升级到 1.28 对应的版本，Mesh v1 的业务 Pod 在整个并存期间保持零重建，直连调用与网关调用持续返回预期结果，未观察到因 CRD schema 升级导致的 Mesh v1 侧异常，向后兼容。唯一需要主动处理的相关场景是单节点或 istiod 节点重合的集群：这类集群需要按[安装 v2 控制面](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx)的条件步骤降级 v1 istiod 的反亲和规则（见上文第一条排障条目），这是运维侧的主动调度调整，不属于 CRD 升级引入的回归。
+
+### 迁移窗口与遥测中断窗口大致要多久？
+
+并存灰度迁移路径下，网格数据面流量本身不需要停机窗口：迁移准备、控制面并存安装、工作负载与网关切换全程可以在业务正常运行下进行，实际耗时取决于命名空间与网关的数量、以及每次切换后的验证节奏。副本数 ≥2 且配置了 PodDisruptionBudget 的服务预期零中断，副本数为 1 的服务会在切换触发的滚动重启窗口内经历一次秒级中断（详见[迁移工作负载](./migrating-a-single-cluster-mesh/migrating-workloads.mdx)「中断预期」一节；建议提前在[迁移准备与前置检查](./preparing-for-migration.mdx)「服务副本数与 PodDisruptionBudget」一节扩容此类服务并配置 PDB）。调用链遥测存在一个独立的中断窗口：从[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)阶段删除 v1 时期的 OTel 采集链路与 Jaeger v1 组件开始，到完成[迁移可观测栈](./migrating-observability.mdx)重新接入 Jaeger v2 为止；这段时间只影响调用链数据的产生与查询，不影响网格流量转发，建议提前准备好 v2 可观测栈所需的组件与配置，缩短这段窗口。
