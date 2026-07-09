@@ -85,7 +85,7 @@ spec:
       enabled: true
       provider: jaeger
       use_grpc: true
-      internal_url: http://jaeger-prod-query.istio-system:16685/jaeger  # [!code callout]
+      internal_url: http://<jaeger-query-service>.istio-system:16685/jaeger  # [!code callout]
       disable_version_check: true
 ```
 
@@ -93,7 +93,7 @@ spec:
   1. `auth.strategy: openid` 的完整 OIDC 配置字段（`issuer_uri`/`client_id`/`api_proxy` 等），按上文引用的 **Configuring Monitoring with Kiali** 一节补全。
   2. 仅当监控数据源需要经 Thanos/VictoriaMetrics 代理访问时才需要 `thanos_proxy`（多集群环境必须开启）；单集群环境直连 Prometheus 时可以省略这一段。
   3. `url` 替换为前面发现命令返回的监控数据源地址。
-  4. `internal_url` 指向 Mesh v1 现有的 Jaeger 查询服务（如上一步核实的名称与 `jaeger-prod-query` 不同，请替换为实际值），保证 Kiali 在并存期间仍可展示调用链；完成[迁移可观测栈](../migrating-observability.mdx)后再切换到 Jaeger v2。
+  4. `<jaeger-query-service>` 为 Mesh v1 的 Jaeger query Service 名（多数环境为 `jaeger-prod-query`），以上文发现命令的实际输出为准；Kiali 借此在并存期间仍可展示调用链，完成[迁移可观测栈](../migrating-observability.mdx)后再切换到 Jaeger v2。
 </Callouts>
 
 将以上内容保存为 `kiali.yaml`，替换 `<monitoring-url>` 并补全 `auth.openid` 相关字段后执行：
