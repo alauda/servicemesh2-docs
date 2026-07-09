@@ -1,0 +1,61 @@
+---
+weight: 70
+---
+
+# 回滚指引
+
+本文汇总并存灰度迁移路径（P0–P6）中各阶段的回滚动作、生效前提与触发判据，供迁移过程中出现预期之外的失败时参考。本文使用的占位符与阶段术语延续[迁移概览](./migration-overview.mdx)中的约定，不再重复说明。
+
+全文贯穿一条总则：[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)阶段的手工下线序列，是本方案唯一的不可回退点。在开始执行该序列之前，无论迁移进行到 P1–P4 的哪一个阶段，都可以通过下表中的操作回滚，不需要重新安装整套 Mesh v1；一旦手工下线序列开始执行，Mesh v1 的控制面、数据面与全部治理资源会被逐步删除，不再存在"改标签""缩容再扩容"这类轻量回滚手段——此时如果仍然需要恢复 Mesh v1，只能进入本文『下线 Mesh v1 之后的恢复』一节，按备份执行灾难恢复级的重新安装。
+
+## 分阶段回滚
+
+下表按迁移阶段列出对应的回滚动作与生效前提；执行前请先核实前提条件是否仍然成立，前提不成立时不要执行对应操作。
+
+| 阶段 | 回滚动作 | 前提 |
+|---|---|---|
+| P1–P2（安装 v2 控制面）后 | 删除 v2 `Istio`/`IstioCNI` CR：`kubectl delete istio default && kubectl delete istiocni default`（Kiali 可以保留，不影响 Mesh v1） | 无 |
+| P3（迁移工作负载）中 / 后 | 单个命名空间：`kubectl label ns <mesh-namespace> istio.io/rev=1-22 --overwrite && kubectl -n <mesh-namespace> rollout restart deploy`；需要回滚多个命名空间时逐个重复。如果切换前执行过（可选）冻结 v1 控制器，还需要按[迁移工作负载](./migrating-a-single-cluster-mesh/migrating-workloads.mdx)『（可选）冻结 v1 控制器』一节给出的命令，将 `global-asm-controller`/`asm-operator`/`asm-controller` 恢复到冻结前的副本数 | Mesh v1 的 istiod 与 admission webhook 尚未删除（P5 序列尚未开始）；`MicroService` 等自研治理 CR 尚未删除 |
+| P4（迁移网关）切换后 | **网关命名空间的 `istio.io/rev` 标签一旦切换到 v2，v1 旧网关的 Pod 模板就失去了重新创建 Pod 的能力**，不能再直接扩容；回滚顺序是先 `kubectl label ns <gateway-namespace> istio.io/rev=1-22 --overwrite`，确认可以重新创建 v1 网关 Pod 后再 `kubectl -n <gateway-namespace> scale deploy <gateway-name> --replicas=<replica-count>` 恢复其副本数，最后缩容或删除 v2 金丝雀网关（`kubectl -n <gateway-namespace> scale deploy <gateway-name>-v2 --replicas=0`）；也可以不切回标签，转而修复 v2 网关问题、继续推进而不回滚 | v1 旧网关的 Deployment 尚未删除（进入 P5 之前应当始终保留，缩容到 0 副本不算删除） |
+| P5（下线 Mesh v1）之后 | 灾难恢复级：按 P0 阶段的备份重新安装 Mesh v1 全部组件，详见下文『下线 Mesh v1 之后的恢复』一节 | [迁移准备与前置检查](./preparing-for-migration.mdx)阶段建立的备份完整可用 |
+
+:::warning 网关的单向门：ns rev 切换后，v1 旧网关不可重建
+如果网关命名空间的 `istio.io/rev` 标签已经从 `1-22` 切换到 v2 修订，v1 旧网关的 Pod 模板将永久失去重新创建 Pod 的能力：其 `inject.istio.io/templates: asm-gateway` 注解在 Mesh v2 的 webhook 中没有对应的注入模板，任何新建 Pod 的请求都会被拒绝，无法再通过直接扩容来回滚。此时回滚只能二选一：修复 v2 网关问题继续推进，或者先把命名空间标签切回 `1-22` 再恢复 v1 网关副本数。完整原理与切流顺序见[迁移网关](./migrating-a-single-cluster-mesh/migrating-gateways.mdx)『顺序总则』一节的告警。
+:::
+
+多集群场景下，回滚矩阵与单集群完全相同：P3、P4 阶段按上表对应动作逐集群分别执行，不需要额外的跨集群协调步骤，见[多集群网格迁移](./migrating-a-multi-cluster-mesh/index.mdx)。
+
+## 下线 Mesh v1 之后的恢复
+
+[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)阶段的手工下线序列一旦开始执行，Mesh v1 的控制面、数据面与全部治理资源会被逐步删除。如果此时才发现需要恢复 Mesh v1（例如下线序列执行到一半才发现验证断言失败），唯一路径是依据[迁移准备与前置检查](./preparing-for-migration.mdx)阶段建立的备份，将 Mesh v1 的全部组件重新安装一遍。
+
+:::warning 这是最后手段，成本高
+本节描述的恢复路径涉及重新安装 Mesh v1 的 Essentials 插件、全部 operator 包与控制面，并逐一回放备份的 CR，耗时与操作复杂度远高于上文『分阶段回滚』中的任何操作。只有在[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)已经开始执行、且确认必须恢复 Mesh v1 时才启用本节；执行前请再次确认没有更低成本的止损方式，例如问题实际出在 Mesh v2 侧配置，直接修复即可，不必恢复 Mesh v1。
+:::
+
+### 所需备份物料
+
+以下物料均来自[迁移准备与前置检查](./preparing-for-migration.mdx)『资源盘点与备份』一节建立的备份，恢复前请逐项确认其完整可用：
+
+- **Essentials 插件包与 4 个 operator 包**（版本与[迁移概览](./migration-overview.mdx)页首声明的 Mesh v1 版本一致）：这部分是可安装的产品包本身，不属于 kubectl 备份范围，需要额外确认其仍然可以重新上传安装；
+- **`ServiceMesh`/`ServiceMeshGroup` CR 备份**：对应备份文件 `global-mesh-crs.yaml`；
+- **治理 CR 备份**：`asm.alauda.io` API 组下的自研治理 CR，对应备份文件 `microservices.yaml`、`gateway-crs.yaml`，以及按 CRD 遍历导出的 `asm-*.yaml`；
+- **命名空间标签快照**：对应备份文件 `ns-labels.yaml`；
+- **`cacerts`/根证书备份**：业务集群中间 CA 对应 `cacerts.yaml`，global 集群根证书对应 `asm-istio-rootca.yaml`；多集群场景下还需要 `remote-secrets.yaml`；
+- **ES 索引无需单独备份**：Jaeger v1 使用的 Elasticsearch 存储在下线过程中不会被清理，历史调用链索引原样保留，恢复出的 Mesh v1 组件重新连接到同一个 Elasticsearch 后即可查询历史数据。
+
+### 恢复顺序
+
+1. **重新安装 Essentials 插件与 operator 包**：按照 Mesh v1 原有的安装方式，重新上传并安装 Service Mesh Essentials 插件与 4 个 operator 包，版本与备份时一致。
+2. **回放 global 集群侧 CR**：恢复 `ServiceMesh`/`ServiceMeshGroup` CR（`global-mesh-crs.yaml`），等待控制面与网关组件被重新创建。
+3. **回放业务集群侧 CR 与标签**：恢复治理 CR（`microservices.yaml`、`gateway-crs.yaml`、`asm-*.yaml`）与命名空间标签快照（`ns-labels.yaml`）。
+4. **恢复证书链**：恢复 `cacerts`（`cacerts.yaml`）与 global 侧根证书（`asm-istio-rootca.yaml`）；多集群场景下一并恢复 `remote-secrets.yaml`。证书恢复到与下线前一致，是 mTLS 能够重新建立的前提。
+5. **探测验证**：参照[迁移准备与前置检查](./preparing-for-migration.mdx)『业务探测器』一节的探测方式重新发起探测，确认网格内调用、网关入口/出口调用均恢复正常，再宣布恢复完成。
+
+## 回滚触发判据
+
+出现以下任一情况，应当停止当前迁移动作，评估并执行对应阶段的回滚：
+
+- 业务探测器出现持续中断（单副本服务滚动重启导致的预期内秒级中断除外）；
+- mTLS 校验失败：跨控制面调用出现握手错误，或[迁移工作负载](./migrating-a-single-cluster-mesh/migrating-workloads.mdx)『跨控制面互通验证』一节中的根证书比对不一致；
+- 任一阶段『验证』一节中的检查断言失败，且**30 分钟内无法定位根因**。
