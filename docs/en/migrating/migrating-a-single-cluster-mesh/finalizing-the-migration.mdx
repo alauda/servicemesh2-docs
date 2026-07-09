@@ -103,7 +103,7 @@ kubectl --kubeconfig <global-kubeconfig> -n cpaas-system get secret asm-istio-ro
 - 不需要执行该节的「Create the root CA certificate」部分：签发中间证书所需的 `root-key.pem`、`root-cert.pem` 直接使用上一步导出的文件，从「Create the intermediate CA certificate for the **East**/**West** cluster」部分对应本集群的取值开始执行即可；
 - 该流程示例中的中间证书有效期为 `-days 3650`（10 年）；建议按客户证书策略调整为 1–2 年（例如 `-days 730`），并建立到期前的轮换 SOP——到期前手工重复本节与下一步的流程，重新签发并替换 `cacerts` 即可完成一次轮换，不需要为此额外部署自动化续期组件。
 
-流程执行完成后，应当得到 `ca-cert.pem`、`ca-key.pem`、`root-cert.pem`、`cert-chain.pem` 四个文件，用于下一步重建 `cacerts`。
+单集群场景只需任选 `East` 或 `West` 一侧执行该流程（对单集群而言两侧完全等价）。注意该 openssl 流程会把生成的文件写入对应的 `east/` 或 `west/` 子目录，因此流程执行完成后，`ca-cert.pem`、`ca-key.pem`、`root-cert.pem`、`cert-chain.pem` 四个文件位于该子目录下；下一步重建 `cacerts` 时，请先 `cd` 进该子目录，或把命令中 `--from-file` 的路径改为带子目录前缀（如 `--from-file=ca-cert.pem=east/ca-cert.pem`）。
 
 ### 重建 cacerts
 
