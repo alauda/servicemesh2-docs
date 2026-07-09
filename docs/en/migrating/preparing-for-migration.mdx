@@ -1,0 +1,246 @@
+---
+weight: 20
+---
+
+# 迁移准备与前置检查
+
+本文对应[迁移概览](./migration-overview.mdx)路线图中的 P0 迁移准备阶段：在对任何 Mesh v1 资源做变更之前，完成前置条件确认、兼容性与风险检查、资源盘点与备份、变更冻结与业务探测器部署，为后续阶段建立可回滚、可验证的基线。本文使用的占位符与阶段术语延续迁移概览中的约定，不再重复说明；开始操作前，请确认已经完整阅读迁移概览，了解整体路线图与并存安全性论证。
+
+## 前置条件
+
+开始迁移前，请确认以下条件已经满足：
+
+- **版本适用性**：当前环境的 ACP、Mesh v1、Mesh v2 版本符合[迁移概览](./migration-overview.mdx)页首的版本适用性声明。如果版本组合不同，请先联系 Alauda 支持确认适用性后再继续。
+- **Mesh v2 可安装**：目标集群具备安装 servicemesh-operator2（Mesh v2 的 Operator）的条件——可以从平台 Marketplace 安装该 Operator，或者 Operator 已安装但尚未创建任何 `Istio`/`IstioCNI` 资源。并存安装的具体步骤见[安装 v2 控制面](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx)。
+- **ACP Networking for Multus 插件已安装**：Mesh v2 的 `IstioCNI` 依赖该插件提供的 CNI 配置目录（`cniConfDir: /etc/cni/multus/net.d`），插件必须先于 `IstioCNI` 资源创建到位。
+- **kubectl 权限**：具备迁移涉及的每个业务集群的 `cluster-admin` 权限；如果迁移计划包含下线阶段（P5），还需要 global 集群侧的相应操作权限。
+- **维护窗口与干系人确认**：已经确定迁移的计划窗口，并与业务方完成迁移范围、时间与影响的确认。并存灰度迁移设计为业务不中断，但仍建议预留应急处理时间。
+
+## 兼容性与风险检查
+
+以下检查项覆盖 istio 1.28 数据面的兼容性、证书链风险，以及切换过程中的潜在中断面。逐项运行发现命令并评估输出；未处理的风险项，应在进入 P2（安装 v2 控制面）之前明确知悉其影响范围。
+
+### ServiceEntry 1.28 兼容性审计
+
+istio 1.28 对 `ServiceEntry` 的 schema 校验比 Mesh v1 所用的 1.22 更严格。以下命令列出缺少 `spec.ports`、或者 `spec.hosts` 超过 256 条的 `ServiceEntry`：
+
+```bash
+# ServiceEntry 1.28 兼容性审计（期望无输出；有输出的条目需先修复）
+kubectl get serviceentries -A -o json | jq -r '.items[] | select((.spec.ports | not) or ((.spec.hosts | length) > 256)) | "\(.metadata.namespace)/\(.metadata.name)"'
+```
+
+期望输出为空。如果有输出，需要在对应命名空间切换到 Mesh v2 之前修复该 `ServiceEntry`（补全 `spec.ports`，或者拆分过长的 `spec.hosts` 列表）。
+
+### EnvoyFilter 版本锁审计
+
+部分 `EnvoyFilter` 通过 `proxyVersion` 字段（形如 `^1\.22.*`）将生效范围锁定到 Mesh v1 数据面版本。Mesh v2 数据面运行 istio 1.28，这些过滤器切换后不会再对新的 proxy 生效：
+
+```bash
+# EnvoyFilter 版本锁审计（列出带 proxyVersion 匹配的过滤器，评估 1.28 下是否失效）
+kubectl get envoyfilters -A -o json | jq -r '.items[] | select([.. | objects | has("proxyVersion")] | any) | "\(.metadata.namespace)/\(.metadata.name)"'
+```
+
+对输出中的每一条 `EnvoyFilter`，判断其承载的能力是否仍被业务依赖：黑白名单、API 属性生成等 Mesh v1 自研治理能力会随 Mesh v1 一并下线；如果业务仍然需要等价能力，需要在 Mesh v2 环境下以原生资源（例如 `AuthorizationPolicy`、`Telemetry`）重新实现，并在[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)之前完成。
+
+### 中间 CA 剩余有效期检查
+
+:::warning 中间 CA 剩余有效期必须覆盖整个迁移窗口
+Mesh v1 的中间 CA（`cacerts`）默认 60 天有效，由 Mesh v1 控制器自动续期；下线 Mesh v1 之后，这条续期链会随之终止。剩余有效期必须晚于计划迁移窗口的结束时间（建议预留延期缓冲）。如果剩余有效期不足，不要在此状态下开始迁移：应先压缩迁移计划，或联系 Alauda 支持评估应对方案——签发长期中间 CA 是 Mesh v1 下线完成之后的收尾动作（见[完成迁移](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx)），无法在本阶段提前完成。
+:::
+
+```bash
+# 中间 CA 剩余有效期（必须晚于计划迁移窗口结束时间）
+kubectl -n istio-system get secret cacerts -o jsonpath='{.data.ca-cert\.pem}' | base64 -d | openssl x509 -noout -enddate
+```
+
+输出的 `notAfter=` 时间即中间 CA 的到期时间，将其与计划迁移窗口的结束时间比对。
+
+### 单节点或 istiod 节点重合的集群识别
+
+Mesh v1 的 istiod pod 带有硬反亲和规则，不允许同一节点上调度两个 istiod pod。如果集群是单节点集群，或者 Mesh v1 istiod 所在节点是集群中唯一可调度节点，Mesh v2 的 istiod 会在创建后长期处于 `Pending` 状态：
+
+```bash
+kubectl get nodes --no-headers | wc -l
+```
+
+如果结果为 1，请在[安装 v2 控制面](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx)中执行对应的条件步骤，预先降级 Mesh v1 istiod 的反亲和规则。多节点集群通常不受影响，无需处理。
+
+### 服务副本数与 PodDisruptionBudget
+
+如果服务副本数少于 2，在工作负载切换阶段的滚动重启期间会有一次秒级中断（属于滚动重启的固有窗口，与 Mesh v1/v2 切换机制本身无关）：
+
+```bash
+# 副本数小于 2 的 Deployment（切换重启期间无法保证零中断）
+kubectl -n <mesh-namespace> get deployment -o json | jq -r '.items[] | select((.spec.replicas // 1) < 2) | .metadata.name'
+
+# 对应命名空间是否已配置 PodDisruptionBudget
+kubectl -n <mesh-namespace> get pdb
+```
+
+对列出的 Deployment，建议在迁移前将副本数扩容到 2 个以上并配置 PDB；如果不具备扩容条件，需要提前告知业务方，接受该服务在切换时的一次秒级中断。
+
+### `ASM_MS_NAME` 依赖排查
+
+`ASM_MS_NAME` 环境变量与 `asm.cpaas.io/msname` 标签是 Mesh v1 的自研注入项，Mesh v2 不再提供（详见[迁移概览](./migration-overview.mdx)的功能对照表）：
+
+```bash
+# 工作负载是否显式引用 ASM_MS_NAME 环境变量
+kubectl -n <mesh-namespace> get deployment -o json | jq -r '.items[] | select([.spec.template.spec.containers[].env[]?.name] | index("ASM_MS_NAME")) | .metadata.name'
+
+# 工作负载 Pod 是否携带 asm.cpaas.io/msname 标签
+kubectl -n <mesh-namespace> get pod -l asm.cpaas.io/msname --show-labels
+```
+
+如果应用代码或配置读取了该环境变量或标签，需要在迁移前改用标准的 `app`/canonical service 标签体系完成适配。
+
+### 带 rev 标签但未实际注入的命名空间甄别
+
+个别命名空间可能带有 `istio.io/rev=1-22` 标签，但其中的 Pod 并未真正注入 sidecar（例如历史遗留标签，或者该命名空间本身仅用于非网格用途）。这类命名空间不应按纳管命名空间处理切换，而应在下线阶段直接摘除标签：
+
+```bash
+# 列出带 istio.io/rev=1-22 标签的命名空间
+kubectl get ns -l istio.io/rev=1-22
+
+# 逐命名空间检查 Pod 的实际容器列表，确认是否包含 istio-proxy
+kubectl -n <mesh-namespace> get pod -o jsonpath='{range .items[*]}{.metadata.name}{": "}{.spec.containers[*].name}{"\n"}{end}'
+```
+
+如果某个命名空间下全部 Pod 的容器列表都不包含 `istio-proxy`，将其记录在案；[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)阶段对这类命名空间执行的是摘除标签，而不是纳入切换流程。
+
+## 资源盘点与备份
+
+以下命令按资源类别盘点当前 Mesh v1 环境，并将其导出为备份文件。这些备份既用于本阶段的风险控制，也是[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)与[回滚指引](./rollback.mdx)阶段的恢复依据，请在对任何资源做变更之前完成并妥善保存。
+
+### 资源盘点
+
+先确认当前环境中网格相关资源的范围：
+
+```bash
+# 网格纳管的命名空间与自研微服务 CR
+kubectl get ns -l istio.io/rev=1-22
+kubectl get microservices.asm.alauda.io -A
+
+# IstioOperator CR（控制面与各网关均在 istio-system 命名空间）
+kubectl -n istio-system get istiooperators.install.istio.io
+
+# 网关自研 CR
+kubectl get gatewaydeploys.asm.alauda.io,ingressgateways.asm.alauda.io -A
+
+# istio 原生资源
+kubectl get gateways.networking.istio.io,virtualservices,destinationrules,serviceentries,sidecars,peerauthentications,envoyfilters -A
+
+# asm.alauda.io API 组下的其余自研治理 CRD 实例（遍历该 API 组下的全部 CRD）
+for crd in $(kubectl get crd -o name | grep asm.alauda.io); do
+  kubectl get "${crd#*/}" -A
+done
+
+# OTel 采集链路、Jaeger 实例与相关 OLM 订阅
+kubectl get opentelemetrycollectors,instrumentations -A
+kubectl get jaegers.jaegertracing.io -A
+kubectl get subscription,csv -A | grep -Ei "asm|flagger|jaeger|opentelemetry|servicemesh"
+```
+
+### 资源备份
+
+将盘点范围内的资源、以及命名空间标签快照、global 集群侧的网格编排 CR 与根证书等补充项一并导出为 YAML，建议先设置一个专用备份目录：
+
+```bash
+BACKUP_DIR=<backup-directory>
+mkdir -p "$BACKUP_DIR"
+
+# 命名空间标签快照
+kubectl get ns -l istio.io/rev=1-22 -o yaml > "$BACKUP_DIR/ns-labels.yaml"
+
+# 自研微服务 CR 与 IstioOperator CR
+kubectl get microservices.asm.alauda.io -A -o yaml > "$BACKUP_DIR/microservices.yaml"
+kubectl -n istio-system get istiooperators.install.istio.io -o yaml > "$BACKUP_DIR/istiooperators.yaml"
+
+# 网关自研 CR
+kubectl get gatewaydeploys.asm.alauda.io,ingressgateways.asm.alauda.io -A -o yaml > "$BACKUP_DIR/gateway-crs.yaml"
+
+# istio 原生资源
+kubectl get gateways.networking.istio.io,virtualservices,destinationrules,serviceentries,sidecars,peerauthentications,envoyfilters -A -o yaml > "$BACKUP_DIR/istio-native-resources.yaml"
+
+# asm.alauda.io API 组下的其余自研治理 CRD 实例
+for crd in $(kubectl get crd -o name | grep asm.alauda.io); do
+  name="${crd#*/}"
+  kubectl get "$name" -A -o yaml > "$BACKUP_DIR/asm-${name}.yaml"
+done
+
+# OTel 采集链路、Jaeger 实例与相关 OLM 订阅/CSV
+kubectl get opentelemetrycollectors,instrumentations -A -o yaml > "$BACKUP_DIR/otel.yaml"
+kubectl get jaegers.jaegertracing.io -A -o yaml > "$BACKUP_DIR/jaeger.yaml"
+kubectl get subscription,csv -A -o yaml > "$BACKUP_DIR/subscriptions-csv.yaml"
+
+# 业务集群的中间 CA
+kubectl -n istio-system get secret cacerts -o yaml > "$BACKUP_DIR/cacerts.yaml"
+
+# 多集群场景下，还需备份跨集群 remote secret
+kubectl -n istio-system get secret -l istio/multiCluster=true -o yaml > "$BACKUP_DIR/remote-secrets.yaml"
+
+# global 集群侧的网格编排 CR 与根证书（在 global 集群上下文执行）
+kubectl --kubeconfig <global-kubeconfig> get servicemesh,servicemeshgroup -o yaml > "$BACKUP_DIR/global-mesh-crs.yaml"
+kubectl --kubeconfig <global-kubeconfig> -n cpaas-system get secret asm-istio-rootca -o yaml > "$BACKUP_DIR/asm-istio-rootca.yaml"
+```
+
+:::warning 网关 Service 必须单独备份
+Mesh v1 网关的 Service 由 `GatewayDeploy` 管理其 `ownerReferences`；下线阶段删除自研治理 CR 时，Service 存在被级联删除的风险，而这个 Service 同时也是 Mesh v2 金丝雀网关将要复用的对象——一旦意外丢失，DNS 解析立即失效，南北向流量随之中断。仅备份 `GatewayDeploy`/`IstioOperator` 等 CR 不足以快速恢复，必须单独备份网关命名空间下的全部 Service，作为应急重建依据。
+:::
+
+```bash
+kubectl -n <gateway-namespace> get svc -o yaml > "$BACKUP_DIR/gateway-services.yaml"
+```
+
+## 变更冻结
+
+迁移窗口内建议执行以下变更冻结：
+
+- 不通过 Mesh v1 平台 UI 对网格做任何变更：不新增服务纳管、不创建网关、不修改流量策略。确有变更需求时，评估是否可以推迟到迁移完成之后。
+- 暂停 Mesh v1 及其配套 Operator（网格控制面、灰度发布、Jaeger、OpenTelemetry 等组件）的升级审批，避免迁移期间叠加额外的控制面版本变化。
+- 变更冻结从进入本阶段开始，持续到[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)完成。
+
+## 业务探测器
+
+在开始任何切换动作之前，部署持续运行的业务探测器，作为迁移全程判断是否发生中断的依据。
+
+探测点至少覆盖以下路径：
+
+- 网格内服务间调用（验证 sidecar/CNI 切换对内部调用没有影响）；
+- 网关入口调用（外部客户端到 ingress 网关再到后端服务的完整路径）；
+- 出口调用（网格内服务经 egress 网关访问外部服务，如果存在出口网关）；
+- 多集群场景下的跨集群调用路径，见[多集群网格迁移](./migrating-a-multi-cluster-mesh/index.mdx)。
+
+探测源的位置：探测应该从网格外发起，或者从计划最后迁移、状态稳定的命名空间发起。如果探测源本身也部署在被迁移的命名空间中，它在该命名空间切换时的滚动重启会产生短暂的探测失败，容易与真实的服务中断混淆。
+
+以下是一个最简单的探测循环示例，每秒发起一次调用并记录结果；建议为每条探测路径单独运行一个循环，并将输出重定向到独立的日志文件，便于事后按时间轴核对每个迁移动作对应的中断窗口：
+
+```bash
+while true; do
+  if curl -sf -o /dev/null "<probe-target-url>"; then
+    echo "$(date +%s) OK"
+  else
+    echo "$(date +%s) FAIL"
+  fi
+  sleep 1
+done
+```
+
+将 `<probe-target-url>` 替换为需要探测的地址：网格内调用使用后端 Service 的集群内 DNS 地址，网关调用使用网关的入口地址。
+
+## 验证
+
+确认备份目录中的文件覆盖资源盘点列出的全部类别：
+
+```bash
+ls -la "$BACKUP_DIR"
+```
+
+目录中应当包含命名空间标签、自研治理 CR、`IstioOperator`、网关 Service、istio 原生资源、OTel/Jaeger 资源、Subscription/CSV、global 侧网格编排 CR 与根证书、`cacerts` 等文件；多集群场景下还应包括 remote secret。
+
+在进入下一阶段之前，同时确认：
+
+- `ServiceEntry` 与 `EnvoyFilter` 的兼容性审计命令均无输出，或者有输出的条目已经确认处理方式；
+- 中间 CA 剩余有效期已经确认覆盖整个迁移窗口；
+- 变更冻结已经通知到相关干系人，业务探测器已经在全部探测路径上运行且当前状态为 OK。
+
+以上检查全部通过后，可以进入 P1 准备可观测性阶段，见[安装 v2 控制面](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx)。
