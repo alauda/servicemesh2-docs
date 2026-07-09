@@ -1,0 +1,271 @@
+---
+weight: 30
+---
+
+# 迁移网关
+
+本文对应[迁移概览](../migration-overview.mdx)路线图中的 P4 迁移网关阶段：在网关所在命名空间内部署与 Mesh v1 旧网关并存的 Mesh v2 金丝雀网关，两者共享同一个 `Service` 与 `Gateway` 资源，通过调整两个 Deployment 的相对副本数将流量从 Mesh v1 逐步切换到 Mesh v2，业务流量在整个过程中不中断。开始操作前，请确认已经完成[迁移工作负载](./migrating-workloads.mdx)中的全部步骤，并已获取本文将要使用的 `<v2-revision>`。
+
+## 顺序总则
+
+**先将网关所在命名空间的 `istio.io/rev` 标签切换到 v2 修订，再部署 v2 金丝雀网关。** 这个顺序务必按本文步骤严格执行，不要跳步或调换。
+
+原因：命名空间的 `istio.io/rev` 标签决定了后续新建 Pod 会被哪一个控制面的 webhook 处理。如果先创建 v2 金丝雀网关的 Deployment，此时命名空间仍然带着 Mesh v1 的 rev 标签，新建的 Pod 会被 Mesh v1 的 webhook 拦截注入，得到的是 1.22 版本的 Envoy 代理，与预期的 Mesh v2（1.28）不符，还需要额外触发一次重建才能得到正确版本。反过来，先切换命名空间的 rev 标签不存在这个问题，而且是安全的：**标签切换本身只影响后续新建 Pod 的注入归属，不会触发命名空间内任何现有 Pod 的重建**——此刻仍在正常运行的 Mesh v1 旧网关 Pod 完全不受影响。真正需要谨慎对待的是标签切换完成之后的状态，见下文告警。
+
+:::warning 网关命名空间 rev 切换后 v1 网关不可重建
+命名空间的 `istio.io/rev` 标签切换到 v2 修订之后，Mesh v1 旧网关的 Pod 模板将永久失去重新创建 Pod 的能力：其 `inject.istio.io/templates: asm-gateway` 注解在 Mesh v2 的 webhook 中没有对应的注入模板，任何新建 Pod 的请求都会被拒绝——无论是手工扩容、节点驱逐后的重新调度，还是 Pod 异常后的自动重建。此刻正在运行的 v1 网关 Pod 不受影响，但这个能力一旦失去就无法恢复。
+
+由此带来两个后果：
+
+- 必须在切换命名空间标签之后，立即按照下文步骤完成 v2 金丝雀网关的部署与就绪验证（监听器绑定 + 实际请求打通），不要让命名空间停留在"已切换但 v2 网关尚未验证可用"的状态；
+- 回滚方式也随之改变：一旦切换完成，回滚不能再依赖"把 v1 旧网关重新扩容"，只能通过修复 v2 网关，或者将命名空间的 rev 标签切回并删除 v2 Pod 来实现，具体步骤见[回滚指引](../rollback.mdx)。
+:::
+
+## 金丝雀网关部署与切流
+
+<Steps>
+
+### 核对网关 Service 属主并采集 selector 信息
+
+在开始切换之前，先核对网关 Service 的属主，并采集下一步部署 v2 金丝雀网关需要用到的 selector 信息。
+
+Mesh v1 的网关 Service 通常由 `GatewayDeploy`（`asm.alauda.io` API 组的自研 CR）持有 `ownerReferences`，而不是 `IstioOperator`：
+
+```bash
+kubectl -n <gateway-namespace> get svc <gateway-name> -o jsonpath='{.metadata.ownerReferences}'
+```
+
+如果输出中的 `kind` 为 `GatewayDeploy`，记录下来即可，本阶段不需要采取任何行动；这一属主关系会影响[下线 Mesh v1](./decommissioning-mesh-v1.mdx)阶段删除自研治理 CR 时的处理方式（需要先摘除该 `ownerReferences` 并验证摘除结果，避免网关 Service 被级联删除）。
+
+接下来采集 v2 金丝雀网关 Pod 需要携带的标签来源：现有 Service 的 selector，以及选中该网关工作负载的 `Gateway` 资源的 selector。
+
+```bash
+kubectl -n <gateway-namespace> get svc <gateway-name> -o jsonpath='{.spec.selector}'
+kubectl -n <gateway-namespace> get gateways.networking.istio.io -o jsonpath='{range .items[*]}{.metadata.name}: {.spec.selector}{"\n"}{end}'
+```
+
+记录两条命令的完整输出：下一步部署 v2 金丝雀网关时，需要把两份输出中的全部键值对合并（即取并集）写入 Pod 标签——只满足其中一份是不够的。如果遗漏了 `Gateway` selector 中的某个键值对，Mesh v2 的 istiod 不会把 v2 Pod 识别为该 `Gateway` 资源的候选工作负载，网关的监听器不会绑定，请求会返回 404。
+
+### 切换网关命名空间的 rev 标签
+
+```bash
+kubectl label ns <gateway-namespace> istio.io/rev=<v2-revision> --overwrite
+```
+
+如上文"顺序总则"所述，这一步只影响后续新建 Pod 的注入归属，不会触发命名空间内现有 Pod 的重建，可以执行以下命令确认现有网关 Pod 未受影响（`AGE` 应与切换前一致）：
+
+```bash
+kubectl -n <gateway-namespace> get pod
+```
+
+### 部署 v2 金丝雀网关
+
+本文将 v2 金丝雀网关的 `Deployment`、`ServiceAccount` 统一命名为 `<gateway-name>-v2`（在上一步发现命令得到的网关名后追加 `-v2` 后缀），与 v1 旧网关的同名资源区分开。
+
+v2 金丝雀网关需要一个独立的 `ServiceAccount`（用于读取 TLS secret 等场景所需的 RBAC 权限），创建方式与全新安装网关完全一致，仅将名称改为 `<gateway-name>-v2`；具体的 `ServiceAccount`/`Role`/`RoleBinding` 定义与创建步骤，见 [Installing a gateway via gateway injection](../../gateways/gateway-installation/installing-a-gateway-via-injection.mdx)。
+
+`ServiceAccount` 创建完成后，部署 v2 金丝雀网关本身：
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: <gateway-name>-v2
+  namespace: <gateway-namespace>
+spec:
+  replicas: 1  # [!code callout]
+  selector:
+    matchLabels:
+      # 必须是下方 Pod 模板标签的子集，用于唯一定位本 Deployment 自身的 Pod
+      <selector-key-1>: <selector-value-1>
+      gateway-revision: v2
+  template:
+    metadata:
+      annotations:
+        inject.istio.io/templates: gateway  # [!code callout]
+      labels:
+        <selector-key-1>: <selector-value-1>  # [!code callout]
+        <selector-key-2>: <selector-value-2>  # [!code callout]
+        istio.io/rev: <v2-revision>  # [!code callout]
+        gateway-revision: v2  # [!code callout]
+    spec:
+      serviceAccountName: <gateway-name>-v2  # [!code callout]
+      containers:
+        - name: istio-proxy
+          image: auto  # [!code callout]
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+          ports:
+            - containerPort: 15090
+              protocol: TCP
+              name: http-envoy-prom
+          resources:
+            limits:
+              cpu: 2000m
+              memory: 1024Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+```
+
+<Callouts>
+  1. 初始建议从 1 个副本开始部署，便于下一步在扩大流量之前先完成就绪验证；正式切流时在"金丝雀切流"步骤中再调整副本数。
+  2. 使用网关注入模板（而不是默认的 sidecar 注入模板），Mesh v2 会将该 Pod 的 Envoy 配置为独立网关，而不是挂在应用容器旁的 sidecar 代理。
+  3. 这一行开始，标签必须包含前面第一条发现命令（Service selector）输出中的全部键值对；以上仅为占位符示意，请替换为该命令的实际输出内容。
+  4. 同时必须包含第二条发现命令（`Gateway` selector）输出中的全部键值对（与上一行重复的键只需保留一份）。**这个并集是本步骤最容易遗漏的地方：只并入 Service selector 而遗漏 `Gateway` selector 中的键值对，会导致监听器不绑定、请求返回 404。**
+  5. 替换为[安装 v2 控制面](./installing-the-v2-control-plane.mdx)"获取 v2 revision 名称"一步获取到的 `<v2-revision>`；此时命名空间的 rev 标签已经在上一步切换到该修订，Pod 创建后会被 Mesh v2 的 webhook 正确注入。
+  6. 用于和 v1 旧网关的 Pod 区分开的金丝雀标识标签。如果您环境中的 Service selector 或 `Gateway` selector 恰好已经使用了名为 `gateway-revision` 的键，请改用其他键名（例如 `canary-revision`）避免冲突。
+  7. 与前面创建的 `ServiceAccount` 同名。
+  8. 设置为 `auto`，Pod 启动时自动匹配控制面下发的代理镜像版本。
+</Callouts>
+
+将以上内容保存为 `<gateway-name>-v2-canary.yaml`，替换全部占位符后执行：
+
+```bash
+kubectl apply -f <gateway-name>-v2-canary.yaml
+```
+
+```bash
+kubectl -n <gateway-namespace> rollout status deploy/<gateway-name>-v2 --timeout=300s
+```
+
+### 验证 v2 金丝雀网关就绪
+
+先获取 v2 金丝雀网关 Pod 的名称：
+
+```bash
+GW_V2_POD=$(kubectl -n <gateway-namespace> get pod -l gateway-revision=v2 -o jsonpath='{.items[0].metadata.name}')
+```
+
+检查该 Pod 的监听器是否已经正确绑定：
+
+```bash
+istioctl proxy-config listeners "$GW_V2_POD.<gateway-namespace>"
+```
+
+期望输出中除了 `15021`（健康检查）、`15090`（统计）等固定端口外，还应当出现该网关业务端口对应的监听器，端口号与 `Gateway` 资源 `spec.servers[].port.number` 一致。如果只看到固定端口、没有出现业务端口，说明上一步的 Pod 标签没有完整覆盖 `Gateway` selector 的键值对，请返回上一步核对并补齐标签。
+
+确认监听器绑定后，再验证实际请求能够被这个 Pod 处理。为避免请求被 Service 负载均衡到其他 Pod（包括仍在正常提供服务的 v1 旧网关 Pod），直接将本地端口转发到 v2 金丝雀网关 Deployment：
+
+```bash
+kubectl -n <gateway-namespace> port-forward deploy/<gateway-name>-v2 8080:<gateway-port>
+```
+
+`<gateway-port>` 替换为该网关对外提供服务的端口，即上一步 `Gateway` 业务监听器对应的端口号。另开一个终端，使用与[迁移准备与前置检查](../preparing-for-migration.mdx)中网关入口业务探测器相同的请求方式发起验证（`Host`、路径按实际网关路由规则替换）：
+
+```bash
+curl -sf -o /dev/null -w '%{http_code}\n' -H 'Host: <gateway-host>' http://127.0.0.1:8080/
+```
+
+返回预期的 HTTP 状态码，说明 v2 金丝雀网关已经就绪，可以进入下一步的金丝雀切流。
+
+### 金丝雀切流
+
+v2 金丝雀网关与 v1 旧网关共享同一个 `Service`：由于 v2 Pod 的标签已经包含 Service selector 的全部键值对，它一旦 Ready 就会立即成为该 Service 的 endpoint 之一，按两个 Deployment 的相对副本数分担流量，不需要创建新的 `Service`，也不需要修改现有的 `Gateway`/`VirtualService`。
+
+逐步扩大 v2 金丝雀网关的副本数，每次调整之间观察业务探测器，确认没有出现预期之外的失败：
+
+```bash
+kubectl -n <gateway-namespace> scale deploy <gateway-name>-v2 --replicas=<replica-count>
+```
+
+与扩容节奏配合，逐步缩小 v1 旧网关的副本数：
+
+```bash
+kubectl -n <gateway-namespace> scale deploy <gateway-name> --replicas=<replica-count>
+```
+
+重复以上两条命令，分几次将流量从 v1 逐步切换到 v2，直至 v2 承载全部流量。确认 v2 独立承载流量正常后，将 v1 旧网关缩容到 0 个副本：
+
+```bash
+kubectl -n <gateway-namespace> scale deploy <gateway-name> --replicas=0
+```
+
+**v1 旧网关的 Deployment 本身不要删除**：保持其缩容至 0 的状态，作为回滚预案的一部分保留，直到[下线 Mesh v1](./decommissioning-mesh-v1.mdx)阶段才随其他 Mesh v1 资源一并清理。
+
+### 处理出口网关与默认网关
+
+出口网关（egress gateway）按照与入口网关完全相同的流程迁移：将 `<gateway-name>` 替换为出口网关的名称，重复"核对网关 Service 属主并采集 selector 信息"到"金丝雀切流"的全部步骤即可。
+
+istio-system 命名空间下 Mesh v1 的默认网关（`istio-ingressgateway`）需要先判断它是否承载真实业务流量：
+
+```bash
+INGRESSGW_POD=$(kubectl -n istio-system get pod -l istio=ingressgateway -o jsonpath='{.items[0].metadata.name}')
+istioctl proxy-config listeners "$INGRESSGW_POD.istio-system"
+```
+
+<Directive type="tip" title="如何判断默认网关是否承载业务流量">
+如果标签选择器没有匹配到 Pod，改用 `kubectl -n istio-system get pod` 直接核对默认网关的 Pod 名称。如果监听器输出中只包含 `15021`（健康检查）、`15090`（统计）等固定端口，没有其他业务端口，说明这个默认网关没有被实际使用——多数 Mesh v1 环境属于这种情况，业务流量通常经由自建的入口网关处理。
+</Directive>
+
+- 如果判断为**承载了真实业务流量**：按照本文入口网关的完整流程迁移（`<gateway-namespace>` 替换为 `istio-system`，`<gateway-name>` 替换为 `istio-ingressgateway`）。
+- 如果判断为**没有业务流量**：本阶段不需要处理，记录下来即可；它会在[下线 Mesh v1](./decommissioning-mesh-v1.mdx)阶段随控制面 `IstioOperator` CR 的删除一并自动回收。
+
+### 为自动生成的外部服务资源打保护注解
+
+如果出口网关配置了外部服务绑定，Mesh v1 会在 istio-system 命名空间下自动生成一组 `Gateway`/`VirtualService`，名称形如 `<绑定名>--<gateway-namespace>--<gateway-name>--<哈希>`，并携带 `asm.cpaas.io/egress-name=<gateway-name>`、`asm.cpaas.io/egress-namespace=<gateway-namespace>` 标签。这些资源默认由 Mesh v1 自研控制器托管；下线阶段删除自研治理 CR 时，如果不加保护，会被一并级联清理，导致外部服务访问中断。
+
+按标签列出这组资源：
+
+```bash
+kubectl get gateways.networking.istio.io,virtualservices.networking.istio.io -n istio-system \
+  -l asm.cpaas.io/egress-name=<gateway-name>,asm.cpaas.io/egress-namespace=<gateway-namespace> -o name
+```
+
+如果环境中的标签与上述约定不同，也可以按命名模式核对（`--<gateway-namespace>--<gateway-name>--` 是资源名的公共片段）：
+
+```bash
+kubectl get gateways.networking.istio.io,virtualservices.networking.istio.io -n istio-system -o name | grep -- "--<gateway-namespace>--<gateway-name>--"
+```
+
+确认列表完整后，逐个打上 `asm.cpaas.io/user-managed: "true"` 注解，使其脱离自研控制器的托管范围：
+
+```bash
+for res in $(kubectl get gateways.networking.istio.io,virtualservices.networking.istio.io -n istio-system \
+  -l asm.cpaas.io/egress-name=<gateway-name>,asm.cpaas.io/egress-namespace=<gateway-namespace> -o name); do
+  kubectl -n istio-system annotate "$res" asm.cpaas.io/user-managed="true"
+done
+```
+
+</Steps>
+
+## 验证
+
+完成入口网关、出口网关（如有）与默认网关的处理后，确认以下检查点：
+
+```bash
+# v1 旧网关副本数应为 0，v2 金丝雀网关承载全部副本
+kubectl -n <gateway-namespace> get deploy <gateway-name> <gateway-name>-v2
+```
+
+`<gateway-name>`（v1）的 `READY`/`UP-TO-DATE`/`AVAILABLE` 应均为 `0`；`<gateway-name>-v2` 应达到计划的副本数。
+
+```bash
+# Service endpoints 应只包含 v2 网关 Pod 的地址
+kubectl -n <gateway-namespace> get endpoints <gateway-name>
+```
+
+```bash
+# 确认全部 v2 网关 Pod 已经同步到 v2 修订（RevisionBased 策略，命令须携带 --revision）
+istioctl proxy-status --revision <v2-revision> -n <gateway-namespace>
+```
+
+同时确认：
+
+- 业务探测器（见[迁移准备与前置检查](../preparing-for-migration.mdx)）在整个切流过程中没有出现预期之外的失败记录；
+- `Gateway`/`VirtualService` 等 istio 原生资源没有被本文任何步骤修改过：
+
+```bash
+kubectl get gateways.networking.istio.io,virtualservices.networking.istio.io -A \
+  -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}: generation={.metadata.generation}{"\n"}{end}'
+```
+
+比对以上输出与[迁移准备与前置检查](../preparing-for-migration.mdx)阶段备份的 `istio-native-resources.yaml` 中记录的 `generation` 字段，两者应当一致。
+
+全部检查点通过后，即可进入 P5 下线 Mesh v1 阶段，见[下线 Mesh v1](./decommissioning-mesh-v1.mdx)。
