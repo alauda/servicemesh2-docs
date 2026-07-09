@@ -127,7 +127,7 @@ kubectl -n istio-system get istiooperators.install.istio.io
 kubectl get gatewaydeploys.asm.alauda.io,ingressgateways.asm.alauda.io -A
 
 # istio 原生资源
-kubectl get gateways.networking.istio.io,virtualservices,destinationrules,serviceentries,sidecars,peerauthentications,envoyfilters -A
+kubectl get gateways.networking.istio.io,virtualservices,destinationrules,serviceentries,sidecars,workloadentries,workloadgroups,envoyfilters,peerauthentications,requestauthentications,authorizationpolicies,telemetries -A
 
 # asm.alauda.io API 组下的其余自研治理 CRD 实例（遍历该 API 组下的全部 CRD）
 for crd in $(kubectl get crd -o name | grep asm.alauda.io); do
@@ -159,7 +159,7 @@ kubectl -n istio-system get istiooperators.install.istio.io -o yaml > "$BACKUP_D
 kubectl get gatewaydeploys.asm.alauda.io,ingressgateways.asm.alauda.io -A -o yaml > "$BACKUP_DIR/gateway-crs.yaml"
 
 # istio 原生资源
-kubectl get gateways.networking.istio.io,virtualservices,destinationrules,serviceentries,sidecars,peerauthentications,envoyfilters -A -o yaml > "$BACKUP_DIR/istio-native-resources.yaml"
+kubectl get gateways.networking.istio.io,virtualservices,destinationrules,serviceentries,sidecars,workloadentries,workloadgroups,envoyfilters,peerauthentications,requestauthentications,authorizationpolicies,telemetries -A -o yaml > "$BACKUP_DIR/istio-native-resources.yaml"
 
 # asm.alauda.io API 组下的其余自研治理 CRD 实例
 for crd in $(kubectl get crd -o name | grep asm.alauda.io); do

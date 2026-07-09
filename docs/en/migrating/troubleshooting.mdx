@@ -88,7 +88,7 @@ kubectl get ns <gateway-namespace> -o jsonpath='{.metadata.labels.istio\.io/rev}
 
 **原因**：v1 旧网关的 Pod 模板携带 `inject.istio.io/templates: asm-gateway` 注解，这是 Mesh v1 专有的注入模板名，在 Mesh v2 的 webhook 中没有对应实现。命名空间的 rev 标签一旦切到 v2，新建 Pod 的注入请求会转交给 Mesh v2 的 webhook 处理，因找不到该模板而拒绝创建——这是[迁移网关](./migrating-a-single-cluster-mesh/migrating-gateways.mdx)「顺序总则」一节告警中描述的预期行为，不是缺陷。
 
-**处理**：不要尝试修复或重建 v1 旧网关。按[回滚指引](./rollback.mdx)中对应阶段的回滚动作二选一：修复 v2 网关问题后继续推进，或者将命名空间的 rev 标签切回 v1 并删除 v2 网关 Pod 以完成回滚。
+**处理**：不要尝试修复或重建 v1 旧网关。按[回滚指引](./rollback.mdx)中对应阶段的回滚动作二选一：修复 v2 网关问题后继续推进，或者将命名空间的 rev 标签切回 v1、恢复 v1 旧网关的副本数并删除 v2 网关 Pod 以完成回滚。
 
 ### 网关 Service 意外消失，DNS 无法解析
 
@@ -127,7 +127,7 @@ kubectl get envoyfilters -A -o json | jq -r '.items[] | select([.. | objects | h
 
 **原因**：以下三种情况都可能导致该现象，建议依次排查：
 
-1. `instrumentation.opentelemetry.io/inject-java` 与 `container-names` 注解没有显式写回 Deployment 的 Pod 模板——Mesh v1 时期这两条注解由已经随下线阶段移除的 webhook 动态打上，这条路径已经断裂；
+1. `instrumentation.opentelemetry.io/inject-java` 与 `instrumentation.opentelemetry.io/container-names` 注解没有显式写回 Deployment 的 Pod 模板——Mesh v1 时期这两条注解由已经随下线阶段移除的 webhook 动态打上，这条路径已经断裂；
 2. `Instrumentation` 资源中 `spec.java.image` 指定的镜像不可达，或目标命名空间缺少对应的 `imagePullSecrets`；
 3. `Instrumentation` 资源的 `OTEL_EXPORTER_OTLP_PROTOCOL` 与 `exporter.endpoint` 端口不匹配（`http/protobuf` 协议必须搭配 `4318` 端口，`grpc` 协议必须搭配 `4317` 端口）。
 

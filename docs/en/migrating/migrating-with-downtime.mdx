@@ -131,7 +131,7 @@ kubectl get crd -o name | grep asm.alauda.io | xargs -r kubectl delete
 
 ### 全新安装 Mesh v2
 
-网格与 global Essentials 插件都已清空，当前集群相当于一个从未安装过 Mesh v2 的全新环境（如果此前已经安装过 servicemesh-operator2、只是尚未创建 `Istio` CR，从下面的 `IstioCNI`/`Istio` 资源创建开始即可）。按照 [Installing Alauda Service Mesh](../installing/installing-service-mesh/install-mesh.mdx) 完成 servicemesh-operator2 Operator 安装、`IstioCNI` 资源创建、`Istio` 资源创建三个部分，版本选择当前的 Mesh v2 适用版本（istio 1.28.x）。创建完成后，记录本次安装得到的 `<v2-revision>`（`kubectl get istiorevisions.sailoperator.io`），后续步骤会用到。
+网格与 global Essentials 插件都已清空，当前集群相当于一个从未安装过 Mesh v2 的全新环境（如果此前已经安装过 servicemesh-operator2、只是尚未创建 `Istio` CR，从下面的 `IstioCNI`/`Istio` 资源创建开始即可）。按照 [Installing Alauda Service Mesh](../installing/installing-service-mesh/install-mesh.mdx) 完成 servicemesh-operator2 Operator 安装、`IstioCNI` 资源创建、`Istio` 资源创建三个部分，版本按安装文档与[迁移概览](./migration-overview.mdx)的版本适用性声明选择。创建完成后，记录本次安装得到的 `<v2-revision>`（`kubectl get istiorevisions.sailoperator.io`），后续步骤会用到。
 
 控制面就绪后，依次完成可观测栈的安装：Kiali 按照 [Alauda Build of Kiali](../integration/observability/kiali.mdx) 安装；OTel v2 与 Jaeger v2 按照[迁移可观测栈](./migrating-observability.mdx)「部署 OTel v2 与 Jaeger v2」一节安装（该节内容本身就是独立于迁移路径的标准安装步骤，同样适用于本路径）。由于本路径没有并存期，Kiali 与 Istio 的调用链配置不需要先配置成过渡态再切换，可以直接按照[迁移可观测栈](./migrating-observability.mdx)「将 Istio 调用链导出切换到 Jaeger v2」与「把 Kiali 调用链数据源切换到 Jaeger v2」两节给出的最终态配置直接创建。
 

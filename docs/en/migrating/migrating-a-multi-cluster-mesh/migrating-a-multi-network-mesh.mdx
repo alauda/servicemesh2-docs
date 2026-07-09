@@ -305,7 +305,7 @@ kubectl --kubeconfig <global-kubeconfig> -n cpaas-system patch servicemeshgroup 
 
 ### 逐业务集群执行下线序列
 
-global 侧处理完成后，对 cluster1、cluster2 分别执行[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)中业务集群侧的全部步骤（复核备份、删除业务集群自研治理 CR、删除 asm CR、删除 v1 系订阅与 CSV、删除网关与控制面 IstioOperator CR、清理残留标签与 CRD）。建议先完整完成一个集群的步骤并验证通过，再处理另一个集群。东西向网关 Service 的归属标签已经在进入本序列前摘除，执行到“删除网关与控制面 IstioOperator CR”一步、删除控制面 `<control-plane-iop>` 时不会将其一并回收，不需要再额外处理。
+global 侧处理完成后，对 cluster1、cluster2 分别执行[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)中业务集群侧的全部步骤（复核备份、删除业务集群自研治理 CR、删除 asm CR、删除 v1 系订阅与 CSV、删除网关与控制面 IstioOperator CR、清理残留标签与 CRD）。建议先完整完成一个集群的步骤并验证通过，再处理另一个集群。东西向网关 Service 的归属标签已经在进入本序列前摘除，执行到“删除网关与控制面 IstioOperator CR”一步、删除控制面 `<control-plane-iop>` 时不会将其一并回收。稳妥起见，删除该集群控制面 `<control-plane-iop>` 前可再执行一次上文的标签确认命令，确认 `install.operator.istio.io/owning-resource`/`operator.istio.io/managed` 仍不存在（防止 istio-operator 在间隔期将其调和回写）；若已被回写则重新摘除后再删。
 
 每个集群删除控制面 `<control-plane-iop>` 之后，确认东西向网关的 Service 与 v2 网关 Deployment 均未受影响：
 
