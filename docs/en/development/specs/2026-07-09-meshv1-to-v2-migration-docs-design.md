@@ -194,7 +194,7 @@ P2 要点：
    7. 删网关 IstioOperator CR（说明：`--cascade=orphan` 不能阻止 istio-operator finalizer 删除其管理资源——旧网关残壳正好随之清理；Service 已摘 ownerRef/归属标签故保留）→ 删控制面 IstioOperator CR（联动回收 istiod-1-22、istio-ingressgateway、1-22 系 webhook）→ 删 istio-operator Deployment 及 RBAC；
    8. 残留清理：default 位 webhook（istio-revision-tag-default、istiod-default-validator，若未随 IOP 回收）、ns 的 `cpaas.io/serviceMesh` 标签、asm CRD（确认无实例后）；**istio CRD（networking/security/telemetry.istio.io）保留**——已由 v2 operator 接管。
 5. 终局断言：asm CRD 为零、istio-system 仅剩 v2 组件与 Kiali、业务探测 0 中断、global 无 asm 组件。
-6. 多集群叠加项提示框：先逐业务集群执行本序列，最后处理 global；东西向网关 Service 摘标步骤见多网络页。
+6. 多集群叠加项提示框：global 部分（步骤 2、3）一次性处理全部业务集群的 ServiceMesh CR 与 ServiceMeshGroup，业务集群部分（步骤 1、4–8）逐集群执行；东西向网关 Service 的归属标签须在删除该集群任何 IstioOperator CR 之前摘除，摘标步骤见多网络页。
 
 ### 6.8 finalizing-the-migration.mdx —— 源：设计 §6 P6、10.1 P6 修订（D-13、V-13）
 
@@ -216,7 +216,7 @@ P2 要点：
 3. P2+：每集群 Istio CR 增加 `global.meshID/network/multiCluster.clusterName`；共享 CA 直接复用（两集群 cacerts 同根）；remote secret 复用（`istio-remote-secret-<peer>` 对 v2 istiod 直接生效，`istioctl remote-clusters` 断言 synced）。
 4. P2.5 东西向网关：每集群以 gateway injection 部署 v2 版 eastwest gateway（`istio.io/rev=<v2-revision>`、`topology.istio.io/network=<network>`、15443 AUTO_PASSTHROUGH）；沿用/新建 expose-services Gateway；过渡期 v1/v2 东西向网关并存（SNI 透传与控制面版本解耦）。
 5. P3+：按集群逐 ns 切换；跨集群三态调用矩阵持续探测（v1↔v1、v1↔v2、v2↔v2）。
-6. P5+：逐业务集群执行下线序列；**删 IOP 前先摘东西向网关 Service 的 operator 归属标签**（`install.operator.istio.io/owning-resource-`、`operator.istio.io/managed-`），保住 v2 东西向网关共用的 Service；最后处理 global（ServiceMeshGroup finalizer 同法）。
+6. P5+：global 编排源头先行（删 webhook→冻结→删全部 ServiceMesh CR 与 SMG→摘 finalizer→卸插件），随后逐业务集群执行下线序列；**删 IOP 前先摘东西向网关 Service 的 operator 归属标签**（`install.operator.istio.io/owning-resource-`、`operator.istio.io/managed-`），建议进入序列前统一摘除。
 7. P6+：每集群独立中间 CA（同根，subject 以集群区分）；Kiali 多集群（必须 VictoriaMetrics、`query_scope.mesh_id` 对齐 meshID、多集群 kubeconfig secret `kiali.io/kiali-multi-cluster-secret`）；Jaeger 索引前缀按集群区分。
 8. 验证检查点：跨集群矩阵全通、`istioctl remote-clusters` synced、CA 轮换后跨集群 mTLS 正常。
 

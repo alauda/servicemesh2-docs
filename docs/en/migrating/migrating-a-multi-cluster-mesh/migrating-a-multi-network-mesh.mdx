@@ -6,7 +6,7 @@ weight: 10
 
 本文对应[多集群网格迁移](./index.mdx)中判定为多网络拓扑的场景：两个业务集群的 Pod 网络互不相通，跨集群流量必须经东西向网关转发。本文在[单集群网格迁移](../migrating-a-single-cluster-mesh/index.mdx) P0 至 P6 六阶段流程的基础上，只描述多网络多集群场景需要叠加的步骤与差异点，未特别说明的步骤按单集群流程对应页面对两个集群分别执行即可。开始操作前，请确认已经通过[多集群网格迁移](./index.mdx)的拓扑判定，确认当前环境属于多网络拓扑，并已完成[迁移准备与前置检查](../preparing-for-migration.mdx)。本文使用的 `<cluster1-kubeconfig>`/`<cluster2-kubeconfig>` 占位符，含义见[多集群网格迁移](./index.mdx)“判定网络拓扑”一节。
 
-本文描述的叠加步骤已经在真实的双集群多网络环境中完成过一轮完整的端到端演练：两个集群从并存安装 v2 控制面、东西向网关双版本并存，到逐命名空间切换、分集群下线、多集群证书与可观测收尾，全程业务探测持续运行，网关切换、下线、证书轮换等阶段的数据面均未出现中断。与[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)不同，本文各步骤均基于这一实测结果撰写，不属于未经验证的设计推演。
+本文描述的叠加步骤已经在真实的双集群多网络环境中完成过一轮完整的端到端演练：两个集群从并存安装 v2 控制面、东西向网关双版本并存，到逐命名空间切换、分集群下线、多集群证书与可观测收尾，全程业务探测持续运行，网关切换、下线、证书轮换等阶段的数据面均未出现中断。与[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)不同，本文的核心迁移流程（网格标识对齐、控制面与东西向网关部署、工作负载与网关切换、v1 下线、CA 交接）均基于该实测结果撰写，不属于未经验证的设计推演。
 
 ## 相对单集群流程的叠加点
 
@@ -20,7 +20,7 @@ weight: 10
 | P2.5 部署东西向网关 | 每集群以 gateway injection 部署 v2 版东西向网关，与 v1 网关共享入口 Service（单集群没有此阶段） | — |
 | P3 迁移工作负载 | 两集群分别执行；新增跨集群三态调用矩阵持续探测 | [迁移工作负载](../migrating-a-single-cluster-mesh/migrating-workloads.mdx) |
 | P4 迁移网关 | 无叠加，两集群分别独立执行 | [迁移网关](../migrating-a-single-cluster-mesh/migrating-gateways.mdx) |
-| P5 下线 Mesh v1 | global 侧提前统一处理，一并删除 `ServiceMeshGroup`；再两集群分别执行业务集群侧步骤；删除控制面 `IstioOperator` CR 前先摘除东西向网关 Service 的归属标签 | [下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) |
+| P5 下线 Mesh v1 | 进入序列前先统一摘除两集群东西向网关 Service 的归属标签；global 编排源头先行处理，一并删除全部业务集群的 `ServiceMesh` CR 与 `ServiceMeshGroup`；再两集群分别执行业务集群侧步骤 | [下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) |
 | P6 完成迁移 | 每集群签发独立中间证书；Kiali 补充多集群查询范围与跨集群 kubeconfig；Jaeger 索引前缀按集群区分 | [完成迁移](../migrating-a-single-cluster-mesh/finalizing-the-migration.mdx) |
 
 ## P0+ 确认两集群网格标识
@@ -91,7 +91,7 @@ cluster2   istio-system/istio-remote-secret-cluster2      synced   istiod-<v2-re
 
 多集群拓扑相对单集群多出这一个阶段：在两个控制面并存期间，为每个集群部署 v2 版本的东西向网关，使其与 Mesh v1 现有的东西向网关并存，共同支撑过渡期的跨集群流量。这一阶段安排在 P2（并存安装 v2 控制面）之后、P3（迁移工作负载）之前，对两个集群分别执行。
 
-东西向网关部署在 istio-system 命名空间——两个控制面共享的命名空间，因此不能沿用[迁移网关](../migrating-a-single-cluster-mesh/migrating-gateways.mdx)中“先将网关命名空间的 rev 标签切换到 v2、再部署 v2 网关”的流程：istio-system 命名空间本身并不携带 `istio.io/rev` 标签，也不应该为它设置——这会影响该命名空间内其他仍需保留在 v1 的组件。v2 东西向网关改为直接在 Pod 模板上携带 `istio.io/rev: <v2-revision>` 标签完成修订绑定，做法与[关于 gateway injection](../../gateways/gateway-installation/about-gateway-injection.mdx)中“`Istio` 资源非 default 时须使用 `istio.io/rev` 标签”的说明一致。
+东西向网关部署在 istio-system 命名空间——两个控制面共享的命名空间，因此不能沿用[迁移网关](../migrating-a-single-cluster-mesh/migrating-gateways.mdx)中“先将网关命名空间的 rev 标签切换到 v2、再部署 v2 网关”的流程：istio-system 命名空间本身并不携带 `istio.io/rev` 标签，也不应该为它设置——这会影响该命名空间内其他仍需保留在 v1 的组件。v2 东西向网关改为直接在 Pod 模板上携带 `istio.io/rev: <v2-revision>` 标签完成修订绑定，做法与[Installing a gateway via gateway injection](../../gateways/gateway-installation/installing-a-gateway-via-injection.mdx)中“`Istio` 资源非 default 时须使用 `istio.io/rev` 标签”的说明一致。
 
 <Steps>
 
@@ -237,7 +237,7 @@ kubectl -n istio-system get pod -l app=istio-eastwestgateway
 | 探测方向 | cluster1 侧修订 | cluster2 侧修订 | 说明 |
 |---|---|---|---|
 | v1 ↔ v1 | `1-22` | `1-22` | 切换前的基线状态 |
-| v1 ↔ v2 | 其中一个集群已切换，另一个未切换 | | 灰度过程中的混合状态，两个方向都需要验证 |
+| v1 ↔ v2 | `1-22` 或 `<v2-revision>` | 与 cluster1 相反（一侧已切换、一侧未切换） | 灰度过程中的混合状态，两个方向都需要验证 |
 | v2 ↔ v2 | `<v2-revision>` | `<v2-revision>` | 两集群该命名空间均完成切换后的终态 |
 
 每完成一次命名空间切换，从其中一个集群已切换命名空间的业务 Pod 内，向另一个集群的对端服务发起调用，两个方向都要验证：
@@ -260,9 +260,40 @@ kubectl --kubeconfig <cluster1-kubeconfig> -n <mesh-namespace> exec deploy/<work
 
 <Steps>
 
+### 摘除两集群东西向网关 Service 的归属标签
+
+多集群东西向网关的 Service 与单集群业务网关不同：单集群业务网关的 Service 由 `GatewayDeploy` 持有 `ownerReferences`，而东西向网关的 Service 是控制面自身 `IstioOperator` CR 的一部分（`IngressGateways` 组件），携带 `install.operator.istio.io/owning-resource`/`operator.istio.io/managed` 标签，与[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)中处理未承载业务流量的默认网关（`istio-ingressgateway`）属于同一种归属机制。这意味着后续任意一个集群执行到该文“删除网关与控制面 IstioOperator CR”一步、删除该集群的 IstioOperator CR 时，东西向网关的 Service 都会一并被回收——但此时 v2 东西向网关仍然依赖这个共享的 Service 提供跨集群入口，不能让它被删除。摘除归属标签本身只会让 Service 脱离 operator 的管理范围，不影响其正常提供服务，因此这一步可以安排在整个下线序列最前面、对两个集群一次性统一执行，不需要等到逐业务集群执行到对应步骤时才处理。
+
+对两个集群分别执行以下发现命令，确认 Service 当前携带这两个标签：
+
+```bash
+kubectl --kubeconfig <cluster1-kubeconfig> -n istio-system get svc istio-eastwestgateway -o jsonpath='{.metadata.labels}'
+kubectl --kubeconfig <cluster2-kubeconfig> -n istio-system get svc istio-eastwestgateway -o jsonpath='{.metadata.labels}'
+```
+
+确认输出中包含 `install.operator.istio.io/owning-resource` 与 `operator.istio.io/managed` 后，对两个集群分别摘除这两个标签：
+
+```bash
+kubectl --kubeconfig <cluster1-kubeconfig> -n istio-system label svc istio-eastwestgateway install.operator.istio.io/owning-resource- operator.istio.io/managed-
+kubectl --kubeconfig <cluster2-kubeconfig> -n istio-system label svc istio-eastwestgateway install.operator.istio.io/owning-resource- operator.istio.io/managed-
+```
+
+<Directive type="warning" title="必须在删除任何 IstioOperator CR 之前完成；建议进入下线序列前统一摘除">
+这一步必须在两个集群各自删除任何 `IstioOperator` CR（含网关 IstioOperator CR 与控制面 IstioOperator CR）之前完成。摘除动作本身随时执行都是安全的，只会使 Service 脱离 operator 管理、不影响其正常工作，因此建议在进入下线序列前就对两个集群统一摘除，而不是等到逐业务集群执行到对应步骤时才处理。一旦某个集群的控制面 IstioOperator CR 已经删除、而归属标签尚未摘除，该集群东西向网关的 Service 会随其管理的资源一并被回收，届时只能按照[迁移准备与前置检查](../preparing-for-migration.mdx)阶段的网关 Service 备份重建。
+</Directive>
+
+摘除后立即用 `get` 命令核实标签确实已经消失，不要只依赖 `label` 命令的成功返回值：
+
+```bash
+kubectl --kubeconfig <cluster1-kubeconfig> -n istio-system get svc istio-eastwestgateway -o jsonpath='{.metadata.labels}'
+kubectl --kubeconfig <cluster2-kubeconfig> -n istio-system get svc istio-eastwestgateway -o jsonpath='{.metadata.labels}'
+```
+
+两条命令的输出中都不应再包含 `install.operator.istio.io/owning-resource` 或 `operator.istio.io/managed`。
+
 ### 处理 global：一并处理 ServiceMeshGroup
 
-执行[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)“（global 集群）删除 ServiceMesh CR”一步时，该步骤删除的 3 个 admission webhook 配置本身就覆盖 `ServiceMeshGroup`（其中 `servicemeshgroup-v1alpha1-mutation` 专为其设置），冻结的 `global-asm-controller` 也是同一个控制器，不需要额外准备。按该文步骤依次删除两个业务集群各自的 `ServiceMesh` CR 并摘除 finalizer（`<cluster-name>` 分别替换为两个集群的名称）后，一并处理 `ServiceMeshGroup`：
+两集群东西向网关 Service 的归属标签摘除后，进入 global 编排源头的处理。执行[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)“（global 集群）删除 ServiceMesh CR”一步时，该步骤删除的 3 个 admission webhook 配置本身就覆盖 `ServiceMeshGroup`（其中 `servicemeshgroup-v1alpha1-mutation` 专为其设置），冻结的 `global-asm-controller` 也是同一个控制器，不需要额外准备。按该文步骤依次删除两个业务集群各自的 `ServiceMesh` CR 并摘除 finalizer（`<cluster-name>` 分别替换为两个集群的名称）后，一并处理 `ServiceMeshGroup`：
 
 ```bash
 # 在 global 集群上下文执行
@@ -274,36 +305,16 @@ kubectl --kubeconfig <global-kubeconfig> -n cpaas-system patch servicemeshgroup 
 
 ### 逐业务集群执行下线序列
 
-global 侧处理完成后，对 cluster1、cluster2 分别执行[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)中业务集群侧的全部步骤（复核备份、删除业务集群自研治理 CR、删除 asm CR、删除 v1 系订阅与 CSV、删除网关与控制面 IstioOperator CR、清理残留标签与 CRD）。建议先完整完成一个集群的步骤并验证通过，再处理另一个集群。
+global 侧处理完成后，对 cluster1、cluster2 分别执行[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)中业务集群侧的全部步骤（复核备份、删除业务集群自研治理 CR、删除 asm CR、删除 v1 系订阅与 CSV、删除网关与控制面 IstioOperator CR、清理残留标签与 CRD）。建议先完整完成一个集群的步骤并验证通过，再处理另一个集群。东西向网关 Service 的归属标签已经在进入本序列前摘除，执行到“删除网关与控制面 IstioOperator CR”一步、删除控制面 `<control-plane-iop>` 时不会将其一并回收，不需要再额外处理。
 
-### 摘除东西向网关 Service 的归属标签
-
-多集群东西向网关的 Service 与单集群业务网关不同：单集群业务网关的 Service 由 `GatewayDeploy` 持有 `ownerReferences`，而东西向网关的 Service 是控制面自身 `IstioOperator` CR 的一部分（`IngressGateways` 组件），携带 `install.operator.istio.io/owning-resource`/`operator.istio.io/managed` 标签，与[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)中处理未承载业务流量的默认网关（`istio-ingressgateway`）属于同一种归属机制。这意味着当该文“删除网关与控制面 IstioOperator CR”一步删除控制面 `<control-plane-iop>` 时，东西向网关的 Service 会一并被回收——但此时 v2 东西向网关仍然依赖这个共享的 Service 提供跨集群入口，不能让它被删除。
-
-因此，在对应集群执行到“删除网关与控制面 IstioOperator CR”步骤、删除控制面 `<control-plane-iop>` 之前，必须先摘除该 Service 的归属标签：
+每个集群删除控制面 `<control-plane-iop>` 之后，确认东西向网关的 Service 与 v2 网关 Deployment 均未受影响：
 
 ```bash
-kubectl -n istio-system get svc istio-eastwestgateway -o jsonpath='{.metadata.labels}'
+kubectl --kubeconfig <cluster1-kubeconfig> -n istio-system get svc istio-eastwestgateway
+kubectl --kubeconfig <cluster1-kubeconfig> -n istio-system get deploy istio-eastwestgateway-v2
 ```
 
-确认输出中包含 `install.operator.istio.io/owning-resource` 与 `operator.istio.io/managed` 后，摘除这两个标签：
-
-```bash
-kubectl -n istio-system label svc istio-eastwestgateway install.operator.istio.io/owning-resource- operator.istio.io/managed-
-```
-
-<Directive type="warning" title="必须在删除控制面 IstioOperator CR 之前完成">
-这一步必须安排在“删除网关与控制面 IstioOperator CR”一步删除 `<control-plane-iop>` 之前执行；一旦控制面 IstioOperator CR 已经删除，东西向网关的 Service 会随其管理的资源一并被回收，届时只能按照[迁移准备与前置检查](../preparing-for-migration.mdx)阶段的网关 Service 备份重建。
-</Directive>
-
-删除控制面 `<control-plane-iop>` 之后，确认东西向网关的 Service 与 v2 网关 Deployment 均未受影响：
-
-```bash
-kubectl -n istio-system get svc istio-eastwestgateway
-kubectl -n istio-system get deploy istio-eastwestgateway-v2
-```
-
-两条命令都应当正常返回，而不是 `NotFound`。
+两条命令都应当正常返回，而不是 `NotFound`；对 cluster2 重复同样的验证（`--kubeconfig` 换成 `<cluster2-kubeconfig>`）。
 
 </Steps>
 
@@ -348,6 +359,10 @@ kubectl -n istio-system label secret kiali-multi-cluster-remote \
 ```
 
 在 cluster2 上执行对称的操作，`--from-file=kubeconfig=` 换成 `<cluster1-kubeconfig>`。两个集群的 Kiali 都完成配置后，即可在 Graph 页面中查看跨集群的完整服务拓扑。
+
+<Directive type="note">
+该 secret 配置方式来自产品集成资料，未包含在本迁移路径的端到端演练范围内；配置后请按下文验证小节确认 Kiali 数据完整。
+</Directive>
 
 ### Jaeger 索引前缀按集群区分
 

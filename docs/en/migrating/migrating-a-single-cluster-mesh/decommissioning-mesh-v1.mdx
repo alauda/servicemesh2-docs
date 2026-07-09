@@ -440,5 +440,5 @@ kubectl --kubeconfig <global-kubeconfig> -n cpaas-system get deploy | grep -Ei "
 全部检查点通过后，Mesh v1 下线完成，目标集群进入 Mesh v2 独占的终态。
 
 :::tip 多集群场景
-多集群网格需要对每个业务集群分别执行步骤 1、4–8；global 集群侧的步骤 2、3（含 `ServiceMeshGroup` CR 的处理）只需要执行一次。建议的顺序是：先逐个完成全部业务集群的本地下线步骤，最后再处理 global 集群侧的清理。多集群东西向网关的 Service 属主机制与单集群南北向网关不同，摘除步骤见[多集群网格迁移](../migrating-a-multi-cluster-mesh/index.mdx)。
+多集群网格仍按本页序列执行：global 部分（步骤 2、3）一次性处理全部业务集群的 `ServiceMesh` CR 与 `ServiceMeshGroup`；业务集群部分（步骤 1、4–8）对每个业务集群分别执行。多集群东西向网关的 Service 属主机制与单集群南北向网关不同，其归属标签必须在删除该集群任何 `IstioOperator` CR 之前摘除；完整的叠加步骤与命令见[迁移多网络多集群网格](../migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx)。
 :::
