@@ -32,6 +32,18 @@ kubectl -n istio-system get svc istio-eastwestgateway -o jsonpath='{.metadata.la
 
 如果命令返回 `NotFound`，说明该集群没有部署东西向网关，记录为“无”；如果命令正常返回，记录输出的 network 取值。
 
+东西向网关只是 network 的其中一处判定来源。即使集群上没有东西向网关（单网络环境的常见情形），Mesh v1 仍可能通过 istio-system 命名空间标签或安装 values 配置了 network，因此继续读取这两处来源并分别记录（输出为空则记录为「无」）：
+
+```bash
+# 读取 istio-system 命名空间的 network 标签
+kubectl get ns istio-system -o jsonpath='{.metadata.labels.topology\.istio\.io/network}'
+
+# 读取 Mesh v1 安装 values 中的 network 配置
+kubectl -n istio-system get istiooperator <control-plane-iop> -o jsonpath='{.spec.values.global.network}'
+```
+
+`<control-plane-iop>` 为 Mesh v1 控制面 `IstioOperator` CR 的名称，发现命令见[迁移概览](../migration-overview.mdx)「约定」一节的占位符表。同一个集群内，三处来源读到的非空取值应当一致；如果互相矛盾（例如安装 values 配置了 network、命名空间标签却是另一个取值），按下文「三项判定特征应当相互印证」的处理原则，先联系 Alauda 支持厘清环境实际拓扑，再继续判定。
+
 最后读取每个集群 istiod 的 `CLUSTER_ID`，即该集群在多集群网格中使用的集群名：
 
 ```bash
@@ -44,6 +56,8 @@ kubectl -n istio-system get deploy istiod-1-22 -o jsonpath='{.spec.template.spec
 |---|---|---|
 | meshId | | |
 | 东西向网关 network 标签 | | |
+| istio-system 命名空间 network 标签 | | |
+| 安装 values 中的 `global.network` | | |
 | clusterName（CLUSTER_ID） | | |
 
 ### 检查跨集群 Pod IP 直连连通性

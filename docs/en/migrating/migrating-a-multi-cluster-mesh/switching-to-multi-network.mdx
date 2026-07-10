@@ -140,7 +140,7 @@ curl -sk -o /dev/null -w '%{http_code}\n' --max-time 3 "https://<cluster2-eastwe
 
 两个集群的东西向网关都确认可达后，为两侧分别设置 network 相关配置；`<network-1>`/`<network-2>` 使用上一步部署网关时已经规划好的取值。
 
-先修改两个集群 v2 `Istio` 资源的 `spec.values.global`，补充 `network` 字段（此前迁移过程中 `global` 下只有 `meshID`/`multiCluster.clusterName`，这是本文唯一一处修改 v2 控制面配置的操作）：
+先修改两个集群 v2 `Istio` 资源的 `spec.values.global`，写入 `network` 字段（迁移按「两侧均无」子情形完成时，此前 `global` 下只有 `meshID`/`multiCluster.clusterName`，本步骤为新增字段；迁移按「两侧同名」子情形照抄过 v1 的 network 取值时，本步骤是把两侧从同一取值分别覆盖为 `<network-1>`/`<network-2>`。这是本文唯一一处修改 v2 控制面配置的操作）：
 
 ```bash
 kubectl --kubeconfig <cluster1-kubeconfig> -n istio-system patch istio default --type=merge -p='{"spec":{"values":{"global":{"network":"<network-1>"}}}}'
@@ -229,6 +229,8 @@ kubectl --kubeconfig <cluster2-kubeconfig> -n istio-system patch istio default -
 kubectl --kubeconfig <cluster1-kubeconfig> label ns istio-system topology.istio.io/network-
 kubectl --kubeconfig <cluster2-kubeconfig> label ns istio-system topology.istio.io/network-
 ```
+
+以上撤销命令对应迁移终态两侧均未设置 network 的情形（此时 `global` 下原本没有 `network` 字段、istio-system 也没有该标签）；如果迁移是按「两侧同名」子情形完成的，回滚不是移除，而是把两侧的 `values.global.network`（及 istio-system 命名空间的 network 标签，若迁移前即存在）改回迁移终态记录的同一取值。
 
 两处配置撤销后，istiod 会再次滚动，端点重新回到迁移完成时的单网络配置（Pod IP 直连）。是否需要连带删除两个集群新部署的东西向网关，取决于是否计划重新尝试切换：如果只是临时回退、后续还会再次尝试，可以将网关 Deployment 保留（缩容或不缩容均不影响单网络路径下的 Pod 直连，因为此时跨集群端点的判定已经不再依赖网关）；如果确定不再需要，参考[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)中处理网关资源的思路手工删除。
 

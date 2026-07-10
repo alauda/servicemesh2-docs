@@ -29,11 +29,11 @@ weight: 40
 # 核对是否仍有业务命名空间停留在 Mesh v1 修订
 kubectl get ns -l istio.io/rev=1-22
 
-# 核对是否仍有 proxy 连接 v1 istiod
-istioctl proxy-status | grep 1-22
+# 核对是否仍有 proxy 连接 v1 istiod（--revision 1-22 直接定向 v1 控制面）
+istioctl proxy-status --revision 1-22
 ```
 
-第一条命令的输出应当为空，或者只包含下文例外清单中记录的命名空间；第二条命令的输出应当为空。
+第一条命令的输出应当为空，或者只包含下文例外清单中记录的命名空间；第二条命令的输出应当没有任何数据行，或者只包含下文例外清单中记录的条目（如未承载业务流量的 `istio-ingressgateway`）。如果第二条命令报错而不是输出空列表，视为检查未通过，先排查报错原因再重试，不要把「没有输出」当作通过。
 
 ### 例外清单
 

@@ -206,7 +206,7 @@ P2 要点：
 ### 6.9 migrating-a-multi-cluster-mesh/index.mdx —— 源：设计 §8 P0+、8.1 判定特征
 
 1. 适用性说明：以单集群流程为基线，本目录为多集群叠加项；多集群迁移按**网络拓扑**分两条路径。
-2. **拓扑判定（进入任一路径前必做）**：采集两集群网格标识（`kubectl -n istio-system get cm istio-1-22 -o jsonpath='{.data.mesh}'` 读 meshId/network/clusterName；东西向网关 `topology.istio.io/network` 标签）→ 跨集群 pod IP 直连检查命令 → 判定表：两集群 network 同名 + pod IP 直连可达 + 无东西向网关 → 单网络路径；network 不同名 + 有东西向网关 → 多网络路径。
+2. **拓扑判定（进入任一路径前必做）**：采集两集群网格标识（`kubectl -n istio-system get cm istio-1-22 -o jsonpath='{.data.mesh}'` 读 meshId/network/clusterName；network 按设计 §8.1.1 的三处判定来源逐一采集——东西向网关 Service 的 `topology.istio.io/network` 标签、istio-system 命名空间的 `topology.istio.io/network` 标签（`kubectl get ns istio-system -o jsonpath='{.metadata.labels.topology\.istio\.io/network}'`）、控制面 IstioOperator CR 的 `spec.values.global.network`——保证无东西向网关的单网络环境也有可读来源）→ 跨集群 pod IP 直连检查命令 → 判定表：两集群 network 同名或均为空 + pod IP 直连可达 + 无东西向网关 → 单网络路径；network 不同名 + 有东西向网关 → 多网络路径。
 3. Overview 子页列表。
 
 ### 6.10 migrating-a-multi-network-mesh.mdx —— 源：设计 §8（实测基线）、D-M1/D-M2
@@ -217,7 +217,7 @@ P2 要点：
 4. P2.5 东西向网关：每集群以 gateway injection 部署 v2 版 eastwest gateway（`istio.io/rev=<v2-revision>`、`topology.istio.io/network=<network>`、15443 AUTO_PASSTHROUGH）；沿用/新建 expose-services Gateway；过渡期 v1/v2 东西向网关并存（SNI 透传与控制面版本解耦）。
 5. P3+：按集群逐 ns 切换；跨集群三态调用矩阵持续探测（v1↔v1、v1↔v2、v2↔v2）。
 6. P5+：global 编排源头先行（删 webhook→冻结→删全部 ServiceMesh CR 与 SMG→摘 finalizer→卸插件），随后逐业务集群执行下线序列；**删 IOP 前先摘东西向网关 Service 的 operator 归属标签**（`install.operator.istio.io/owning-resource-`、`operator.istio.io/managed-`），建议进入序列前统一摘除。
-7. P6+：每集群独立中间 CA（同根，subject 以集群区分）；Kiali 多集群（必须 VictoriaMetrics、`query_scope.mesh_id` 对齐 meshID、多集群 kubeconfig secret `kiali.io/kiali-multi-cluster-secret`）；Jaeger 索引前缀按集群区分。
+7. P6+：每集群独立中间 CA（同根，subject 以集群区分）；Kiali 多集群（必须 VictoriaMetrics、`query_scope.mesh_id` 对齐 meshID；多集群 kubeconfig secret 名固定为 `kiali-multi-cluster-secret`、标签为 `kiali.io/multiCluster=true`——依据 istio 官方 kiali 样例 `clustering.autodetect_secrets.label` 与 Kiali 2.22.2 CSV 对 secret 的 RBAC `resourceNames` 限定；本条早前版本误把 secret 名写成了标签键，已订正）；Jaeger 索引前缀按集群区分。
 8. 验证检查点：跨集群矩阵全通、`istioctl remote-clusters` synced、CA 轮换后跨集群 mTLS 正常。
 
 ### 6.11 migrating-a-single-network-mesh.mdx —— 源：设计 §8.1（推演，性质必须区分）

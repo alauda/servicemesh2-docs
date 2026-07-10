@@ -340,22 +340,21 @@ spec:
         mesh_id: <v1-mesh-id>  # [!code callout]
     tracing:
       query_scope:
-        istio:
-          mesh_id: <v1-mesh-id>  # [!code callout]
+        istio.mesh_id: <v1-mesh-id>  # [!code callout]
 ```
 
 <Callouts>
   1. `query_scope.mesh_id` 的取值必须与两集群 `Istio` 资源中 `global.meshID` 的取值一致，即[拓扑判定](./index.mdx)阶段采集到的 meshId。
-  2. `query_scope.istio.mesh_id` 同理，用于调用链数据的多集群查询范围界定，取值与上一项相同。
+  2. tracing 侧 `query_scope` 下的 `istio.mesh_id` 键同理，用于调用链数据的多集群查询范围界定，取值与上一项相同。注意 `istio.mesh_id` 是一个带点的完整键名——`query_scope` 的取值是字符串到字符串的平铺映射，不能写成 `istio:` 下再嵌套 `mesh_id:` 的两层结构，嵌套写法不会生效。
 </Callouts>
 
-为了让 Kiali 能够展示跨集群的完整拓扑，还需要让它具备访问对端集群 API Server 的凭据：将对端集群的 kubeconfig 保存为 Kiali 部署命名空间（istio-system）下的一个 Secret，并携带 `kiali.io/kiali-multi-cluster-secret` 标签：
+为了让 Kiali 能够展示跨集群的完整拓扑，还需要让它具备访问对端集群 API Server 的凭据：将对端集群的 kubeconfig 保存为 Kiali 部署命名空间（istio-system）下名为 `kiali-multi-cluster-secret` 的 Secret，并携带 `kiali.io/multiCluster=true` 标签。Kiali 按这个标签自动发现远端集群凭据，其 RBAC 也只授权读取这个固定名称的 Secret，名称与标签都不能自行改动：
 
 ```bash
-kubectl -n istio-system create secret generic kiali-multi-cluster-remote \
+kubectl -n istio-system create secret generic kiali-multi-cluster-secret \
   --from-file=kubeconfig=<cluster2-kubeconfig>
-kubectl -n istio-system label secret kiali-multi-cluster-remote \
-  kiali.io/kiali-multi-cluster-secret=true
+kubectl -n istio-system label secret kiali-multi-cluster-secret \
+  kiali.io/multiCluster=true
 ```
 
 在 cluster2 上执行对称的操作，`--from-file=kubeconfig=` 换成 `<cluster1-kubeconfig>`。两个集群的 Kiali 都完成配置后，即可在 Graph 页面中查看跨集群的完整服务拓扑。

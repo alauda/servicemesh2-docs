@@ -9,7 +9,7 @@ weight: 50
 开始操作前，请确认已经完成[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)的全部步骤——v1 时期的 OTel 采集链路与 Jaeger v1 组件已经在该阶段「删除 asm CR」一节中随 asm 的 Helm release 一并移除。
 
 :::warning 遥测中断窗口
-调用链遥测的中断从[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)阶段删除 v1 时期的 OTel 采集链路与 Jaeger v1 组件时就已经开始——这不是本文引入的新中断，而是延续自上一阶段、此刻仍在持续的状态；完成本文全部步骤后，遥测恢复正常。中断期间只影响调用链数据的产生与查询，网格本身的流量转发不受影响。这一行为与 OpenTelemetry 官方的 v1 到 v2 迁移路径一致：该路径同样存在从卸载旧 Collector 到新 Collector 就绪之间的遥测中断窗口。
+调用链遥测的中断从[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)阶段删除 v1 时期的 OTel 采集链路与 Jaeger v1 组件时就已经开始——这不是本文引入的新中断，而是延续自上一阶段、此刻仍在持续的状态；完成本文全部步骤后，遥测恢复正常。并存灰度期间已切换到 v2 的工作负载之所以调用链未断，依赖的是[安装 v2 控制面](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx)阶段在 v2 控制面中定义的、与 v1 同名的 `zipkin` provider——它指向的 v1 Collector 正是在上述删除动作中被移除的组件，这条过渡链路随之断开。中断期间只影响调用链数据的产生与查询，网格本身的流量转发不受影响。这一行为与 OpenTelemetry 官方的 v1 到 v2 迁移路径一致：该路径同样存在从卸载旧 Collector 到新 Collector 就绪之间的遥测中断窗口。
 :::
 
 ## 部署 OTel v2 与 Jaeger v2
@@ -53,6 +53,8 @@ spec:
 <Directive type="warning" title="merge patch 会整体替换 extensionProviders 数组">
 这条命令使用 JSON merge patch，会整体替换 `meshConfig.extensionProviders` 数组。如果 `Istio` 资源中除了 `otel` 之外还定义了其他 provider，改用 `kubectl edit istio default` 交互式编辑追加，或使用 JSON Patch（`--type=json`）向 `/spec/values/meshConfig/extensionProviders/-` 追加，避免覆盖其他条目。
 </Directive>
+
+[安装 v2 控制面](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx)阶段为并存窗口定义的 `zipkin` provider 属于过渡配置：它所服务的 v1 根 `Telemetry` 与 v1 Collector 都已随[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)回收，本步骤的整体替换会将其一并移除，属预期结果，不需要按上面的提醒为它改用追加式写法。
 
 `port: 4317` 是 OTLP gRPC 的默认端口——Istio 的 `opentelemetry` provider 固定通过 gRPC 向 Collector 导出 span；这与下一节 OTel Java Agent 使用的 `4318`（OTLP HTTP 端口）是同一个 Collector 上两个相互独立的协议入口，配置时不要混用。`Telemetry` 资源不需要改动，它通过 provider 名称（`otel`）引用配置，与 Collector 的实际地址无关。
 
@@ -251,7 +253,8 @@ spec:
 
 ```bash
 # 可选：通过 Jaeger v2 的查询接口核对服务清单，与预期的业务服务范围对比
-kubectl -n jaeger-system port-forward svc/jaeger-collector 16686:16686 &
+# 16686 是查询 API 在容器内监听的端口，jaeger-collector Service 并不暴露该端口，因此对 Deployment 做端口转发
+kubectl -n jaeger-system port-forward deploy/jaeger-collector 16686:16686 &
 curl -s http://localhost:16686/api/services | jq -r '.data[]'
 ```
 

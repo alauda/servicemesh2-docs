@@ -37,7 +37,7 @@ weight: 20
 | 阶段 | 多网络路径 | 单网络变体 |
 |---|---|---|
 | P0 迁移准备 | 采集两集群 meshId/network/clusterName，以及东西向网关的 network 标签 | 同左；两集群 network 取值预期一致（含两侧均为“无”的情况）；不存在东西向网关，相应的采集与备份项相应减少；新增前置检查——跨集群 Pod IP 直连连通性，已经在[多集群网格迁移](./index.mdx)“判定网络拓扑”一节完成，无需重复执行 |
-| P2 并存安装 v2 控制面 | `Istio` 资源的 `global` 追加 `meshID`/`network`/`multiCluster.clusterName` | 同左；`network` 逐字段照抄两集群在判定阶段记录的取值（同名则同名，两集群一致）；共享 CA 与 remote secret 的复用逻辑不变——多网络路径已实测的这条复用逻辑，同样适用于单网络场景下的跨集群端点发现 |
+| P2 并存安装 v2 控制面 | `Istio` 资源的 `global` 追加 `meshID`/`network`/`multiCluster.clusterName` | 同左；`network` 逐字段照抄两集群在判定阶段记录的取值，分两种子情形：两侧均为「无」时，v2 的 `Istio` 资源不设置 `values.global.network`；两侧同名时，v2 在 `values.global.network` 写入与 v1 相同的同一取值（两集群一致）；共享 CA 与 remote secret 的复用逻辑不变——多网络路径已实测的这条复用逻辑，同样适用于单网络场景下的跨集群端点发现 |
 | P2.5 部署东西向网关 | 每集群以 gateway injection 部署 v2 版东西向网关 | **整步跳过**：单网络拓扑下不存在东西向网关，没有对应的部署对象 |
 | P3 迁移工作负载 | 跨集群三态调用矩阵（v1↔v1、v1↔v2、v2↔v2） | 矩阵验证方式相同，路径预期全程为 Pod IP 直连；新增单网络专属断言，见下文“单网络专属验证”一节 |
 | P5 下线 Mesh v1 | 进入下线序列前，先统一摘除两集群东西向网关 Service 的归属标签 | 不适用：单网络拓扑没有东西向网关 Service；南北向网关 Service 的归属保护（摘除 `ownerReferences`）按[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)中的步骤照常执行 |
