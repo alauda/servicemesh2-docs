@@ -42,7 +42,7 @@ weight: 20
 | P3 迁移工作负载 | 跨集群三态调用矩阵（v1↔v1、v1↔v2、v2↔v2） | 矩阵验证方式相同，路径预期全程为 Pod IP 直连；新增单网络专属断言，见下文“单网络专属验证”一节 |
 | P5 下线 Mesh v1 | 进入下线序列前，先统一摘除两集群东西向网关 Service 的归属标签 | 不适用：单网络拓扑没有东西向网关 Service；南北向网关 Service 的归属保护（摘除 `ownerReferences`）按[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)中的步骤照常执行 |
 
-除以上五个阶段外，P1、P4、P6 三个阶段在两条路径下没有差异，均直接按[单集群网格迁移](../migrating-a-single-cluster-mesh/index.mdx)对应页面对两个集群分别执行；其余叠加内容（webhook 下线顺序、asm 自研 CR 的 finalizer 旁路处理、CA 交接、Kiali 与 VictoriaMetrics 对接等）与[迁移多网络多集群网格](./migrating-a-multi-network-mesh.mdx)完全同构，按该文对应章节执行即可，不需要额外调整。
+除以上五个阶段外，P1、P4 两个阶段在两条路径下没有差异，均直接按[单集群网格迁移](../migrating-a-single-cluster-mesh/index.mdx)对应页面对两个集群分别执行；P6 阶段的多集群叠加内容（每集群独立中间 CA 的签发、Kiali 多集群配置、Jaeger 索引前缀按集群区分）对单网络拓扑同样适用，按[迁移多网络多集群网格](./migrating-a-multi-network-mesh.mdx)「P6+ 完成迁移：多集群收尾」一节执行；其余叠加内容（webhook 下线顺序、asm 自研 CR 的 finalizer 旁路处理、Kiali 与 VictoriaMetrics 对接等）与该文完全同构，按对应章节执行即可，不需要额外调整。
 
 ## 单网络专属验证
 
