@@ -4,7 +4,7 @@ weight: 10
 
 # 迁移多网络多集群网格
 
-本文对应[多集群网格迁移](./index.mdx)中判定为多网络拓扑的场景：两个业务集群的 Pod 网络互不相通，跨集群流量必须经东西向网关转发。本文在[单集群网格迁移](../migrating-a-single-cluster-mesh/index.mdx) P0 至 P6 六阶段流程的基础上，只描述多网络多集群场景需要叠加的步骤与差异点，未特别说明的步骤按单集群流程对应页面对两个集群分别执行即可。开始操作前，请确认已经通过[多集群网格迁移](./index.mdx)的拓扑判定，确认当前环境属于多网络拓扑，并已完成[迁移准备与前置检查](../preparing-for-migration.mdx)。本文使用的 `<cluster1-kubeconfig>`/`<cluster2-kubeconfig>` 占位符，含义见[多集群网格迁移](./index.mdx)“判定网络拓扑”一节。
+本文对应[多集群网格迁移](./index.mdx)中判定为多网络拓扑的场景：两个业务集群的 Pod 网络互不相通，跨集群流量必须经东西向网关转发。本文在[单集群网格迁移](../migrating-a-single-cluster-mesh/index.mdx) P0 至 P6 六阶段流程的基础上，只描述多网络多集群场景需要叠加的步骤与差异点，未特别说明的步骤按单集群流程对应页面对两个集群分别执行即可。开始操作前，请确认已经通过[多集群网格迁移](./index.mdx)的拓扑判定，确认当前环境属于多网络拓扑，并已完成[迁移准备与前置检查](../preparing-for-migration.mdx)。本文使用的 `<cluster1-kubeconfig>`/`<cluster2-kubeconfig>` 占位符，含义见[多集群网格迁移](./index.mdx)「判定网络拓扑」一节。
 
 本文描述的叠加步骤已经在真实的双集群多网络环境中完成过一轮完整的端到端演练：两个集群从并存安装 v2 控制面、东西向网关双版本并存，到逐命名空间切换、分集群下线、多集群证书与可观测收尾，全程业务探测持续运行，网关切换、下线、证书轮换等阶段的数据面均未出现中断。与[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)不同，本文的核心迁移流程（网格标识对齐、控制面与东西向网关部署、工作负载与网关切换、v1 下线、CA 交接）均基于该实测结果撰写，不属于未经验证的设计推演。
 
@@ -15,7 +15,7 @@ weight: 10
 | 阶段 | 叠加动作 | 对应单集群页 |
 |---|---|---|
 | P0 迁移准备 | 先完成[拓扑判定](./index.mdx)；采集两集群网格标识，供后续阶段逐字段对齐 | [迁移准备与前置检查](../preparing-for-migration.mdx) |
-| P1 准备可观测性 | 无叠加（Kiali 的多集群专属配置见下文“P6+”一节） | [安装 v2 控制面](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx) |
+| P1 准备可观测性 | 无叠加（Kiali 的多集群专属配置见下文「P6+」一节） | [安装 v2 控制面](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx) |
 | P2 并存安装 v2 控制面 | 每集群 `Istio` 资源的 `global` 追加 `meshID`/`network`/`multiCluster.clusterName`；共享 CA 与 remote secret 直接复用 | [安装 v2 控制面](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx) |
 | P2.5 部署东西向网关 | 每集群以 gateway injection 部署 v2 版东西向网关，与 v1 网关共享入口 Service（单集群没有此阶段） | — |
 | P3 迁移工作负载 | 两集群分别执行；新增跨集群三态调用矩阵持续探测 | [迁移工作负载](../migrating-a-single-cluster-mesh/migrating-workloads.mdx) |
@@ -25,7 +25,7 @@ weight: 10
 
 ## P0+ 确认两集群网格标识
 
-[多集群网格迁移](./index.mdx)“判定网络拓扑”一节已经采集了两集群的 meshId、各自东西向网关的 network 标签，以及 clusterName；如果尚未完成判定与采集，请先返回完成。
+[多集群网格迁移](./index.mdx)「判定网络拓扑」一节已经采集了两集群的 meshId、各自东西向网关的 network 标签，以及 clusterName；如果尚未完成判定与采集，请先返回完成。
 
 下文 P2+ 阶段创建 v2 `Istio` 资源时，这些取值必须逐字段对齐 v1 的实测结果——尤其是两侧的 network 取值，v2 与 v1 对同一个集群的 network 认知必须完全一致，否则两个控制面会对跨集群端点的归属产生分歧，出现跨集群路由异常。请确保判定阶段记录的取值准确无误，下文会直接引用这些记录。
 
@@ -59,7 +59,7 @@ spec:
 
 ### 确认共享 CA 直接复用
 
-两个业务集群的 `cacerts` 在 Mesh v1 阶段已经由同一份根证书签发（[迁移准备与前置检查](../preparing-for-migration.mdx)阶段的备份中应当包含两侧的 `cacerts`）。v2 istiod 在各自集群内加载的同样是本集群已有的 `cacerts`，不需要按照[多集群配置概览](../../installing/multi-cluster/configuration-overview.mdx)中面向全新安装的流程重新签发证书——那份流程用于从零构建多集群信任链，本场景两集群的互信关系已经由 Mesh v1 建立完成，v2 只是复用现有的 `cacerts` Secret。验证方式与单集群相同：确认两集群的 v2 istiod 日志中均出现从现有 `cacerts` 加载的记录，见[安装 v2 控制面](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx)“验证”一节。
+两个业务集群的 `cacerts` 在 Mesh v1 阶段已经由同一份根证书签发（[迁移准备与前置检查](../preparing-for-migration.mdx)阶段的备份中应当包含两侧的 `cacerts`）。v2 istiod 在各自集群内加载的同样是本集群已有的 `cacerts`，不需要按照[多集群配置概览](../../installing/multi-cluster/configuration-overview.mdx)中面向全新安装的流程重新签发证书——那份流程用于从零构建多集群信任链，本场景两集群的互信关系已经由 Mesh v1 建立完成，v2 只是复用现有的 `cacerts` Secret。验证方式与单集群相同：确认两集群的 v2 istiod 日志中均出现从现有 `cacerts` 加载的记录，见[安装 v2 控制面](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx)「验证」一节。
 
 ### 确认 remote secret 复用
 
@@ -91,7 +91,7 @@ cluster2   istio-system/istio-remote-secret-cluster2      synced   istiod-<v2-re
 
 多集群拓扑相对单集群多出这一个阶段：在两个控制面并存期间，为每个集群部署 v2 版本的东西向网关，使其与 Mesh v1 现有的东西向网关并存，共同支撑过渡期的跨集群流量。这一阶段安排在 P2（并存安装 v2 控制面）之后、P3（迁移工作负载）之前，对两个集群分别执行。
 
-东西向网关部署在 istio-system 命名空间——两个控制面共享的命名空间，因此不能沿用[迁移网关](../migrating-a-single-cluster-mesh/migrating-gateways.mdx)中“先将网关命名空间的 rev 标签切换到 v2、再部署 v2 网关”的流程：istio-system 命名空间本身并不携带 `istio.io/rev` 标签，也不应该为它设置——这会影响该命名空间内其他仍需保留在 v1 的组件。v2 东西向网关改为直接在 Pod 模板上携带 `istio.io/rev: <v2-revision>` 标签完成修订绑定，做法与[Installing a gateway via gateway injection](../../gateways/gateway-installation/installing-a-gateway-via-injection.mdx)中“`Istio` 资源非 default 时须使用 `istio.io/rev` 标签”的说明一致。
+东西向网关部署在 istio-system 命名空间——两个控制面共享的命名空间，因此不能沿用[迁移网关](../migrating-a-single-cluster-mesh/migrating-gateways.mdx)中「先将网关命名空间的 rev 标签切换到 v2、再部署 v2 网关」的流程：istio-system 命名空间本身并不携带 `istio.io/rev` 标签，也不应该为它设置——这会影响该命名空间内其他仍需保留在 v1 的组件。v2 东西向网关改为直接在 Pod 模板上携带 `istio.io/rev: <v2-revision>` 标签完成修订绑定，做法与[Installing a gateway via gateway injection](../../gateways/gateway-installation/installing-a-gateway-via-injection.mdx)中「`Istio` 资源非 default 时须使用 `istio.io/rev` 标签」的说明一致。
 
 <Steps>
 
@@ -228,7 +228,7 @@ kubectl -n istio-system get pod -l app=istio-eastwestgateway
 
 ### 按集群逐命名空间切换
 
-对 cluster1、cluster2 分别执行[迁移工作负载](../migrating-a-single-cluster-mesh/migrating-workloads.mdx)中“逐命名空间切换”一节的步骤；两个集群的切换进度不需要保持同步，可以先完整切换一个集群的全部命名空间再切换另一个，也可以交替进行，具体节奏按业务方的验证与发布计划确定。
+对 cluster1、cluster2 分别执行[迁移工作负载](../migrating-a-single-cluster-mesh/migrating-workloads.mdx)中「逐命名空间切换」一节的步骤；两个集群的切换进度不需要保持同步，可以先完整切换一个集群的全部命名空间再切换另一个，也可以交替进行，具体节奏按业务方的验证与发布计划确定。
 
 ### 跨集群三态调用矩阵
 
@@ -262,7 +262,7 @@ kubectl --kubeconfig <cluster1-kubeconfig> -n <mesh-namespace> exec deploy/<work
 
 ### 摘除两集群东西向网关 Service 的归属标签
 
-多集群东西向网关的 Service 与单集群业务网关不同：单集群业务网关的 Service 由 `GatewayDeploy` 持有 `ownerReferences`，而东西向网关的 Service 是控制面自身 `IstioOperator` CR 的一部分（`IngressGateways` 组件），携带 `install.operator.istio.io/owning-resource`/`operator.istio.io/managed` 标签，与[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)中处理未承载业务流量的默认网关（`istio-ingressgateway`）属于同一种归属机制。这意味着后续任意一个集群执行到该文“删除网关与控制面 IstioOperator CR”一步、删除该集群的 IstioOperator CR 时，东西向网关的 Service 都会一并被回收——但此时 v2 东西向网关仍然依赖这个共享的 Service 提供跨集群入口，不能让它被删除。摘除归属标签本身只会让 Service 脱离 operator 的管理范围，不影响其正常提供服务，因此这一步可以安排在整个下线序列最前面、对两个集群一次性统一执行，不需要等到逐业务集群执行到对应步骤时才处理。
+多集群东西向网关的 Service 与单集群业务网关不同：单集群业务网关的 Service 由 `GatewayDeploy` 持有 `ownerReferences`，而东西向网关的 Service 是控制面自身 `IstioOperator` CR 的一部分（`IngressGateways` 组件），携带 `install.operator.istio.io/owning-resource`/`operator.istio.io/managed` 标签，与[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)中处理未承载业务流量的默认网关（`istio-ingressgateway`）属于同一种归属机制。这意味着后续任意一个集群执行到该文「删除网关与控制面 IstioOperator CR」一步、删除该集群的 IstioOperator CR 时，东西向网关的 Service 都会一并被回收——但此时 v2 东西向网关仍然依赖这个共享的 Service 提供跨集群入口，不能让它被删除。摘除归属标签本身只会让 Service 脱离 operator 的管理范围，不影响其正常提供服务，因此这一步可以安排在整个下线序列最前面、对两个集群一次性统一执行，不需要等到逐业务集群执行到对应步骤时才处理。
 
 对两个集群分别执行以下发现命令，确认 Service 当前携带这两个标签：
 
@@ -293,7 +293,7 @@ kubectl --kubeconfig <cluster2-kubeconfig> -n istio-system get svc istio-eastwes
 
 ### 处理 global：一并处理 ServiceMeshGroup
 
-两集群东西向网关 Service 的归属标签摘除后，进入 global 编排源头的处理。执行[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)“（global 集群）删除 ServiceMesh CR”一步时，该步骤删除的 3 个 admission webhook 配置本身就覆盖 `ServiceMeshGroup`（其中 `servicemeshgroup-v1alpha1-mutation` 专为其设置），冻结的 `global-asm-controller` 也是同一个控制器，不需要额外准备。按该文步骤依次删除两个业务集群各自的 `ServiceMesh` CR 并摘除 finalizer（`<cluster-name>` 分别替换为两个集群的名称）后，一并处理 `ServiceMeshGroup`：
+两集群东西向网关 Service 的归属标签摘除后，进入 global 编排源头的处理。执行[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)「（global 集群）删除 ServiceMesh CR」一步时，该步骤删除的 3 个 admission webhook 配置本身就覆盖 `ServiceMeshGroup`（其中 `servicemeshgroup-v1alpha1-mutation` 专为其设置），冻结的 `global-asm-controller` 也是同一个控制器，不需要额外准备。按该文步骤依次删除两个业务集群各自的 `ServiceMesh` CR 并摘除 finalizer（`<cluster-name>` 分别替换为两个集群的名称）后，一并处理 `ServiceMeshGroup`：
 
 ```bash
 # 在 global 集群上下文执行
@@ -301,11 +301,11 @@ kubectl --kubeconfig <global-kubeconfig> -n cpaas-system delete servicemeshgroup
 kubectl --kubeconfig <global-kubeconfig> -n cpaas-system patch servicemeshgroup <mesh-group-name> --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]'
 ```
 
-`<mesh-group-name>` 可以通过 `kubectl --kubeconfig <global-kubeconfig> get servicemeshgroup` 获取。确认两个 `ServiceMesh` CR 与 `ServiceMeshGroup` 均已消失、两个业务集群的 istio-system 命名空间均完好无损后，继续执行该文“（global 集群）卸载 Service Mesh Essentials 插件”一步，两个业务集群共用这一次操作，不需要重复。
+`<mesh-group-name>` 可以通过 `kubectl --kubeconfig <global-kubeconfig> get servicemeshgroup` 获取。确认两个 `ServiceMesh` CR 与 `ServiceMeshGroup` 均已消失、两个业务集群的 istio-system 命名空间均完好无损后，继续执行该文「（global 集群）卸载 Service Mesh Essentials 插件」一步，两个业务集群共用这一次操作，不需要重复。
 
 ### 逐业务集群执行下线序列
 
-global 侧处理完成后，对 cluster1、cluster2 分别执行[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)中业务集群侧的全部步骤（复核备份、删除业务集群自研治理 CR、删除 asm CR、删除 v1 系订阅与 CSV、删除网关与控制面 IstioOperator CR、清理残留标签与 CRD）。建议先完整完成一个集群的步骤并验证通过，再处理另一个集群。东西向网关 Service 的归属标签已经在进入本序列前摘除，执行到“删除网关与控制面 IstioOperator CR”一步、删除控制面 `<control-plane-iop>` 时不会将其一并回收。稳妥起见，删除该集群控制面 `<control-plane-iop>` 前可再执行一次上文的标签确认命令，确认 `install.operator.istio.io/owning-resource`/`operator.istio.io/managed` 仍不存在（防止 istio-operator 在间隔期将其调和回写）；若已被回写则重新摘除后再删。
+global 侧处理完成后，对 cluster1、cluster2 分别执行[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)中业务集群侧的全部步骤（复核备份、删除业务集群自研治理 CR、删除 asm CR、删除 v1 系订阅与 CSV、删除网关与控制面 IstioOperator CR、清理残留标签与 CRD）。建议先完整完成一个集群的步骤并验证通过，再处理另一个集群。东西向网关 Service 的归属标签已经在进入本序列前摘除，执行到「删除网关与控制面 IstioOperator CR」一步、删除控制面 `<control-plane-iop>` 时不会将其一并回收。稳妥起见，删除该集群控制面 `<control-plane-iop>` 前可再执行一次上文的标签确认命令，确认 `install.operator.istio.io/owning-resource`/`operator.istio.io/managed` 仍不存在（防止 istio-operator 在间隔期将其调和回写）；若已被回写则重新摘除后再删。
 
 每个集群删除控制面 `<control-plane-iop>` 之后，确认东西向网关的 Service 与 v2 网关 Deployment 均未受影响：
 
@@ -324,7 +324,7 @@ kubectl --kubeconfig <cluster1-kubeconfig> -n istio-system get deploy istio-east
 
 ### 每集群独立签发中间证书
 
-根证书全局只有一份，从 global 集群导出一次即可复用于两个集群的签发（见[完成迁移](../migrating-a-single-cluster-mesh/finalizing-the-migration.mdx)“CA 生命周期交接”一节的导出步骤）。建议参照[多集群配置概览](../../installing/multi-cluster/configuration-overview.mdx)中区分 East/West 集群签发中间证书的做法，为每个集群的 `intermediate.conf` 设置不同的 `L`（Locality）字段（例如 `L=<cluster-name>`），使用同一份根证书为两个集群分别签发 subject 可区分、但同根互信的中间证书；两侧证书仍然共享根证书，签发后跨集群 mTLS 不受影响。其余重建 `cacerts`、验证热加载的步骤与单集群完全一致，分别在两个集群上执行一遍即可。
+根证书全局只有一份，从 global 集群导出一次即可复用于两个集群的签发（见[完成迁移](../migrating-a-single-cluster-mesh/finalizing-the-migration.mdx)「CA 生命周期交接」一节的导出步骤）。建议参照[多集群配置概览](../../installing/multi-cluster/configuration-overview.mdx)中区分 East/West 集群签发中间证书的做法，为每个集群的 `intermediate.conf` 设置不同的 `L`（Locality）字段（例如 `L=<cluster-name>`），使用同一份根证书为两个集群分别签发 subject 可区分、但同根互信的中间证书；两侧证书仍然共享根证书，签发后跨集群 mTLS 不受影响。其余重建 `cacerts`、验证热加载的步骤与单集群完全一致，分别在两个集群上执行一遍即可。
 
 ### Kiali 多集群配置
 

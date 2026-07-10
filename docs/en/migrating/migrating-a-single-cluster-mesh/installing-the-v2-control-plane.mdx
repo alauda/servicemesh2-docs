@@ -4,7 +4,7 @@ weight: 10
 
 # 安装 v2 控制面（并存部署）
 
-本文对应[迁移概览](../migration-overview.mdx)路线图中的 P1 准备可观测性与 P2 并存安装 v2 控制面两个阶段：先为即将并存运行的 v2 控制面准备好可观测性能力，再创建 v2 的 `IstioCNI`/`Istio` 等资源，使其与 Mesh v1 控制面在同一个集群内并存运行、对 Mesh v1 零扰动。开始操作前，请确认已经完成[迁移准备与前置检查](../preparing-for-migration.mdx)中的全部检查项；本文使用的占位符延续[迁移概览](../migration-overview.mdx)"约定"小节中的约定，不再重复说明。
+本文对应[迁移概览](../migration-overview.mdx)路线图中的 P1 准备可观测性与 P2 并存安装 v2 控制面两个阶段：先为即将并存运行的 v2 控制面准备好可观测性能力，再创建 v2 的 `IstioCNI`/`Istio` 等资源，使其与 Mesh v1 控制面在同一个集群内并存运行、对 Mesh v1 零扰动。开始操作前，请确认已经完成[迁移准备与前置检查](../preparing-for-migration.mdx)中的全部检查项；本文使用的占位符延续[迁移概览](../migration-overview.mdx)「约定」小节中的约定，不再重复说明。
 
 ## 准备可观测性
 
@@ -171,7 +171,7 @@ kubectl apply -f v2-monitors.yaml
 ### （条件步骤）降级 Mesh v1 istiod 的反亲和规则
 
 <Directive type="warning" title="仅适用于单节点集群，或 Mesh v1 istiod 所在节点是唯一可调度节点的场景">
-判定方法见[迁移准备与前置检查](../preparing-for-migration.mdx)"单节点或 istiod 节点重合的集群识别"一节；多节点集群通常不受影响，可以跳过本步骤，直接从下一步开始创建 `IstioCNI` 资源。
+判定方法见[迁移准备与前置检查](../preparing-for-migration.mdx)「单节点或 istiod 节点重合的集群识别」一节；多节点集群通常不受影响，可以跳过本步骤，直接从下一步开始创建 `IstioCNI` 资源。
 
 执行本步骤会触发 v1 istiod 滚动一次；滚动期间数据面代理已经建立的连接不受影响，业务探测应保持零中断。
 </Directive>

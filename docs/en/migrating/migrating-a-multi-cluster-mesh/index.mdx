@@ -30,7 +30,7 @@ kubectl -n istio-system get cm istio-1-22 -o jsonpath='{.data.mesh}'
 kubectl -n istio-system get svc istio-eastwestgateway -o jsonpath='{.metadata.labels.topology\.istio\.io/network}'
 ```
 
-如果命令返回 `NotFound`，说明该集群没有部署东西向网关，记录为“无”；如果命令正常返回，记录输出的 network 取值。
+如果命令返回 `NotFound`，说明该集群没有部署东西向网关，记录为「无」；如果命令正常返回，记录输出的 network 取值。
 
 东西向网关只是 network 的其中一处判定来源。即使集群上没有东西向网关（单网络环境的常见情形），Mesh v1 仍可能通过 istio-system 命名空间标签或安装 values 配置了 network，因此继续读取这两处来源并分别记录（输出为空则记录为「无」）：
 
@@ -87,7 +87,7 @@ kubectl --kubeconfig <cluster1-kubeconfig> -n <mesh-namespace> exec deploy/<work
 
 | 判定特征 | 单网络拓扑 | 多网络拓扑 |
 |---|---|---|
-| 两集群 network 标签 | 均为“无”，或两侧取值相同 | 两侧均存在东西向网关，且取值不同 |
+| 两集群 network 标签 | 均为「无」，或两侧取值相同 | 两侧均存在东西向网关，且取值不同 |
 | 跨集群 Pod IP 直连 | 可达 | 不可达 |
 | 东西向网关 | 不存在 | 两集群各自存在 |
 | 对应迁移路径 | [迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx) | [迁移多网络多集群网格](./migrating-a-multi-network-mesh.mdx) |

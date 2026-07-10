@@ -18,7 +18,7 @@ weight: 30
 由此带来两个后果：
 
 - 切换命名空间标签后，应**立即**部署 v2 金丝雀网关并完成就绪验证（监听器绑定与实际请求验证），尽量缩短 v1 旧网关不可重建的暴露窗口；**在 v2 金丝雀网关就绪验证通过之前，严禁缩容或删除 v1 旧网关**；
-- 回滚方式也随之改变：一旦切换完成，回滚不能再依赖"把 v1 旧网关重新扩容"，只能通过修复 v2 网关，或者将命名空间的 rev 标签切回并删除 v2 Pod 来实现，具体步骤见[回滚指引](../rollback.mdx)。
+- 回滚方式也随之改变：一旦切换完成，回滚不能再依赖「把 v1 旧网关重新扩容」，只能通过修复 v2 网关，或者将命名空间的 rev 标签切回并删除 v2 Pod 来实现，具体步骤见[回滚指引](../rollback.mdx)。
 :::
 
 ## 金丝雀网关部署与切流
@@ -52,7 +52,7 @@ kubectl -n <gateway-namespace> get gateways.networking.istio.io -o jsonpath='{ra
 kubectl label ns <gateway-namespace> istio.io/rev=<v2-revision> --overwrite
 ```
 
-如上文"顺序总则"所述，这一步只影响后续新建 Pod 的注入归属，不会触发命名空间内现有 Pod 的重建，可以执行以下命令确认现有网关 Pod 未受影响（`AGE` 应与切换前一致）：
+如上文「顺序总则」所述，这一步只影响后续新建 Pod 的注入归属，不会触发命名空间内现有 Pod 的重建，可以执行以下命令确认现有网关 Pod 未受影响（`AGE` 应与切换前一致）：
 
 ```bash
 kubectl -n <gateway-namespace> get pod
@@ -115,11 +115,11 @@ spec:
 ```
 
 <Callouts>
-  1. 初始建议从 1 个副本开始部署，便于下一步在扩大流量之前先完成就绪验证；正式切流时在"金丝雀切流"步骤中再调整副本数。
+  1. 初始建议从 1 个副本开始部署，便于下一步在扩大流量之前先完成就绪验证；正式切流时在「金丝雀切流」步骤中再调整副本数。
   2. 使用网关注入模板（而不是默认的 sidecar 注入模板），Mesh v2 会将该 Pod 的 Envoy 配置为独立网关，而不是挂在应用容器旁的 sidecar 代理。
   3. 这一行开始，标签必须包含前面第一条发现命令（Service selector）输出中的全部键值对；以上仅为占位符示意，请替换为该命令的实际输出内容。
   4. 同时必须包含第二条发现命令（`Gateway` selector）输出中的全部键值对（与上一行重复的键只需保留一份）。**这个并集是本步骤最容易遗漏的地方：只并入 Service selector 而遗漏 `Gateway` selector 中的键值对，会导致监听器不绑定、请求返回 404。**
-  5. 替换为[安装 v2 控制面](./installing-the-v2-control-plane.mdx)"获取 v2 revision 名称"一步获取到的 `<v2-revision>`；此时命名空间的 rev 标签已经在上一步切换到该修订，Pod 创建后会被 Mesh v2 的 webhook 正确注入。
+  5. 替换为[安装 v2 控制面](./installing-the-v2-control-plane.mdx)「获取 v2 revision 名称」一步获取到的 `<v2-revision>`；此时命名空间的 rev 标签已经在上一步切换到该修订，Pod 创建后会被 Mesh v2 的 webhook 正确注入。
   6. 用于和 v1 旧网关的 Pod 区分开的金丝雀标识标签。如果您环境中的 Service selector 或 `Gateway` selector 恰好已经使用了名为 `gateway-revision` 的键，请改用其他键名（例如 `canary-revision`）避免冲突。
   7. 与前面创建的 `ServiceAccount` 同名。
   8. 设置为 `auto`，Pod 启动时自动匹配控制面下发的代理镜像版本。
@@ -191,7 +191,7 @@ kubectl -n <gateway-namespace> scale deploy <gateway-name> --replicas=0
 
 ### 处理出口网关与默认网关
 
-出口网关（egress gateway）按照与入口网关完全相同的流程迁移：将 `<gateway-name>` 替换为出口网关的名称，重复"核对网关 Service 属主并采集 selector 信息"到"金丝雀切流"的全部步骤即可。
+出口网关（egress gateway）按照与入口网关完全相同的流程迁移：将 `<gateway-name>` 替换为出口网关的名称，重复「核对网关 Service 属主并采集 selector 信息」到「金丝雀切流」的全部步骤即可。
 
 istio-system 命名空间下 Mesh v1 的默认网关（`istio-ingressgateway`）需要先判断它是否承载真实业务流量：
 

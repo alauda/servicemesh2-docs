@@ -4,30 +4,30 @@ weight: 30
 
 # 切换到多网络拓扑
 
-本文描述[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)“迁移完成后的拓扑选择”一节中，选择切换到多网络拓扑之后需要执行的具体步骤：将已经完成迁移、处于单网络终态的 Mesh v2 网格，切换为多网络（multi-network）拓扑——为两个业务集群分别部署东西向网关，跨集群流量改为经网关转发，使网格回到 Mesh v2 官方支持矩阵认证的拓扑形态。
+本文描述[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)「迁移完成后的拓扑选择」一节中，选择切换到多网络拓扑之后需要执行的具体步骤：将已经完成迁移、处于单网络终态的 Mesh v2 网格，切换为多网络（multi-network）拓扑——为两个业务集群分别部署东西向网关，跨集群流量改为经网关转发，使网格回到 Mesh v2 官方支持矩阵认证的拓扑形态。
 
 :::warning 本文步骤未经端到端实机演练
 本文所述为迁移完成后的独立变更操作，基于多网络部署的标准做法整理。执行前，应先在与生产同形态的测试环境中完整演练一轮并确认结果符合预期。
 :::
 
-本文描述的操作与[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)所述的迁移流程是两次完全独立的变更：必须在迁移全部完成、网格稳定运行之后，另行安排一个独立的变更窗口执行，不能与迁移过程中的任何步骤混排或穿插进行。与迁移阶段的要求一致，本文操作全程也应当保持业务探测持续运行；一旦出现预期之外的失败，应立即停止并评估是否需要回滚（见下文“回滚”一节）。
+本文描述的操作与[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)所述的迁移流程是两次完全独立的变更：必须在迁移全部完成、网格稳定运行之后，另行安排一个独立的变更窗口执行，不能与迁移过程中的任何步骤混排或穿插进行。与迁移阶段的要求一致，本文操作全程也应当保持业务探测持续运行；一旦出现预期之外的失败，应立即停止并评估是否需要回滚（见下文「回滚」一节）。
 
 ## 前提
 
 开始本文操作之前，请确认以下条件已经满足：
 
 - 已经完成[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)描述的全部迁移步骤，两个业务集群均已进入 Mesh v2 独占、单网络配置的终态，并已经稳定运行一段时间，业务探测器持续处于运行状态；
-- 已经按照[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)“迁移完成后的拓扑选择”一节的判断标准，确定切换到多网络拓扑是当前环境的正确选择；
+- 已经按照[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)「迁移完成后的拓扑选择」一节的判断标准，确定切换到多网络拓扑是当前环境的正确选择；
 - 已经规划好独立的变更窗口，明确本文操作不与其他任何变更（尤其是仍在进行中的迁移步骤）混排执行；
-- 已经为两个集群的东西向网关规划好即将使用的对外地址（LoadBalancer 或 NodePort），且这两个地址在网络层面具备跨集群可达性——具体的可达性预检方法见下文“部署每集群 v2 东西向网关”一节；如果规划阶段已经能够确认这一点（例如已知两个集群所在网络之间的防火墙规则允许 15443 端口互通），也可以提前完成确认。
+- 已经为两个集群的东西向网关规划好即将使用的对外地址（LoadBalancer 或 NodePort），且这两个地址在网络层面具备跨集群可达性——具体的可达性预检方法见下文「部署每集群 v2 东西向网关」一节；如果规划阶段已经能够确认这一点（例如已知两个集群所在网络之间的防火墙规则允许 15443 端口互通），也可以提前完成确认。
 
 <Steps>
 
 ### 部署每集群 v2 东西向网关
 
-两个集群此前处于单网络拓扑，都不存在东西向网关（见[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)“与多网络路径的差异”一节 P2.5 行）。本步骤需要为两个集群从零创建东西向网关的完整资源集合（Service、`Gateway`、Deployment），而不是像[迁移多网络多集群网格](./migrating-a-multi-network-mesh.mdx)“P2.5 部署东西向网关”一节那样只需将 v2 Pod 加入一个已经由 Mesh v1 创建好的 Service。
+两个集群此前处于单网络拓扑，都不存在东西向网关（见[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)「与多网络路径的差异」一节 P2.5 行）。本步骤需要为两个集群从零创建东西向网关的完整资源集合（Service、`Gateway`、Deployment），而不是像[迁移多网络多集群网格](./migrating-a-multi-network-mesh.mdx)「P2.5 部署东西向网关」一节那样只需将 v2 Pod 加入一个已经由 Mesh v1 创建好的 Service。
 
-Deployment 的资源形态——gateway injection 注入方式、容器安全上下文、资源限额——与该节展示的定义完全相同，直接复用即可；由于这里的 Service、`Gateway` 都是全新创建，不需要该节中“取并集覆盖既有 selector”的额外标签，Pod 只需携带 `app: istio-eastwestgateway`、`istio: eastwestgateway`、`topology.istio.io/network: <network-1>`（cluster2 上下文替换为 `<network-2>`）、`istio.io/rev: <v2-revision>` 四个标签，`<v2-revision>` 使用迁移阶段已经获取到的取值；独立 `ServiceAccount` 的创建方式同样复用该节说明（名称改为 `istio-eastwestgateway`），具体定义见 [Installing a gateway via gateway injection](../../gateways/gateway-installation/installing-a-gateway-via-injection.mdx)。完整的 Deployment 定义如下：
+Deployment 的资源形态——gateway injection 注入方式、容器安全上下文、资源限额——与该节展示的定义完全相同，直接复用即可；由于这里的 Service、`Gateway` 都是全新创建，不需要该节中「取并集覆盖既有 selector」的额外标签，Pod 只需携带 `app: istio-eastwestgateway`、`istio: eastwestgateway`、`topology.istio.io/network: <network-1>`（cluster2 上下文替换为 `<network-2>`）、`istio.io/rev: <v2-revision>` 四个标签，`<v2-revision>` 使用迁移阶段已经获取到的取值；独立 `ServiceAccount` 的创建方式同样复用该节说明（名称改为 `istio-eastwestgateway`），具体定义见 [Installing a gateway via gateway injection](../../gateways/gateway-installation/installing-a-gateway-via-injection.mdx)。完整的 Deployment 定义如下：
 
 ```yaml
 apiVersion: apps/v1
@@ -83,10 +83,10 @@ spec:
   5. 替换为[安装 v2 控制面](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx)中获取到的 `<v2-revision>`；由于 istio-system 命名空间没有 rev 标签，这一行是 Pod 被 Mesh v2 正确注入的唯一依据。
 </Callouts>
 
-`Gateway` 资源直接复用该节“如果……还没有面向 15443 端口的东西向 Gateway 资源”处给出的示例，selector 同样使用 `istio: eastwestgateway`。
+`Gateway` 资源直接复用该节「如果……还没有面向 15443 端口的东西向 Gateway 资源」处给出的示例，selector 同样使用 `istio: eastwestgateway`。
 
 <Directive type="note" title="此时集群内只有 Mesh v2 一个控制面">
-[迁移多网络多集群网格](./migrating-a-multi-network-mesh.mdx)中的东西向网关部署发生在 v1、v2 控制面并存阶段，其中关于“v1、v2 网关并存是安全的”的说明在本文场景下不适用——本文的前提是迁移已经完成，集群内不存在 v1 控制面，按上文的资源定义直接部署即可，不需要关注并存相关的说明。
+[迁移多网络多集群网格](./migrating-a-multi-network-mesh.mdx)中的东西向网关部署发生在 v1、v2 控制面并存阶段，其中关于「v1、v2 网关并存是安全的」的说明在本文场景下不适用——本文的前提是迁移已经完成，集群内不存在 v1 控制面，按上文的资源定义直接部署即可，不需要关注并存相关的说明。
 </Directive>
 
 额外需要创建的是 Service 本身（多网络路径场景下这个 Service 已经由 Mesh v1 预先创建，本场景没有）：
@@ -119,7 +119,7 @@ kubectl --kubeconfig <cluster1-kubeconfig> apply -f eastwestgateway.yaml
 kubectl --kubeconfig <cluster2-kubeconfig> apply -f eastwestgateway.yaml
 ```
 
-确认两个集群的东西向网关 Pod 已经就绪，并已同步到 v2 修订（期望输出参考[迁移多网络多集群网格](./migrating-a-multi-network-mesh.mdx)“P2.5 部署东西向网关”一节的验证部分）：
+确认两个集群的东西向网关 Pod 已经就绪，并已同步到 v2 修订（期望输出参考[迁移多网络多集群网格](./migrating-a-multi-network-mesh.mdx)「P2.5 部署东西向网关」一节的验证部分）：
 
 ```bash
 kubectl --kubeconfig <cluster1-kubeconfig> -n istio-system get pod -l app=istio-eastwestgateway
@@ -171,7 +171,7 @@ kubectl --kubeconfig <cluster2-kubeconfig> -n istio-system get pod -l app=istio-
 
 ### 滚动业务工作负载
 
-上一步的端点切换只更新了 istiod 下发给 Envoy 的配置，Pod 本身并没有被打上 network 相关的注入期标签，处于“路由已经切换、标签尚未补齐”的过渡状态——功能可用，但不如显式标签清晰可靠。为使标签与实际状态完全对齐，仍然需要滚动重启业务工作负载，使新建 Pod 在注入时获得 network 标签：
+上一步的端点切换只更新了 istiod 下发给 Envoy 的配置，Pod 本身并没有被打上 network 相关的注入期标签，处于「路由已经切换、标签尚未补齐」的过渡状态——功能可用，但不如显式标签清晰可靠。为使标签与实际状态完全对齐，仍然需要滚动重启业务工作负载，使新建 Pod 在注入时获得 network 标签：
 
 ```bash
 kubectl --kubeconfig <cluster1-kubeconfig> -n <mesh-namespace> rollout restart deploy
@@ -210,7 +210,7 @@ ENDPOINT                                    STATUS      OUTLIER CHECK     CLUSTE
 <cluster2-eastwestgateway-address>:15443    HEALTHY     OK                outbound|<port>||<peer-service>.<mesh-namespace>.svc.cluster.local
 ```
 
-`ENDPOINT` 列此时应为对端集群东西向网关的地址与 15443 端口，而不再是对端 Pod 的直接 IP——这与[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)“单网络专属验证”一节中的预期结果正好相反，这个变化正是本文切换操作生效的标志。
+`ENDPOINT` 列此时应为对端集群东西向网关的地址与 15443 端口，而不再是对端 Pod 的直接 IP——这与[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)「单网络专属验证」一节中的预期结果正好相反，这个变化正是本文切换操作生效的标志。
 
 mTLS 不受本次切换影响：东西向网关以 `AUTO_PASSTHROUGH` 模式透传 TLS 连接，由发起端与接收端的 sidecar 直接完成 mTLS 握手，网关本身不解密流量；两个集群的证书链在整个切换过程中都没有变化，跨集群 mTLS 互信不需要任何额外操作即可继续成立。
 
@@ -234,4 +234,4 @@ kubectl --kubeconfig <cluster2-kubeconfig> label ns istio-system topology.istio.
 
 两处配置撤销后，istiod 会再次滚动，端点重新回到迁移完成时的单网络配置（Pod IP 直连）。是否需要连带删除两个集群新部署的东西向网关，取决于是否计划重新尝试切换：如果只是临时回退、后续还会再次尝试，可以将网关 Deployment 保留（缩容或不缩容均不影响单网络路径下的 Pod 直连，因为此时跨集群端点的判定已经不再依赖网关）；如果确定不再需要，参考[下线 Mesh v1](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)中处理网关资源的思路手工删除。
 
-回滚完成后，重复[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)“单网络专属验证”一节中的 `istioctl proxy-config endpoints` 检查，确认端点已经恢复为对端 Pod IP 直连。
+回滚完成后，重复[迁移单网络多集群网格](./migrating-a-single-network-mesh.mdx)「单网络专属验证」一节中的 `istioctl proxy-config endpoints` 检查，确认端点已经恢复为对端 Pod IP 直连。

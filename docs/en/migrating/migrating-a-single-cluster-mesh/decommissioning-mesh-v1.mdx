@@ -21,7 +21,7 @@ weight: 40
 - [ ] 全部业务命名空间的 `istio.io/rev` 标签均已指向 `<v2-revision>`，且集群中不存在任何仍然连接 Mesh v1 istiod 的 proxy；
 - [ ] 全部网关（含出口网关、多集群东西向网关、istio-system 默认网关）均已由 Mesh v2 承载，或已确认未承载业务流量；
 - [ ] [迁移准备与前置检查](../preparing-for-migration.mdx)阶段建立的备份完整可用（含本文步骤 1 的备份复核）；
-- [ ] 已经就"进入本阶段后不可回退"取得干系人的明确确认。
+- [ ] 已经就「进入本阶段后不可回退」取得干系人的明确确认。
 
 前两项可以用以下命令核实：
 
@@ -37,13 +37,13 @@ istioctl proxy-status --revision 1-22
 
 ### 例外清单
 
-以下两类场景属于已知例外，不需要按"未完成切换"处理：
+以下两类场景属于已知例外，不需要按「未完成切换」处理：
 
-- **Mesh v1 自有的默认网关（`istio-ingressgateway`）**：如果在[迁移网关](./migrating-gateways.mdx)阶段已经确认它没有承载真实业务流量（监听器中没有业务端口），可以豁免"无 proxy 连接 v1 istiod"这一项检查——它会在下文步骤 7 删除控制面 `IstioOperator` CR 时随之自动回收，不需要单独处理。
+- **Mesh v1 自有的默认网关（`istio-ingressgateway`）**：如果在[迁移网关](./migrating-gateways.mdx)阶段已经确认它没有承载真实业务流量（监听器中没有业务端口），可以豁免「无 proxy 连接 v1 istiod」这一项检查——它会在下文步骤 7 删除控制面 `IstioOperator` CR 时随之自动回收，不需要单独处理。
 - **带 `istio.io/rev=1-22` 标签但从未实际注入的命名空间**：[迁移准备与前置检查](../preparing-for-migration.mdx)阶段已经甄别出这类命名空间（例如仅使用 OTel Java Agent、未注入 sidecar 的场景）。它们不需要切换到 Mesh v2 修订，而是在下文步骤 8 中直接摘除标签。
 
 :::warning 本阶段是并存灰度迁移方案中唯一的不可回退点
-下方手工下线序列执行过程中，Mesh v1 的控制面、数据面与全部治理资源会被逐步删除。一旦开始执行，不再存在"改标签""缩容再扩容"这类轻量回滚手段：如果需要恢复 Mesh v1，唯一路径是依据[迁移准备与前置检查](../preparing-for-migration.mdx)阶段建立的备份，按灾难恢复级别重新安装 Mesh v1 的全部组件，恢复所需的物料清单见[回滚指引](../rollback.mdx)。请在确认上方 Go/No-Go 检查单全部通过之后，再开始执行下方步骤。
+下方手工下线序列执行过程中，Mesh v1 的控制面、数据面与全部治理资源会被逐步删除。一旦开始执行，不再存在「改标签」「缩容再扩容」这类轻量回滚手段：如果需要恢复 Mesh v1，唯一路径是依据[迁移准备与前置检查](../preparing-for-migration.mdx)阶段建立的备份，按灾难恢复级别重新安装 Mesh v1 的全部组件，恢复所需的物料清单见[回滚指引](../rollback.mdx)。请在确认上方 Go/No-Go 检查单全部通过之后，再开始执行下方步骤。
 :::
 
 ## 手工下线序列
@@ -67,7 +67,7 @@ ls -la "$BACKUP_DIR/gateway-services.yaml"
 
 ### （global 集群）删除 ServiceMesh CR
 
-global 集群侧的 `ServiceMesh` CR 是 `global-asm-controller` 编排业务集群网格生命周期的入口：只要控制器处于运行状态，对该 CR 的删除请求会被控制器感知并执行完整的删除流程——这正是页首告警中提到的、会摧毁整个 istio-system 命名空间的那条路径。手工下线的核心思路是：先把控制器冻结在停止状态，再删除 CR，让删除请求永远停留在"已标记待删除、无人处理"的状态，从而只清除 global 侧的编排记录，不触发业务集群侧的任何实际删除动作。
+global 集群侧的 `ServiceMesh` CR 是 `global-asm-controller` 编排业务集群网格生命周期的入口：只要控制器处于运行状态，对该 CR 的删除请求会被控制器感知并执行完整的删除流程——这正是页首告警中提到的、会摧毁整个 istio-system 命名空间的那条路径。手工下线的核心思路是：先把控制器冻结在停止状态，再删除 CR，让删除请求永远停留在「已标记待删除、无人处理」的状态，从而只清除 global 侧的编排记录，不触发业务集群侧的任何实际删除动作。
 
 global 集群侧有 3 个与网格编排相关的 admission webhook 配置：
 
@@ -252,7 +252,7 @@ kubectl -n istio-system scale deploy asm-operator --replicas=1
 kubectl delete asms.operator.alauda.io asm --wait=false
 ```
 
-`--wait=false` 是必须的：这条删除命令会触发 asm-operator 执行 Helm 卸载前的预检查钩子，而这个钩子按照"Pod 是否带有 sidecar 容器"清点仍在使用 Mesh v1 的工作负载，而不是按照 Pod 实际连接的控制面判断——在并存灰度迁移场景下，已经切换到 Mesh v2 的 Pod 仍然带着 sidecar 容器，会被钩子持续误判为"仍在使用 Mesh v1"，导致检查永远无法通过、删除操作无限重试。不要额外加 `--wait`/`--timeout` 等待这个删除自然完成。
+`--wait=false` 是必须的：这条删除命令会触发 asm-operator 执行 Helm 卸载前的预检查钩子，而这个钩子按照「Pod 是否带有 sidecar 容器」清点仍在使用 Mesh v1 的工作负载，而不是按照 Pod 实际连接的控制面判断——在并存灰度迁移场景下，已经切换到 Mesh v2 的 Pod 仍然带着 sidecar 容器，会被钩子持续误判为「仍在使用 Mesh v1」，导致检查永远无法通过、删除操作无限重试。不要额外加 `--wait`/`--timeout` 等待这个删除自然完成。
 
 摘除 finalizer，绕过卡住的预检查钩子：
 
@@ -376,7 +376,7 @@ kubectl delete mutatingwebhookconfiguration istio-revision-tag-default 2>/dev/nu
 kubectl delete validatingwebhookconfiguration istiod-default-validator 2>/dev/null
 ```
 
-摘除全部业务命名空间上的 `cpaas.io/serviceMesh` 标签，包括 Go/No-Go 检查单例外清单中"带 rev 标签但从未注入"的命名空间：
+摘除全部业务命名空间上的 `cpaas.io/serviceMesh` 标签，包括 Go/No-Go 检查单例外清单中「带 rev 标签但从未注入」的命名空间：
 
 ```bash
 kubectl label ns <mesh-namespace> cpaas.io/serviceMesh-

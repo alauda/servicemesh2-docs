@@ -35,7 +35,7 @@ kubectl get mutatingwebhookconfigurations,validatingwebhookconfigurations | grep
 
 **原因**：对应的控制器（`global-asm-controller`/`asm-controller`）副本数已经降为 0，但其注册的 admission webhook 配置尚未删除，且 `failurePolicy` 为 `Fail`：后端没有可用 Pod 处理请求，凡是匹配该 webhook 规则的请求都会因连接失败被拦截。
 
-**处理**：先删除对应的 webhook 配置，再重试 patch；完整的删除顺序见[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)「（global 集群）删除 ServiceMesh CR」与「删除业务集群自研治理 CR」两节。**严禁通过重新调大控制器副本数来"解锁" webhook**：如果对应 CR 已经带有 `deletionTimestamp`，控制器一旦恢复运行会立即感知并执行完整删除流程，这正是页首红线要规避的路径。
+**处理**：先删除对应的 webhook 配置，再重试 patch；完整的删除顺序见[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)「（global 集群）删除 ServiceMesh CR」与「删除业务集群自研治理 CR」两节。**严禁通过重新调大控制器副本数来「解锁」webhook**：如果对应 CR 已经带有 `deletionTimestamp`，控制器一旦恢复运行会立即感知并执行完整删除流程，这正是页首红线要规避的路径。
 
 ### asm CR 删除卡住，反复报 proxies still pointing to the control plane
 
@@ -45,7 +45,7 @@ kubectl get mutatingwebhookconfigurations,validatingwebhookconfigurations | grep
 kubectl get asms.operator.alauda.io asm -o jsonpath='{.metadata.deletionTimestamp}{"\n"}{.metadata.finalizers}{"\n"}'
 ```
 
-**原因**：Operator 的卸载前置检查钩子按照"Pod 是否携带 sidecar 容器"清点仍在使用 Mesh v1 的工作负载，而不是按 Pod 实际连接的控制面判断。并存灰度迁移场景下，已经切换到 Mesh v2 的 Pod 仍然带着 sidecar 容器，会被持续误判为"仍在使用 Mesh v1"，检查永远无法通过。
+**原因**：Operator 的卸载前置检查钩子按照「Pod 是否携带 sidecar 容器」清点仍在使用 Mesh v1 的工作负载，而不是按 Pod 实际连接的控制面判断。并存灰度迁移场景下，已经切换到 Mesh v2 的 Pod 仍然带着 sidecar 容器，会被持续误判为「仍在使用 Mesh v1」，检查永远无法通过。
 
 **处理**：见[下线 Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx)「删除 asm CR」一节：摘除 asm CR 的 finalizer 绕开卡住的检查钩子，再核对对应的 Helm release 是否已被自动清理，未清理的资源按 release manifest 手工删除。
 
