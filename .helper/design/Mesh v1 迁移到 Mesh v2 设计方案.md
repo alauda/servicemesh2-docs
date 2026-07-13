@@ -11,6 +11,8 @@
 
 ACP 当前处于 4.3 版本，Mesh v1（Alauda Service Mesh，基于社区已废弃的 istio-operator + 自研管控面）将于 4.4 下线，需要在 4.3 版本周期内把存量网格迁移到 Mesh v2（基于 Sail-Operator 的 servicemesh-operator2）。
 
+支持 Mesh v1 迁移的 ACP 版本：4.1.1+，4.2.x, 4.3.x
+
 **终态目标**：
 
 - 业务集群运行 Mesh v2：`servicemesh-operator2` + `Istio`/`IstioCNI` CR（istio v1.28.x，RevisionBased）+ Kiali + OTel v2 + Jaeger v2；
@@ -18,7 +20,9 @@ ACP 当前处于 4.3 版本，Mesh v1（Alauda Service Mesh，基于社区已废
 - 工作负载 sidecar、入口/出口网关、可观测管道全部切换到 v2；
 - 根信任链保持同一根 CA（"ASM Istio Root CA"）不变，业务证书链在迁移前后可互相验证。
 
-**方案取向**：主推「并存灰度」（业务流量尽量不中断），同时提供「停机卸载重装」作为测试/非生产环境的简化路径（附录 A）（TODO: 待定）。
+**方案取向**：主推「并存灰度」（业务流量尽量不中断），同时提供「停机卸载重装」作为测试/非生产环境的简化路径（附录 A）。
+
+**方案取向结论**：只做「并存灰度」（业务流量尽量不中断），暂时不提供「停机卸载重装」方案（附录 A）。
 
 ---
 
@@ -343,9 +347,11 @@ kubectl -n istio-system delete deploy istio-operator-122   # + 其 SA/ClusterRol
 kubectl delete mutatingwebhookconfiguration istio-revision-tag-default 2>/dev/null
 kubectl delete validatingwebhookconfiguration istiod-default-validator 2>/dev/null
 
-# ⑧ 清 ns 上的 v1 标签 与 asm CRD（确认无实例后）
+# ⑧ 清 ns 上的 v1 标签 与 asm CRD 对应的残留资源（asm.alauda.io CRD 本身保留，空 CRD 无副作用，不删定义避免误伤）
 kubectl label ns mesh-demo cpaas.io/serviceMesh- 2>/dev/null
-kubectl get crd -o name | grep asm.alauda.io | xargs kubectl delete
+for crd in $(kubectl get crd -o name | grep asm.alauda.io | sed 's|.*/||'); do
+  kubectl delete $crd --all -A --wait=false 2>/dev/null
+done
 # ⑨ 清 v1 控制面 IOP 渲染的 istio 配置残留（D-17）：istio-operator 删除 IOP 时不回收
 #    Telemetry 等配置类资源（实测全局 Telemetry asm-mesh-default--1-22 三集群均残留，
 #    其 zipkin provider/ASM_MS_NAME customTags/istio_operation tagOverrides 在 v2 均为死配置，
@@ -357,7 +363,7 @@ done   # 逐个确认属 v1（owning-resource=istio-122 等）后删除；至少
 
 > ②③ 的精确顺序与 finalizer 行为以验证演练实测为准（**V-11**），⑥ 删除 IOP 后 istio-operator 对 istiod/webhook 的回收范围同样以实测回填（**V-12**）。istio CRD（networking/security/telemetry.istio.io）**保留**——已由 v2 operator 接管。
 
-✅ 断言：`kubectl get crd | grep asm.alauda.io` 为空；istio-system 内仅剩 v2 istiod 与 Kiali；探测器全程 0 中断（**含 https 探测项**）；global 集群无 asm 组件；**保留清单核对**——网关 TLS secret、访问日志 Telemetry、网关 Service 逐个 `get` 在位（D-16），全 `*.istio.io` 资源无 `install.operator.istio.io/owning-resource` 残留（D-17）。
+✅ 断言：`asm.alauda.io` CRD 保留，其对应资源无残留（逐 CRD `kubectl get <crd> -A` 均为空）；istio-system 内仅剩 v2 istiod 与 Kiali；探测器全程 0 中断（**含 https 探测项**）；global 集群无 asm 组件；**保留清单核对**——网关 TLS secret、访问日志 Telemetry、网关 Service 逐个 `get` 在位（D-16），全 `*.istio.io` 资源无 `install.operator.istio.io/owning-resource` 残留（D-17）。
 
 ### P6 收编与可观测终态
 
@@ -445,7 +451,7 @@ done   # 逐个确认属 v1（owning-resource=istio-122 等）后删除；至少
 
 其余步骤（webhook 下线序列、asm CR finalizer 旁路、CA 交接、Kiali/VictoriaMetrics 对接）与多网络路径完全同构，按第 10.1 节实测修订执行。整体上单网络变体**少一个组件域**（东西向网关），P4/P5 比多网络更简单。
 
-**8.1.3 终态选择与（可选的）第二阶段：单网络 → 多网络切换**（TODO: 待定）
+**8.1.3 终态选择与（可选的）第二阶段：单网络 → 多网络切换**
 
 - **产品背景**：istio 上游四种多集群拓扑（multi-primary / primary-remote × same / different networks）齐全；OCP OSSM 3.x 概念文档承认单网络模型，但**安装步骤与支持矩阵仅覆盖多网络**（ambient 模式明确 multi-primary multi-network 为唯一支持形态）——原因是单网络的前提（跨集群 pod 网络互通）依赖 Submariner/扁平网络等产品外基础设施，不在其认证范围。ACP Mesh v2 对标 OCP，同样仅认证多网络。因此单网络终态**技术成立但落在产品支持矩阵之外**（与本方案「手工 CR」形态性质相同），需与产品团队确认支持口径。
 - **决策判据**：客户需要产品 UI 纳管、回到官方支持矩阵 → 迁移完成后追加本切换；客户接受手工 CR 形态、看重单网络优势（跨集群少一跳网关、少一组网关组件与故障域）→ 与产品确认口径后可长期保持单网络终态。
@@ -456,6 +462,8 @@ done   # 逐个确认属 v1（owning-resource=istio-122 等）后删除；至少
   4. 验收：跨集群调用矩阵全通 + `istioctl proxy-config endpoints` 断言远端端点已为对端网关地址；mTLS 信任链不受影响（AUTO_PASSTHROUGH 为 SNI 透传，端到端 mTLS 与同根 CA 均不变）；
   5. 回滚：撤销两集群 network 值与标签（恢复空/同名）即回到 pod IP 直连。
 - **不要反向操作**（先在 v1 上切多网络再迁移）：在即将退役的 v1 栈上做全网格端点重算的高风险变更不值得；v1 东西向网关为 asm 形态，迁移时还要按 P4/P5 再迁一遍网关；在 v2 上切换用的是上游标准做法，工具链与文档齐全。
+
+结论：不做单网络 → 多网络切换，用户保持迁移后的单网络现状。
 
 ---
 
@@ -480,7 +488,7 @@ done   # 逐个确认属 v1（owning-resource=istio-122 等）后删除；至少
 
 ## 附录
 
-### 附录 A：备选方案——停机卸载重装（测试/非生产）（TODO: 待定）
+### 附录 A：备选方案——停机卸载重装（测试/非生产）
 
 前提：可接受整段网格流量与遥测中断（sidecar 在 istiod 消失后存量连接仍可短时工作，但无新配置/新证书，网关重启即断）。**适用于尚未创建 v2 `Istio` CR 的集群**；若 v2 控制面已在 istio-system，严禁走 UI 删网格（回到 P5 手工序列）。
 
@@ -502,6 +510,8 @@ done   # 逐个确认属 v1（owning-resource=istio-122 等）后删除；至少
 
 > 本附录路径不在两套环境演练范围内（环境用于主路径全流程验证），删除行为结论基于源码推导；如需实证可在单集群环境完成主路径验证并恢复 v1 后追加演练。
 
+结论：暂不提供停机卸载重装方案。
+
 ### 附录 B：P5 之后的灾难恢复（重装 v1）清单
 
 Essentials 插件包与 4 个 operator 包（版本 v4.3.5 系）、ServiceMesh/ServiceMeshGroup CR 备份、治理 CR 备份、ns 标签快照、cacerts/根证书备份、ES 索引未动即可恢复历史。恢复顺序 = 安装文档正序 + CR 回放，恢复后按 P0 探测器验证。
@@ -518,6 +528,8 @@ Jaeger v2（OpenTelemetryCollector 形态）ES 存储配置临时增加老索引
 - 实例隔离：K8s 原生（改 label 使其脱离 Service selector / `kubectl cordon` 类操作）说明
 - 日志级别：`sidecar.istio.io/logLevel` 注解（Kiali 可视化编辑）
 
+结论：灰度发布、全局限流、API 指标分类的方案暂时不提供，后续看需求情况再提供。
+
 ### 附录 E：证据与引用
 
 - v1 删除流程删 istio-system：`mesh-v1/monorepo/global-asm-controller/pkg/mesh/manage.go`（delete istio-system 段）
@@ -531,10 +543,15 @@ Jaeger v2（OpenTelemetryCollector 形态）ES 存储配置临时增加老索引
 
 ## TODO
 
-- [ ] 将迁移过程脚本化，但迁移过程比较复杂，涉及单集群多集群等多种场景，建议不做
+- [x] 将迁移过程脚本化，但迁移过程比较复杂，涉及单集群多集群等多种场景，建议不做（结论：不做脚本后）
 - [ ] Mesh v2 文档 Kiali 支持多集群
-- [ ] Mesh v2 文档支持多集群单网络模式（待定）
-  - [ ] Mesh v1 的单网络是否要迁移到多网络模式？
+- [x] Mesh v2 文档支持多集群单网络模式（结论：因为 kube-ovn 单网络模式不被推荐，所以文档不提供多集群单网络模式）
+  - [x] Mesh v1 的单网络是否要迁移到多网络模式？（结论：不迁移，保持单网络模式）
+- [ ] 调研 Jaeger v2 能否复用 Mesh v1 的 Jaeger ES 索引？
 - [ ] 设计方案确定后
-  - [ ] 编写单集群、多集群单网络和多网络的迁移文档
+  - [ ] 编写迁移文档
+    - [ ] 单集群模式
+    - [ ] 多集群单网络模式
+    - [ ] 多集群多网络模式
+    - [ ] Mesh v1 OTel 迁移到 OTel v2
   - [ ] 测试迁移文档
