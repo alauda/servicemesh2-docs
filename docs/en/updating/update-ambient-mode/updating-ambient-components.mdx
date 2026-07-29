@@ -43,14 +43,11 @@ This section exists so that you can walk through the update process from a known
           excludeNamespaces:
             - istio-cni
             - kube-system
-          ambient:
-            reconcileIptablesOnStartup: true # [!code callout]
     EOF
     ```
 
     <Callouts>
         1. Pinning `spec.version` defines the version that the update procedure starts from.
-        2. The `reconcileIptablesOnStartup` option lets the CNI agent detect and repair incompatible iptables rules in already-running ambient pods when the agent restarts — exactly the situation an upgrade creates.
     </Callouts>
 
 3. Wait for the Istio CNI pods to become ready:

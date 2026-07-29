@@ -41,13 +41,10 @@ You can deploy Istio in ambient mode on Alauda Container Platform with Alauda Se
           excludeNamespaces:
             - istio-cni
             - kube-system
-          ambient:
-            reconcileIptablesOnStartup: true # [!code callout]
     ```
 
     <Callouts>
         1. You must set the `profile` field to `ambient`.
-        2. Set `spec.values.cni.ambient.reconcileIptablesOnStartup` to `true`. The `reconcileIptablesOnStartup` option enables the IstioCNI agent to detect and repair incompatible iptables rules in already-running ambient pods during CNI agent startup, handling scenarios such as upgrades or rule drift.
     </Callouts>
 
 3. Apply the IstioCNI CR:
