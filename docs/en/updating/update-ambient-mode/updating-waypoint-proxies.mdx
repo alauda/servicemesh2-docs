@@ -25,7 +25,7 @@ istioctl proxy-status | grep waypoint
 **Example output**
 
 ```text {name=update-waypoint:verify-proxy-status-output}
-waypoint-7b6bcffd55-lj54j.bookinfo     Kubernetes     istiod-85c76b5b66-qgbrv     1.28.6-asm-r3     4 (CDS,LDS,EDS,WDS)
+waypoint-7b6bcffd55-lj54j.bookinfo     Kubernetes     istiod-85c76b5b66-qgbrv     1.30.3-asm-r3     4 (CDS,LDS,EDS,WDS)
 ```
 
 The output lists the waypoint pod, the istiod pod it is connected to, the proxy version it runs, and the xDS configuration types the proxy subscribes to. A populated subscription list confirms that the waypoint receives configuration from the control plane, and the `VERSION` column should now show the updated release.

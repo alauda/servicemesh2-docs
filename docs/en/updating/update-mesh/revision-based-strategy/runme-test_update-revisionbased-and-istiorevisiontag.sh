@@ -149,8 +149,8 @@ EOF
 
     # ===== 更新 =====
 
-    # 13. 更新 Istio 版本至 v1.28.6
-    log_info "步骤 13: 更新 Istio 版本至 v1.28.6"
+    # 13. 更新 Istio 版本至 v1.30.3
+    log_info "步骤 13: 更新 Istio 版本至 v1.30.3"
     runme run update-revisionbased-tag:patch-istio-version || {
         log_error "更新 Istio 版本失败"
         return 1
@@ -165,7 +165,7 @@ EOF
     log_info "步骤 14: 等待新版本控制面就绪"
     for i in $(seq 1 12); do
         NEW_REV=$(runme run update-revisionbased-tag:get-istiorevision-update 2>&1 \
-            | grep 'v1.28.6' | grep -oE 'default-v[0-9]+-[0-9]+-[0-9]+' | head -1 || true)
+            | grep 'v1.30.3' | grep -oE 'default-v[0-9]+-[0-9]+-[0-9]+' | head -1 || true)
         [ -n "$NEW_REV" ] && break
         sleep 5
     done
@@ -180,9 +180,9 @@ EOF
     log_info "步骤 15: 确认 Istio 资源就绪（新版本）"
     output=$(runme run update-revisionbased-tag:get-istio-update 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
-+ default-v1-28-6
++ default-v1-30-3
 + Healthy
-+ v1.28.6
++ v1.30.3
 EOF
     )"; then
         log_error "Istio 更新状态验证失败"
@@ -196,9 +196,9 @@ EOF
     output=$(runme run update-revisionbased-tag:get-istiorevision-update 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
 + default-v1-26-3
-+ default-v1-28-6
++ default-v1-30-3
 + v1.26.3
-+ v1.28.6
++ v1.30.3
 EOF
     )"; then
         log_error "新旧 IstioRevision 并存验证失败"
@@ -213,7 +213,7 @@ EOF
     if ! __cmp_lines "$output" "$(cat <<EOF
 + default
 + Healthy
-+ default-v1-28-6
++ default-v1-30-3
 EOF
     )"; then
         log_error "IstioRevisionTag 更新验证失败"
@@ -227,7 +227,7 @@ EOF
     output=$(runme run update-revisionbased-tag:get-pods-update 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
 + istiod-default-v1-26-3
-+ istiod-default-v1-28-6
++ istiod-default-v1-30-3
 + Running
 EOF
     )"; then
@@ -259,7 +259,7 @@ EOF
     log_success "sidecar 仍连接旧控制面，验证通过"
 
     # 20. 更新 Istio CNI 插件到新控制面版本（对应文档步骤 5，公共步骤见 istio-cni-update-steps.sh）
-    log_info "步骤 20: 更新 Istio CNI 插件至 v1.28.6"
+    log_info "步骤 20: 更新 Istio CNI 插件至 v1.30.3"
     update_istio_cni_and_verify || {
         log_error "更新 Istio CNI 插件失败"
         return 1
@@ -293,7 +293,7 @@ EOF
     ps_cmd="${ps_cmd//<new_revision_name>/$NEW_REV}"
     output=$(eval "$ps_cmd" 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
-+ 1.28.6
++ 1.30.3
 + details-v1
 + productpage-v1
 + ratings-v1

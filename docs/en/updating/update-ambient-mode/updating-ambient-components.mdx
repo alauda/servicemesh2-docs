@@ -157,10 +157,10 @@ This section exists so that you can walk through the update process from a known
 
 ### Updating the Istio control plane
 
-1. Change the version in the `Istio` resource. For example, to update to Istio `1.28.6`, set the `spec.version` field to `v1.28.6` by running the following command:
+1. Change the version in the `Istio` resource. For example, to update to Istio `1.30.3`, set the `spec.version` field to `v1.30.3` by running the following command:
 
     ```bash {name=update-ambient:patch-istio-version}
-    kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.28.6"}}'
+    kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.30.3"}}'
     ```
 
     The Operator replaces the running control plane with the new version. ZTunnel and any waypoint proxies reconnect to the new istiod instance automatically; the application pods keep running and do not need a restart.
@@ -181,7 +181,7 @@ This section exists so that you can walk through the update process from a known
 
     ```text {name=update-ambient:get-istio-update-output}
     NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
-    default   istio-system   ambient   1           1       0        default           Healthy   v1.28.6   12m
+    default   istio-system   ambient   1           1       0        default           Healthy   v1.30.3   12m
     ```
 
 ### Updating the Istio CNI plugin
@@ -191,7 +191,7 @@ Update the Istio CNI plugin only after the control plane update has completed, b
 1. Set the `spec.version` field of the `IstioCNI` resource to the same version as the control plane:
 
     ```bash {name=update-ambient:patch-istiocni-version}
-    kubectl patch istiocni default --type='merge' -p '{"spec":{"version":"v1.28.6"}}'
+    kubectl patch istiocni default --type='merge' -p '{"spec":{"version":"v1.30.3"}}'
     ```
 
 2. Watch the `istio-cni-node` DaemonSet roll out:
@@ -216,7 +216,7 @@ Update the Istio CNI plugin only after the control plane update has completed, b
 
     ```text {name=update-ambient:get-istiocni-update-output}
     NAME      NAMESPACE   PROFILE   READY   STATUS    VERSION   AGE
-    default   istio-cni   ambient   True    Healthy   v1.28.6   15m
+    default   istio-cni   ambient   True    Healthy   v1.30.3   15m
     ```
 
 For details about the `IstioCNI` resource and its update behavior, see [The Istio CNI update process](../update-mesh/istio-cni.mdx).
@@ -232,7 +232,7 @@ Replacing a ZTunnel pod can reset long-lived TCP connections on that node. If yo
 1. Set the `spec.version` field of the `ZTunnel` resource to the same version as the control plane:
 
     ```bash {name=update-ambient:patch-ztunnel-version}
-    kubectl patch ztunnel default --type='merge' -p '{"spec":{"version":"v1.28.6"}}'
+    kubectl patch ztunnel default --type='merge' -p '{"spec":{"version":"v1.30.3"}}'
     ```
 
 2. Watch the ZTunnel DaemonSet roll out:
@@ -263,7 +263,7 @@ Replacing a ZTunnel pod can reset long-lived TCP connections on that node. If yo
 
     ```text {name=update-ambient:get-ztunnel-update-output}
     NAME      NAMESPACE   READY   STATUS    VERSION   AGE
-    default   ztunnel     True    Healthy   v1.28.6   18m
+    default   ztunnel     True    Healthy   v1.30.3   18m
     ```
 
 5. Inspect the per-node ZTunnel pods:
