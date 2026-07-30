@@ -58,7 +58,7 @@ The gateway in each cluster must be reachable from the other cluster.
     namespace: istio-cni
     values:
       cni:
-        cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
+        cniConfDir: /etc/cni/multus/net.d
         excludeNamespaces:
           - istio-cni
           - kube-system
@@ -157,7 +157,7 @@ The gateway in each cluster must be reachable from the other cluster.
     namespace: istio-cni
     values:
       cni:
-        cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
+        cniConfDir: /etc/cni/multus/net.d
         excludeNamespaces:
           - istio-cni
           - kube-system

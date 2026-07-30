@@ -63,7 +63,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
     namespace: istio-cni
     values:
       cni:
-        cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
+        cniConfDir: /etc/cni/multus/net.d
         excludeNamespaces:
           - istio-cni
           - kube-system
@@ -179,7 +179,7 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
     namespace: istio-cni
     values:
       cni:
-        cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
+        cniConfDir: /etc/cni/multus/net.d
         excludeNamespaces:
           - istio-cni
           - kube-system
