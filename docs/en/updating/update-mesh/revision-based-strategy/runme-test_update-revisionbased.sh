@@ -54,9 +54,9 @@ test_update_revisionbased() {
     log_info "步骤 5: 获取 IstioRevision 名称"
     output=$(runme run update-revisionbased:get-istiorevision 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
-+ default-v1-26-3
++ default-v1-28-6
 + Healthy
-+ v1.26.3
++ v1.28.6
 EOF
     )"; then
         log_error "IstioRevision 状态验证失败"
@@ -111,9 +111,9 @@ EOF
     log_info "步骤 10: 检查 Istio 资源状态（安装后）"
     output=$(runme run update-revisionbased:get-istio-install 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
-+ default-v1-26-3
++ default-v1-28-6
 + Healthy
-+ v1.26.3
++ v1.28.6
 EOF
     )"; then
         log_error "Istio 资源状态验证失败"
@@ -128,7 +128,7 @@ EOF
     ps_cmd="${ps_cmd//<revision_name>/$REV}"
     output=$(eval "$ps_cmd" 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
-+ 1.26.3
++ 1.28.6
 + details-v1
 + productpage-v1
 + ratings-v1
@@ -191,9 +191,9 @@ EOF
     log_info "步骤 15: 确认新旧 IstioRevision 并存"
     output=$(runme run update-revisionbased:get-istiorevision-update 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
-+ default-v1-26-3
++ default-v1-28-6
 + default-v1-30-3
-+ v1.26.3
++ v1.28.6
 + v1.30.3
 EOF
     )"; then
@@ -207,7 +207,7 @@ EOF
     log_info "步骤 16: 确认两个控制面 Pod 并存"
     output=$(runme run update-revisionbased:get-pods-update 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
-+ istiod-default-v1-26-3
++ istiod-default-v1-28-6
 + istiod-default-v1-30-3
 + Running
 EOF
@@ -224,7 +224,7 @@ EOF
     ps_cmd="${ps_cmd//<revision_name>/$REV}"
     output=$(eval "$ps_cmd" 2>&1)
     if ! __cmp_lines "$output" "$(cat <<EOF
-+ 1.26.3
++ 1.28.6
 + details-v1
 + productpage-v1
 + ratings-v1

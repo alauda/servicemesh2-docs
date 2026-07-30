@@ -81,7 +81,7 @@ With the `InPlace` strategy, the `IstioRevision` resource that the Alauda Servic
    metadata:
      name: default
    spec:
-     version: v1.26.3
+     version: v1.28.6
      namespace: istio-cni
      values:
        cni:
@@ -103,7 +103,7 @@ With the `InPlace` strategy, the `IstioRevision` resource that the Alauda Servic
    metadata:
      name: default
    spec:
-     version: v1.26.3
+     version: v1.28.6
      namespace: istio-system
      updateStrategy:
        type: InPlace
@@ -146,7 +146,7 @@ With the `InPlace` strategy, the `IstioRevision` resource that the Alauda Servic
 
     ```text {name=update-inplace:get-istio-install-output}
     NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
-    default   istio-system             1           1       1        default           Healthy   v1.26.3   6m3s
+    default   istio-system             1           1       1        default           Healthy   v1.28.6   6m3s
     ```
     
     A value of `1` in the `IN USE` column signifies that the `IstioRevision` resource is referenced by both the label on the namespace and the injected sidecar proxies.

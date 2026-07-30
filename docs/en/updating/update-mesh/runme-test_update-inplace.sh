@@ -89,7 +89,7 @@ test_update_inplace() {
 
     if ! __cmp_lines "$output" "$(cat <<'EOF'
 + Healthy
-+ v1.26.3
++ v1.28.6
 + IN USE
 EOF
     )"; then
