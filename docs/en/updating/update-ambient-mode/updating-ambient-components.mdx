@@ -335,7 +335,7 @@ After all components run the new version, confirm that the workloads still parti
 
 If you deployed waypoint proxies, additionally verify them as described in [Updating waypoint proxies](./updating-waypoint-proxies.mdx).
 
-## Updating the Kiali tracing configuration
+## Updating the Kiali tracing configuration \{#updating-the-kiali-tracing-configuration}
 
 Starting with Istio 1.30, waypoint proxies report every trace span under the waypoint's own service name (for example `waypoint.bookinfo`) instead of the destination service name that Istio 1.28 used. This is an intentional upstream change that aligns Istio with the OpenTelemetry specification, where `service.name` identifies the producer of the span.
 
