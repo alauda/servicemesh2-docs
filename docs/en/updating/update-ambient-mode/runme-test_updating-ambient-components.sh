@@ -316,6 +316,44 @@ EOF
     fi
     log_success "网格连通性验证通过"
 
+    # ==========================================
+    # Section 6: 升级后 Kiali tracing 配置（use_waypoint_name）
+    # ==========================================
+    # Istio 1.30 起 waypoint 将所有 span 上报在自身服务名 waypoint.<ns> 下，
+    # Kiali 必须开启 use_waypoint_name 才能查到 ambient 工作负载的调用链。
+    # 文档该步骤以"已安装 Kiali 并集成 tracing"为前提；本测试流程不安装 Kiali，
+    # 故先守卫 Kiali CR 是否存在（参照 runme-test_kiali.sh 对 jaeger 的守卫方式），
+    # 不存在时跳过，避免 patch 不存在的资源导致误报失败。
+
+    # 28. 开启 use_waypoint_name（仅在 istio-system/kiali CR 存在时执行）
+    if kubectl -nistio-system get kiali kiali >/dev/null 2>&1; then
+        log_info "步骤 28: 开启 Kiali use_waypoint_name"
+        local kiali_patch_output kiali_patch_expected
+        kiali_patch_output=$(runme run update-ambient:enable-kiali-waypoint-tracing 2>&1) || {
+            log_error "开启 use_waypoint_name 失败"
+            log_error "输出: $kiali_patch_output"
+            return 1
+        }
+        kiali_patch_expected=$(runme print update-ambient:enable-kiali-waypoint-tracing-output)
+        if ! __cmp_contains "$kiali_patch_output" "$kiali_patch_expected"; then
+            log_error "开启 use_waypoint_name 输出验证失败"
+            log_error "期待输出: $kiali_patch_expected"
+            log_error "实际输出: $kiali_patch_output"
+            return 1
+        fi
+        log_success "use_waypoint_name 已开启"
+
+        # 29. 等待 Kiali Operator 调和并滚动重启 Kiali
+        log_info "步骤 29: 等待 Kiali CR 就绪与 Deployment 滚动完成"
+        runme run update-ambient:wait-kiali-waypoint-tracing || {
+            log_error "等待 Kiali 调和/滚动失败"
+            return 1
+        }
+        log_success "Kiali tracing 配置更新完成"
+    else
+        log_warn "未检测到 istio-system/kiali CR，跳过 Kiali use_waypoint_name 配置步骤"
+    fi
+
     log_success "=========================================="
     log_success "Ambient 模式组件升级测试完成，所有验证通过！"
     log_success "=========================================="

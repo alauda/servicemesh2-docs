@@ -187,6 +187,13 @@ test_kiali() {
         cat /tmp/kiali_cr.yaml
         return 1
     fi
+    # 校验 use_waypoint_name 配置存在（ambient + Istio 1.30+ 必需：
+    # waypoint 将所有 span 上报在自身服务名 waypoint.<ns> 下，Kiali 需按 waypoint 名查询）
+    if ! grep -q "use_waypoint_name: true" /tmp/kiali_cr.yaml; then
+        log_error "use_waypoint_name: true 未包含在 tracing 配置模板中"
+        cat /tmp/kiali_cr.yaml
+        return 1
+    fi
     log_success "kiali_cr.yaml 改写完成"
 
     # 步骤 11: 在 /tmp 下应用 patch（命令使用 `cat kiali_cr.yaml` 相对路径）

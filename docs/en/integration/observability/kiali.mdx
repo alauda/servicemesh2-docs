@@ -263,7 +263,7 @@ The following steps show how to integrate the Alauda Build of Kiali with monitor
   ### Create a `Secret` named `kiali` in the `istio-system` namespace for OpenID authentication:
 
   ```bash {name=config-kiali:create-secret-kiali}
-  kubectl create secret generic kiali --from-literal="oidc-secret=$OIDC_CLIENT_SECRET" -nistio-system
+  kubectl create secret generic kiali --from-literal="oidc-secret=$OIDC_CLIENT_SECRET" -n istio-system
   ```
 
   **Example output:**
@@ -421,6 +421,7 @@ This capability supports the analysis of request flow behavior, aiding in root c
          enabled: true  # [!code callout]
          provider: jaeger  # [!code callout]
          use_grpc: true
+         use_waypoint_name: true  # [!code callout]
          internal_url: "http://jaeger-collector.jaeger-system:16685/jaeger"  # [!code callout]
          # When external_url is not defined, disable_version_check should be set to true
          disable_version_check: true
@@ -432,8 +433,9 @@ This capability supports the analysis of request flow behavior, aiding in root c
      1. Required in multi cluster mesh. `<mesh_id>` should be the same as the `.spec.values.global.meshId` in `Istio` resource.
      2. Specifies whether tracing is enabled.
      3. Specifies the tracing provider (`jaeger` or `tempo`).
-     4. Specifies the internal URL for the Jaeger or Tempo API.
-     5. The `external_url` that the Kiali UI uses when displaying Tracing UI links to the user. This URL must be accessible to clients external to the cluster (e.g. a browser) in order to generate valid links.
+     4. Required for ambient mode with Istio 1.30 or later: waypoint proxies report every span under the waypoint's own service name (for example `waypoint.<namespace>`), so Kiali must look up traces by the waypoint name. The setting has no effect on sidecar-mode workloads, so it is safe to keep enabled in either mode.
+     5. Specifies the internal URL for the Jaeger or Tempo API.
+     6. The `external_url` that the Kiali UI uses when displaying Tracing UI links to the user. This URL must be accessible to clients external to the cluster (e.g. a browser) in order to generate valid links.
    </Callouts>
 
 2. Save the updated spec in `kiali_cr.yaml`.
@@ -441,7 +443,7 @@ This capability supports the analysis of request flow behavior, aiding in root c
 3. Run the following command to apply the configuration:
 
    ```bash {name=config-kiali:apply-tracing-patch}
-   kubectl -nistio-system patch kiali kiali --type merge -p "$(cat kiali_cr.yaml)"
+   kubectl -n istio-system patch kiali kiali --type merge -p "$(cat kiali_cr.yaml)"
    ```
 
    **Example output:**

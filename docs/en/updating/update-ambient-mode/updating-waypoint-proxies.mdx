@@ -30,6 +30,10 @@ waypoint-7b6bcffd55-lj54j.bookinfo     Kubernetes     istiod-85c76b5b66-qgbrv   
 
 The output lists the waypoint pod, the istiod pod it is connected to, the proxy version it runs, and the xDS configuration types the proxy subscribes to. A populated subscription list confirms that the waypoint receives configuration from the control plane, and the `VERSION` column should now show the updated release.
 
+:::note
+Starting with Istio 1.30, waypoint proxies report trace spans under the waypoint's own service name instead of the destination service name. If you use tracing with Kiali, complete the steps in [Updating the Kiali tracing configuration](./updating-ambient-components.mdx#updating-the-kiali-tracing-configuration) after the update, otherwise the trace views of ambient workloads stay empty.
+:::
+
 ## Verifying L7 traffic routing
 
 After the waypoint proxies are updated, confirm that Layer 7 (L7) traffic management still behaves as configured. If you route traffic with `HTTPRoute` resources, check that the configured weights are still enforced.
