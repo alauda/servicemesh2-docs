@@ -45,7 +45,7 @@ This guide demonstrates how to use the Kubernetes Gateway API together with a wa
         istio.io/use-waypoint: waypoint  # [!code callout]
     spec:
       hosts:
-        - httpbin.org
+        - httpbingo.org
       ports:
         - number: 80
           name: http
@@ -196,14 +196,14 @@ This guide demonstrates how to use the Kubernetes Gateway API together with a wa
     echo "CURL_POD=$CURL_POD"
     ```
 
-4.  From the `curl` client, verify that you can reach `httpbin.org` through the egress gateway:
+4.  From the `curl` client, verify that you can reach `httpbingo.org` through the egress gateway:
 
     ```shell {name=ambient-egress:verify-egress}
     kubectl exec $CURL_POD -n egress-gateway -- \
-      curl -sS -v http://httpbin.org/get
+      curl -sS -v http://httpbingo.org/get
     ```
 
-    A successful response from `httpbin.org` confirms that egress traffic is being routed through the configured gateway. 
+    A successful response from `httpbingo.org` confirms that egress traffic is being routed through the configured gateway. 
 
     **Example output**
 
@@ -226,7 +226,7 @@ This guide demonstrates how to use the Kubernetes Gateway API together with a wa
       src.identity="spiffe://cluster.local/ns/egress-gateway/sa/curl"
       dst.addr=10.3.0.131:15008
       dst.hbone_addr=240.240.0.3:80
-      dst.service="httpbin.org"
+      dst.service="httpbingo.org"
       dst.workload="waypoint-7d688546dc-v8x9c"
       dst.namespace="egress-gateway"
       dst.identity="spiffe://cluster.local/ns/egress-gateway/sa/waypoint"
