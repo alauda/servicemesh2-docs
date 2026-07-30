@@ -351,8 +351,6 @@ The following steps show how to integrate the Alauda Build of Kiali with monitor
           scrape_interval: 60s
         url: ${MONITORING_URL}  # [!code callout]
     kiali_feature_flags:
-      authz:
-        require_namespace_get: true  # [!code callout]
       ui_defaults:
         i18n: # [!code callout]
           language: en
@@ -373,8 +371,7 @@ The following steps show how to integrate the Alauda Build of Kiali with monitor
     11. `password` references the monitoring basic‑auth password stored in the `kiali-monitoring-basic-auth` Secret.
     12. Define `thanos_proxy` if Prometheus is to be queried through a Thanos proxy (it is required when using VictoriaMetrics).
     13. `url` is the monitoring endpoint for Prometheus or VictoriaMetrics.
-    14. When `require_namespace_get` is `true`, the namespace dropdown only shows namespaces for which the user has `get` permission, providing stricter access control in multi-tenant environments. When `false` (the upstream default), users with `list` permission on namespaces are treated as also having `get` permission, which can expose namespaces that users should not access when the two permissions differ.
-    15. `i18n` specifies the default language and whether to show the language selector.
+    14. `i18n` specifies the default language and whether to show the language selector.
   </Callouts>
 
   ### Apply the configuration, render the manifest with `envsubst`:
