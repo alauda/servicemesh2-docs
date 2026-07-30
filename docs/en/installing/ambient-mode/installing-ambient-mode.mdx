@@ -129,7 +129,20 @@ You can deploy Istio in ambient mode on Alauda Container Platform with Alauda Se
     spec:
       version: v1.30.3
       namespace: ztunnel
+      values:
+        ztunnel:
+          resources: # [!code callout]
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 1024Mi
     ```
+
+    <Callouts>
+        1. The `requests` values shown here are the chart defaults. The chart does not define any `limits` by default, so declare them explicitly; `2000m` / `1024Mi` matches the default limits of the other data plane proxies (sidecar and waypoint). Ztunnel runs as a per-node proxy whose memory grows with the number of open connections on the node, so raise the memory limit accordingly in high-traffic clusters.
+    </Callouts>
 
 3. Apply the ZTunnel CR:
 
