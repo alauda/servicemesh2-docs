@@ -101,6 +101,15 @@ This section exists so that you can walk through the update process from a known
     spec:
       version: v1.28.3 # [!code callout]
       namespace: ztunnel
+      values:
+        ztunnel:
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 1024Mi
     EOF
     ```
 
