@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Ambient 模式组件升级文档测试脚本
 # 流程：铺垫安装 v1.28.3 ambient 环境（Istio/IstioCNI/ZTunnel + bookinfo）
-#       → 按 控制面 → IstioCNI → ZTunnel 顺序升级到 v1.28.6 → 验证工作负载
+#       → 按 控制面 → IstioCNI → ZTunnel 顺序升级到 v1.30.3 → 验证工作负载
 # 清理：cleanup 函数执行文档 update-ambient:cleanup 块（含 bookinfo 与三组件回收）
 
 set -e
@@ -118,11 +118,11 @@ test_updating_ambient_components() {
     maybe_gen_bookinfo_traffic
 
     # ==========================================
-    # Section 2: 升级 Istio 控制面 → v1.28.6
+    # Section 2: 升级 Istio 控制面 → v1.30.3
     # ==========================================
 
     # 13. 升级控制面版本
-    log_info "步骤 13: 升级 Istio 控制面版本至 v1.28.6"
+    log_info "步骤 13: 升级 Istio 控制面版本至 v1.30.3"
     runme run update-ambient:patch-istio-version || {
         log_error "升级 Istio 控制面版本失败"
         return 1
@@ -137,28 +137,28 @@ test_updating_ambient_components() {
     }
 
     # 15. 验证控制面版本（输出含动态 AGE 值，使用 __cmp_lines 验证关键字段）
-    log_info "步骤 15: 验证控制面已升级到 v1.28.6"
+    log_info "步骤 15: 验证控制面已升级到 v1.30.3"
     output=$(runme run update-ambient:get-istio-update 2>&1)
 
     if ! __cmp_lines "$output" "$(cat <<'EOF'
 + default
 + ambient
 + Healthy
-+ v1.28.6
++ v1.30.3
 EOF
     )"; then
         log_error "验证控制面版本失败"
         log_error "实际输出: $output"
         return 1
     fi
-    log_success "控制面版本验证通过 (v1.28.6)"
+    log_success "控制面版本验证通过 (v1.30.3)"
 
     # ==========================================
-    # Section 3: 升级 IstioCNI → v1.28.6
+    # Section 3: 升级 IstioCNI → v1.30.3
     # ==========================================
 
     # 16. 升级 IstioCNI 版本
-    log_info "步骤 16: 升级 IstioCNI 版本至 v1.28.6"
+    log_info "步骤 16: 升级 IstioCNI 版本至 v1.30.3"
     runme run update-ambient:patch-istiocni-version || {
         log_error "升级 IstioCNI 版本失败"
         return 1
@@ -180,7 +180,7 @@ EOF
     }
 
     # 19. 验证 IstioCNI 版本（输出含动态 AGE 值，使用 __cmp_lines 验证关键字段）
-    log_info "步骤 19: 验证 IstioCNI 已升级到 v1.28.6"
+    log_info "步骤 19: 验证 IstioCNI 已升级到 v1.30.3"
     output=$(runme run update-ambient:get-istiocni-update 2>&1)
 
     if ! __cmp_lines "$output" "$(cat <<'EOF'
@@ -188,21 +188,21 @@ EOF
 + istio-cni
 + True
 + Healthy
-+ v1.28.6
++ v1.30.3
 EOF
     )"; then
         log_error "验证 IstioCNI 版本失败"
         log_error "实际输出: $output"
         return 1
     fi
-    log_success "IstioCNI 版本验证通过 (v1.28.6)"
+    log_success "IstioCNI 版本验证通过 (v1.30.3)"
 
     # ==========================================
-    # Section 4: 升级 ZTunnel → v1.28.6
+    # Section 4: 升级 ZTunnel → v1.30.3
     # ==========================================
 
     # 20. 升级 ZTunnel 版本
-    log_info "步骤 20: 升级 ZTunnel 版本至 v1.28.6"
+    log_info "步骤 20: 升级 ZTunnel 版本至 v1.30.3"
     runme run update-ambient:patch-ztunnel-version || {
         log_error "升级 ZTunnel 版本失败"
         return 1
@@ -224,7 +224,7 @@ EOF
     }
 
     # 23. 验证 ZTunnel 版本（输出含动态 AGE 值，使用 __cmp_lines 验证关键字段）
-    log_info "步骤 23: 验证 ZTunnel 已升级到 v1.28.6"
+    log_info "步骤 23: 验证 ZTunnel 已升级到 v1.30.3"
     output=$(runme run update-ambient:get-ztunnel-update 2>&1)
 
     if ! __cmp_lines "$output" "$(cat <<'EOF'
@@ -232,14 +232,14 @@ EOF
 + ztunnel
 + True
 + Healthy
-+ v1.28.6
++ v1.30.3
 EOF
     )"; then
         log_error "验证 ZTunnel 版本失败"
         log_error "实际输出: $output"
         return 1
     fi
-    log_success "ZTunnel 版本验证通过 (v1.28.6)"
+    log_success "ZTunnel 版本验证通过 (v1.30.3)"
 
     # 24. 验证 ztunnel pods（输出含动态 pod 名/IP/AGE，使用 __cmp_lines 验证关键字段）
     log_info "步骤 24: 验证 ztunnel pods 运行状态"
@@ -315,6 +315,44 @@ EOF
         return 1
     fi
     log_success "网格连通性验证通过"
+
+    # ==========================================
+    # Section 6: 升级后 Kiali tracing 配置（use_waypoint_name）
+    # ==========================================
+    # Istio 1.30 起 waypoint 将所有 span 上报在自身服务名 waypoint.<ns> 下，
+    # Kiali 必须开启 use_waypoint_name 才能查到 ambient 工作负载的调用链。
+    # 文档该步骤以"已安装 Kiali 并集成 tracing"为前提；本测试流程不安装 Kiali，
+    # 故先守卫 Kiali CR 是否存在（参照 runme-test_kiali.sh 对 jaeger 的守卫方式），
+    # 不存在时跳过，避免 patch 不存在的资源导致误报失败。
+
+    # 28. 开启 use_waypoint_name（仅在 istio-system/kiali CR 存在时执行）
+    if kubectl -nistio-system get kiali kiali >/dev/null 2>&1; then
+        log_info "步骤 28: 开启 Kiali use_waypoint_name"
+        local kiali_patch_output kiali_patch_expected
+        kiali_patch_output=$(runme run update-ambient:enable-kiali-waypoint-tracing 2>&1) || {
+            log_error "开启 use_waypoint_name 失败"
+            log_error "输出: $kiali_patch_output"
+            return 1
+        }
+        kiali_patch_expected=$(runme print update-ambient:enable-kiali-waypoint-tracing-output)
+        if ! __cmp_contains "$kiali_patch_output" "$kiali_patch_expected"; then
+            log_error "开启 use_waypoint_name 输出验证失败"
+            log_error "期待输出: $kiali_patch_expected"
+            log_error "实际输出: $kiali_patch_output"
+            return 1
+        fi
+        log_success "use_waypoint_name 已开启"
+
+        # 29. 等待 Kiali Operator 调和并滚动重启 Kiali
+        log_info "步骤 29: 等待 Kiali CR 就绪与 Deployment 滚动完成"
+        runme run update-ambient:wait-kiali-waypoint-tracing || {
+            log_error "等待 Kiali 调和/滚动失败"
+            return 1
+        }
+        log_success "Kiali tracing 配置更新完成"
+    else
+        log_warn "未检测到 istio-system/kiali CR，跳过 Kiali use_waypoint_name 配置步骤"
+    fi
 
     log_success "=========================================="
     log_success "Ambient 模式组件升级测试完成，所有验证通过！"

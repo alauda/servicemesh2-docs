@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Waypoint 代理升级验证文档测试脚本
-# 依赖：上游 updating-ambient-components --no-cleanup 已完成 v1.28.6 升级（含 ambient bookinfo），
+# 依赖：上游 updating-ambient-components --no-cleanup 已完成 v1.30.3 升级（含 ambient bookinfo），
 #       且 waypoint-proxies 测试已在 bookinfo 命名空间部署 waypoint
 # 前置：curl 客户端为文档 Prerequisites（指向 ambient-l7-features.mdx），
 #       由本脚本步骤 0 跨文档复用 ambient-l7-features:* 代码块部署，cleanup 时回收
@@ -58,14 +58,14 @@ test_updating_waypoint_proxies() {
 
     if ! __cmp_lines "$output" "$(cat <<'EOF'
 + waypoint
-+ 1.28.6
++ 1.30.3
 EOF
     )"; then
         log_error "验证 waypoint 代理版本失败"
         log_error "实际输出: $output"
         return 1
     fi
-    log_success "waypoint 代理版本验证通过 (1.28.6)"
+    log_success "waypoint 代理版本验证通过 (1.30.3)"
 
     # 2. 创建 HTTPRoute（YAML heredoc 代码块，使用 kubectl_apply_runme_block）
     log_info "步骤 2: 创建 HTTPRoute (reviews 80/20)"

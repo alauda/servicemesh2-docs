@@ -43,14 +43,11 @@ This section exists so that you can walk through the update process from a known
           excludeNamespaces:
             - istio-cni
             - kube-system
-          ambient:
-            reconcileIptablesOnStartup: true # [!code callout]
     EOF
     ```
 
     <Callouts>
         1. Pinning `spec.version` defines the version that the update procedure starts from.
-        2. The `reconcileIptablesOnStartup` option lets the CNI agent detect and repair incompatible iptables rules in already-running ambient pods when the agent restarts — exactly the situation an upgrade creates.
     </Callouts>
 
 3. Wait for the Istio CNI pods to become ready:
@@ -104,6 +101,15 @@ This section exists so that you can walk through the update process from a known
     spec:
       version: v1.28.3 # [!code callout]
       namespace: ztunnel
+      values:
+        ztunnel:
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 1024Mi
     EOF
     ```
 
@@ -129,13 +135,13 @@ This section exists so that you can walk through the update process from a known
     b. Deploy the Bookinfo application:
 
     ```shell {name=update-ambient:deploy-bookinfo}
-    kubectl apply -n bookinfo -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.28/samples/bookinfo/platform/kube/bookinfo.yaml
+    kubectl apply -n bookinfo -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/bookinfo/platform/kube/bookinfo.yaml
     ```
 
     c. Deploy the per-version services of the Bookinfo application:
 
     ```shell {name=update-ambient:deploy-bookinfo-versions}
-    kubectl apply -n bookinfo -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.28/samples/bookinfo/platform/kube/bookinfo-versions.yaml
+    kubectl apply -n bookinfo -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/bookinfo/platform/kube/bookinfo-versions.yaml
     ```
 
     d. Enroll all workloads of the namespace in the ambient mesh:
@@ -157,10 +163,10 @@ This section exists so that you can walk through the update process from a known
 
 ### Updating the Istio control plane
 
-1. Change the version in the `Istio` resource. For example, to update to Istio `1.28.6`, set the `spec.version` field to `v1.28.6` by running the following command:
+1. Change the version in the `Istio` resource. For example, to update to Istio `1.30.3`, set the `spec.version` field to `v1.30.3` by running the following command:
 
     ```bash {name=update-ambient:patch-istio-version}
-    kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.28.6"}}'
+    kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.30.3"}}'
     ```
 
     The Operator replaces the running control plane with the new version. ZTunnel and any waypoint proxies reconnect to the new istiod instance automatically; the application pods keep running and do not need a restart.
@@ -181,7 +187,7 @@ This section exists so that you can walk through the update process from a known
 
     ```text {name=update-ambient:get-istio-update-output}
     NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
-    default   istio-system   ambient   1           1       0        default           Healthy   v1.28.6   12m
+    default   istio-system   ambient   1           1       0        default           Healthy   v1.30.3   12m
     ```
 
 ### Updating the Istio CNI plugin
@@ -191,7 +197,7 @@ Update the Istio CNI plugin only after the control plane update has completed, b
 1. Set the `spec.version` field of the `IstioCNI` resource to the same version as the control plane:
 
     ```bash {name=update-ambient:patch-istiocni-version}
-    kubectl patch istiocni default --type='merge' -p '{"spec":{"version":"v1.28.6"}}'
+    kubectl patch istiocni default --type='merge' -p '{"spec":{"version":"v1.30.3"}}'
     ```
 
 2. Watch the `istio-cni-node` DaemonSet roll out:
@@ -216,7 +222,7 @@ Update the Istio CNI plugin only after the control plane update has completed, b
 
     ```text {name=update-ambient:get-istiocni-update-output}
     NAME      NAMESPACE   PROFILE   READY   STATUS    VERSION   AGE
-    default   istio-cni   ambient   True    Healthy   v1.28.6   15m
+    default   istio-cni   ambient   True    Healthy   v1.30.3   15m
     ```
 
 For details about the `IstioCNI` resource and its update behavior, see [The Istio CNI update process](../update-mesh/istio-cni.mdx).
@@ -232,7 +238,7 @@ Replacing a ZTunnel pod can reset long-lived TCP connections on that node. If yo
 1. Set the `spec.version` field of the `ZTunnel` resource to the same version as the control plane:
 
     ```bash {name=update-ambient:patch-ztunnel-version}
-    kubectl patch ztunnel default --type='merge' -p '{"spec":{"version":"v1.28.6"}}'
+    kubectl patch ztunnel default --type='merge' -p '{"spec":{"version":"v1.30.3"}}'
     ```
 
 2. Watch the ZTunnel DaemonSet roll out:
@@ -263,7 +269,7 @@ Replacing a ZTunnel pod can reset long-lived TCP connections on that node. If yo
 
     ```text {name=update-ambient:get-ztunnel-update-output}
     NAME      NAMESPACE   READY   STATUS    VERSION   AGE
-    default   ztunnel     True    Healthy   v1.28.6   18m
+    default   ztunnel     True    Healthy   v1.30.3   18m
     ```
 
 5. Inspect the per-node ZTunnel pods:
@@ -337,6 +343,39 @@ After all components run the new version, confirm that the workloads still parti
     ```
 
 If you deployed waypoint proxies, additionally verify them as described in [Updating waypoint proxies](./updating-waypoint-proxies.mdx).
+
+## Updating the Kiali tracing configuration \{#updating-the-kiali-tracing-configuration}
+
+Starting with Istio 1.30, waypoint proxies report every trace span under the waypoint's own service name (for example `waypoint.bookinfo`) instead of the destination service name that Istio 1.28 used. This is an intentional upstream change that aligns Istio with the OpenTelemetry specification, where `service.name` identifies the producer of the span.
+
+After updating to Istio 1.30 or later, this change has two consequences for tracing:
+
+- **Kiali shows no traces for ambient workloads** unless `external_services.tracing.use_waypoint_name` is set to `true` in the `Kiali` resource. With this setting, Kiali looks up traces by the waypoint name and uses the span tags (such as `istio.destination_canonical_service`) to attribute spans to the correct workloads. The setting has no effect on sidecar-mode workloads.
+- **Traces recorded before the update stay under the old per-service names** (for example `productpage.bookinfo.svc.cluster.local`), while new traces appear under `waypoint.<namespace>`. This discontinuity in trace queries is expected. In the Jaeger UI, select the `waypoint.<namespace>` service and narrow the results with the **Operation** dropdown or a tag filter such as `istio.destination_canonical_service=<service>`.
+
+If Alauda Build of Kiali is installed with tracing integration (see [Integrating distributed tracing platform with Alauda Build of Kiali](../../integration/observability/kiali.mdx#integrating-distributed-tracing-platform-with-alauda-build-of-kiali)), enable the setting:
+
+1. Patch the `Kiali` resource:
+
+    ```bash {name=update-ambient:enable-kiali-waypoint-tracing}
+    kubectl -n istio-system patch kiali kiali --type=merge \
+      -p '{"spec":{"external_services":{"tracing":{"use_waypoint_name":true}}}}'
+    ```
+
+    **Example output**
+
+    ```text {name=update-ambient:enable-kiali-waypoint-tracing-output}
+    kiali.kiali.io/kiali patched
+    ```
+
+2. Wait for the Kiali Operator to reconcile the configuration and roll out the Kiali deployment:
+
+    ```bash {name=update-ambient:wait-kiali-waypoint-tracing}
+    kubectl -n istio-system wait --for=condition=Successful kiali/kiali --timeout=3m
+    kubectl -n istio-system rollout status deployment/kiali --timeout=3m
+    ```
+
+3. In the Kiali UI, open the **Traces** tab of a workload in an ambient namespace and confirm that traces are displayed again.
 
 ## Removing update resources from a development environment
 

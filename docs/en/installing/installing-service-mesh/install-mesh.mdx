@@ -276,7 +276,7 @@ The Alauda Service Mesh v2 Operator uses this resource's configuration to deploy
       # Applying the following contents to the yaml code editor:
       values:
         cni:
-          cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
+          cniConfDir: /etc/cni/multus/net.d
           excludeNamespaces:
             - istio-cni
             - kube-system
@@ -306,11 +306,11 @@ Wait until the `.status.state` field of the `IstioCNI` resource to be `Healthy`.
     metadata:
       name: default
     spec:
-      version: v1.28.6
+      version: v1.30.3
       namespace: istio-cni
       values:
         cni:
-          cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
+          cniConfDir: /etc/cni/multus/net.d
           excludeNamespaces:
             - istio-cni
             - kube-system
@@ -377,7 +377,7 @@ Wait until the `.status.state` field of the `Istio` resource to be `Healthy`.
     metadata:
       name: default
     spec:
-      version: v1.28.6
+      version: v1.30.3
       namespace: istio-system
     EOF
     ```

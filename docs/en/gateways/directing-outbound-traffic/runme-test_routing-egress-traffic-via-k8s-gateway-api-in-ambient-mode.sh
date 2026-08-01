@@ -111,7 +111,7 @@ EOF
     log_info "CURL_POD=$CURL_POD"
 
     # 步骤 13: 验证 egress 连通性
-    # 请求外部服务 httpbin.org，可能受网络波动影响，使用 retry_command 重试
+    # 请求外部服务 httpbingo.org，可能受网络波动影响，使用 retry_command 重试
     # 输出包含动态值，使用 __cmp_lines 验证关键字段
     log_info "步骤 13: 验证 egress 连通性"
     local egress_output

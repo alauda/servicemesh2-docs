@@ -39,7 +39,7 @@ The gateway in each cluster must be reachable from the other cluster.
   ### Create an `ISTIO_VERSION` environment variable that defines the Istio version to install
 
   ```bash {name=multi-primary-multi-network:set-istio-version}
-  export ISTIO_VERSION=1.28.6
+  export ISTIO_VERSION=1.30.3
   ```
 
   ### Install IstioCNI on the **East** cluster
@@ -58,7 +58,7 @@ The gateway in each cluster must be reachable from the other cluster.
     namespace: istio-cni
     values:
       cni:
-        cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
+        cniConfDir: /etc/cni/multus/net.d
         excludeNamespaces:
           - istio-cni
           - kube-system
@@ -157,7 +157,7 @@ The gateway in each cluster must be reachable from the other cluster.
     namespace: istio-cni
     values:
       cni:
-        cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
+        cniConfDir: /etc/cni/multus/net.d
         excludeNamespaces:
           - istio-cni
           - kube-system

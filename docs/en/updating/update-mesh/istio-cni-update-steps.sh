@@ -17,8 +17,8 @@
 update_istio_cni_and_verify() {
     local output
 
-    # 1. 升级 IstioCNI 版本到 v1.28.6
-    log_info "IstioCNI 升级: patch 版本至 v1.28.6"
+    # 1. 升级 IstioCNI 版本到 v1.30.3
+    log_info "IstioCNI 升级: patch 版本至 v1.30.3"
     runme run update-istio-cni:patch-version || {
         log_error "升级 IstioCNI 版本失败"
         return 1
@@ -48,7 +48,7 @@ update_istio_cni_and_verify() {
 + istio-cni
 + True
 + Healthy
-+ v1.28.6
++ v1.30.3
 EOF
     )"; then
         log_error "验证 IstioCNI 状态失败"

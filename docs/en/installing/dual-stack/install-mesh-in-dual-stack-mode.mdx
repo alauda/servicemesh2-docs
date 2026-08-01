@@ -27,11 +27,11 @@ Install Istio with dual-stack networking support to enable both IPv4 and IPv6 co
   metadata:
     name: default
   spec:
-    version: v1.28.6
+    version: v1.30.3
     namespace: istio-cni
     values:
       cni:
-        cniConfDir: /etc/cni/multus/net.d # /etc/cni/net.d in ACP 4.0
+        cniConfDir: /etc/cni/multus/net.d
         excludeNamespaces:
           - istio-cni
           - kube-system
@@ -50,7 +50,7 @@ Install Istio with dual-stack networking support to enable both IPv4 and IPv6 co
      metadata:
        name: default
      spec:
-       version: v1.28.6
+       version: v1.30.3
        namespace: istio-system
        values:
          meshConfig:
@@ -112,25 +112,25 @@ kubectl label namespace sleep istio-injection=enabled
 1. Deploy the `tcp-echo` application with dual-stack configuration:
 
    ```bash {name=dual-stack:deploy-tcp-echo-dual-stack}
-   kubectl apply -n dual-stack -f https://raw.githubusercontent.com/alauda-mesh/istio/istio-1.28/samples/tcp-echo/tcp-echo-dual-stack.yaml
+   kubectl apply -n dual-stack -f https://raw.githubusercontent.com/alauda-mesh/istio/istio-1.30/samples/tcp-echo/tcp-echo-dual-stack.yaml
    ```
 
 2. Deploy the `tcp-echo` application with IPv4-only configuration:
 
    ```bash {name=dual-stack:deploy-tcp-echo-ipv4}
-   kubectl apply -n ipv4 -f https://raw.githubusercontent.com/alauda-mesh/istio/istio-1.28/samples/tcp-echo/tcp-echo-ipv4.yaml
+   kubectl apply -n ipv4 -f https://raw.githubusercontent.com/alauda-mesh/istio/istio-1.30/samples/tcp-echo/tcp-echo-ipv4.yaml
    ```
 
 3. Deploy the `tcp-echo` application with IPv6-only configuration:
 
    ```bash {name=dual-stack:deploy-tcp-echo-ipv6}
-   kubectl apply -n ipv6 -f https://raw.githubusercontent.com/alauda-mesh/istio/istio-1.28/samples/tcp-echo/tcp-echo-ipv6.yaml
+   kubectl apply -n ipv6 -f https://raw.githubusercontent.com/alauda-mesh/istio/istio-1.30/samples/tcp-echo/tcp-echo-ipv6.yaml
    ```
 
 4. Deploy the `sleep` application, which will act as a client for sending test requests:
 
    ```bash {name=dual-stack:deploy-sleep}
-   kubectl apply -n sleep -f https://raw.githubusercontent.com/alauda-mesh/istio/istio-1.28/samples/sleep/sleep.yaml
+   kubectl apply -n sleep -f https://raw.githubusercontent.com/alauda-mesh/istio/istio-1.30/samples/sleep/sleep.yaml
    ```
 
 5. Wait for all deployments to become available:

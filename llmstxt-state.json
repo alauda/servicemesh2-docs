@@ -4,10 +4,7 @@
   "project_name": "Alauda Service Mesh v2 Documentation",
   "summary": "User-facing documentation for Alauda Service Mesh v2 — installation, configuration, gateways, ambient mode, multi-cluster, upgrades, integrations, and APIs.",
   "generated_at": "2026-05-16T09:39:26Z",
-  "include_patterns": [
-    "docs/**/*.md",
-    "docs/**/*.mdx"
-  ],
+  "include_patterns": ["docs/**/*.md", "docs/**/*.mdx"],
   "exclude_patterns": [
     "node_modules/**",
     "**/node_modules/**",
@@ -146,14 +143,14 @@
     "docs/en/gateways/directing-outbound-traffic/routing-egress-traffic-via-k8s-gateway-api-in-ambient-mode.mdx": {
       "sha256": "27854b2c5dbd52040395b31768ee1a4305e1446527dff0e6435d82c22ce29f2c",
       "size": 6360,
-      "description": "Walks through ambient-mode egress routing by deploying a waypoint proxy with `gatewayClassName: istio-waypoint` and the `istio.io/waypoint-for: service` label on an HBONE listener (port 15008), then tying a `ServiceEntry` for `httpbin.org` to it via `istio.io/use-waypoint`. Prerequisites include ambient-profile `Istio` and `IstioCNI`, a `Ztunnel` resource, and kernel compatibility; verification uses a `curl` pod plus ztunnel access logs showing HBONE flows through the waypoint, with an `istioctl waypoint apply --enroll-namespace` shortcut.",
+      "description": "Walks through ambient-mode egress routing by deploying a waypoint proxy with `gatewayClassName: istio-waypoint` and the `istio.io/waypoint-for: service` label on an HBONE listener (port 15008), then tying a `ServiceEntry` for `httpbingo.org` to it via `istio.io/use-waypoint`. Prerequisites include ambient-profile `Istio` and `IstioCNI`, a `Ztunnel` resource, and kernel compatibility; verification uses a `curl` pod plus ztunnel access logs showing HBONE flows through the waypoint, with an `istioctl waypoint apply --enroll-namespace` shortcut.",
       "generation_method": "ai_agent_reading",
       "updated_at": "2026-05-16T09:39:26Z"
     },
     "docs/en/gateways/directing-outbound-traffic/routing-egress-traffic-via-k8s-gateway-api.mdx": {
       "sha256": "78bbfae11f1a6a55d20155b8e8ff0e9ac9c10fd46b728d2a0815dc04ba41a7f6",
       "size": 7699,
-      "description": "Configures sidecar-mode egress routing with the Kubernetes Gateway API by deploying a `Gateway` (class `istio`, `ClusterIP` service type) plus two `HTTPRoute`s — one with `parentRef` to a `ServiceEntry` to redirect sidecar traffic to the egress gateway, and another with `parentRef` to the gateway to forward to the `httpbin.org` Hostname backend. Includes verification via a `curl` pod with sidecar injection labels for both `InPlace` and `RevisionBased` upgrade strategies, and an optional `asm-kube-gateway-options` ConfigMap (`infrastructure.parametersRef`) for scheduling onto ACP Infra Nodes.",
+      "description": "Configures sidecar-mode egress routing with the Kubernetes Gateway API by deploying a `Gateway` (class `istio`, `ClusterIP` service type) plus two `HTTPRoute`s — one with `parentRef` to a `ServiceEntry` to redirect sidecar traffic to the egress gateway, and another with `parentRef` to the gateway to forward to the `httpbingo.org` Hostname backend. Includes verification via a `curl` pod with sidecar injection labels for both `InPlace` and `RevisionBased` upgrade strategies, and an optional `asm-kube-gateway-options` ConfigMap (`infrastructure.parametersRef`) for scheduling onto ACP Infra Nodes.",
       "generation_method": "ai_agent_reading",
       "updated_at": "2026-05-16T09:39:26Z"
     },

@@ -26,14 +26,14 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
     <summary>**Example egress gateway CR file**</summary>
 
     ```yaml {name=sidecar-egress:gateway-cr-yaml}
-    # ServiceEntry to allow traffic to httpbin.org
+    # ServiceEntry to allow traffic to httpbingo.org
     apiVersion: networking.istio.io/v1
     kind: ServiceEntry
     metadata:
       name: httpbin-ext
     spec:
       hosts:
-        - httpbin.org
+        - httpbingo.org
       ports:
         - number: 80
           name: http
@@ -55,7 +55,7 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
       gatewayClassName: istio
       listeners:
         - name: http
-          hostname: httpbin.org
+          hostname: httpbingo.org
           port: 80
           protocol: HTTP
           allowedRoutes:
@@ -77,7 +77,7 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
             - name: httpbin-egress-gateway-istio
               port: 80
     ---
-    # HTTPRoute to forward traffic from the egress gateway to httpbin.org
+    # HTTPRoute to forward traffic from the egress gateway to httpbingo.org
     apiVersion: gateway.networking.k8s.io/v1
     kind: HTTPRoute
     metadata:
@@ -86,12 +86,12 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
       parentRefs:
         - name: httpbin-egress-gateway
       hostnames:
-        - httpbin.org
+        - httpbingo.org
       rules:
         - backendRefs:
             - kind: Hostname
               group: networking.istio.io
-              name: httpbin.org
+              name: httpbingo.org
               port: 80
     ```
     </details>
@@ -207,7 +207,7 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
 
         ```shell
         NAME      NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
-        default   istio-system             True    Healthy   True     v1.28.6   47h
+        default   istio-system             True    Healthy   True     v1.30.3   47h
         ```
 
     2.  Label the namespace using the revision name to enable sidecar injection:
@@ -231,13 +231,13 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
     echo "CURL_POD=$CURL_POD"
     ```
 
-5.  Using the `curl` client, confirm that you can reach `httpbin.org` via the egress gateway by entering this command:
+5.  Using the `curl` client, confirm that you can reach `httpbingo.org` via the egress gateway by entering this command:
 
     ```shell {name=sidecar-egress:verify-egress}
-    kubectl exec "$CURL_POD" -n curl -c curl -- curl -sS -v http://httpbin.org/get
+    kubectl exec "$CURL_POD" -n curl -c curl -- curl -sS -v http://httpbingo.org/get
     ```
 
-    The desired output will show a response from `httpbin.org`, which indicates that the egress traffic is being routed through the configured gateway.
+    The desired output will show a response from `httpbingo.org`, which indicates that the egress traffic is being routed through the configured gateway.
 
      **Example output**
 
@@ -245,12 +245,12 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
     ...
     {
       "headers": {
-        "Host": "httpbin.org",
+        "Host": "httpbingo.org",
         "User-Agent": "curl/8.15.0",
         "X-Envoy-Peer-Metadata-Id": "router~10.3.0.58~httpbin-egress-gateway-istio-7db8cbfc64-72g85.egress-gateway~egress-gateway.svc.cluster.local"
         ...
       },
-      "url": "http://httpbin.org/get"
+      "url": "http://httpbingo.org/get"
     }
     < HTTP/1.1 200 OK
     < server: envoy

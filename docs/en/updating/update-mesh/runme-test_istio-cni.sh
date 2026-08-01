@@ -3,7 +3,7 @@
 # 实际步骤封装在同目录 istio-cni-update-steps.sh 的 update_istio_cni_and_verify，
 # 三个更新策略测试脚本（update-inplace / update-revisionbased /
 # update-revisionbased-and-istiorevisiontag）按各自文档的 CNI 更新步骤复用同一函数
-# 依赖：环境中已存在旧版本 IstioCNI 且控制面已升级到 v1.28.6
+# 依赖：环境中已存在旧版本 IstioCNI 且控制面已升级到 v1.30.3
 #       （单独运行时可由 update-inplace --no-cleanup 铺垫）
 # 清理：资源由上游铺垫测试统一回收，故本脚本无 cleanup 函数
 

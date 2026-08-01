@@ -89,7 +89,7 @@ test_update_inplace() {
 
     if ! __cmp_lines "$output" "$(cat <<'EOF'
 + Healthy
-+ v1.26.3
++ v1.28.6
 + IN USE
 EOF
     )"; then
@@ -100,7 +100,7 @@ EOF
     log_success "Istio 资源状态验证通过（安装后）"
 
     # 10. 更新 Istio 版本
-    log_info "步骤 10: 更新 Istio 版本至 v1.28.6"
+    log_info "步骤 10: 更新 Istio 版本至 v1.30.3"
     runme run update-inplace:patch-istio-version || {
         log_error "更新 Istio 版本失败"
         return 1
@@ -120,7 +120,7 @@ EOF
 
     if ! __cmp_lines "$output" "$(cat <<'EOF'
 + Healthy
-+ v1.28.6
++ v1.30.3
 EOF
     )"; then
         log_error "检查 Istio 更新状态失败"
@@ -130,7 +130,7 @@ EOF
     log_success "Istio 更新状态验证通过"
 
     # 13. 更新 Istio CNI 插件到与控制面一致的版本（对应文档步骤 4，公共步骤见 istio-cni-update-steps.sh）
-    log_info "步骤 13: 更新 Istio CNI 插件至 v1.28.6"
+    log_info "步骤 13: 更新 Istio CNI 插件至 v1.30.3"
     update_istio_cni_and_verify || {
         log_error "更新 Istio CNI 插件失败"
         return 1
@@ -161,7 +161,7 @@ EOF
     output=$(runme run update-inplace:verify-proxy-status 2>&1)
 
     if ! __cmp_lines "$output" "$(cat <<'EOF'
-+ 1.28.6
++ 1.30.3
 + bookinfo
 + details-v1
 + productpage-v1
