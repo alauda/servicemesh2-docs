@@ -91,6 +91,11 @@ echo "Searching for .mdx and .sh files in docs/en/ (excluding docs/en/about/rele
 
 file_count=0
 while IFS= read -r -d '' file; do
+    # 仅处理实际包含旧版本号的文件
+    if ! grep -Fq -e "$OLD_VERSION" -e "$OLD_VERSION_REVISION_FORMAT" "$file"; then
+        continue
+    fi
+
     echo "Updating file: $file"
     
     # 替换 VERSION 格式 (x.y.z)
@@ -99,7 +104,7 @@ while IFS= read -r -d '' file; do
     # 替换 REVISION_FORMAT 格式 (x-y-z)
     "$SED_CMD" -i -E "s/$OLD_VERSION_REVISION_FORMAT/$NEW_VERSION_REVISION_FORMAT/g" "$file"
     
-    ((file_count++))
+    ((++file_count))
 done < <(find docs/en -type f \( -name '*.mdx' -o -name '*.sh' \) ! -path 'docs/en/about/release-notes/*' -print0)
 
 echo "Updated $file_count documentation files successfully."

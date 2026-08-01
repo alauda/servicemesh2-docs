@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Ambient 模式组件升级文档测试脚本
-# 流程：铺垫安装 v1.28.3 ambient 环境（Istio/IstioCNI/ZTunnel + bookinfo）
+# 流程：铺垫安装 v1.28.6 ambient 环境（Istio/IstioCNI/ZTunnel + bookinfo）
 #       → 按 控制面 → IstioCNI → ZTunnel 顺序升级到 v1.30.3 → 验证工作负载
 # 清理：cleanup 函数执行文档 update-ambient:cleanup 块（含 bookinfo 与三组件回收）
 
@@ -23,7 +23,7 @@ test_updating_ambient_components() {
     local output
 
     # ==========================================
-    # Section 1: 铺垫安装（pin v1.28.3 的 ambient 环境）
+    # Section 1: 铺垫安装（pin v1.28.6 的 ambient 环境）
     # ==========================================
 
     # 1. 创建 istio-cni / istio-system / ztunnel 命名空间并打 istio-discovery 标签
@@ -33,8 +33,8 @@ test_updating_ambient_components() {
         return 1
     }
 
-    # 2. 安装 IstioCNI v1.28.3（YAML heredoc 代码块，使用 kubectl_apply_runme_block）
-    log_info "步骤 2: 安装 IstioCNI v1.28.3 (ambient profile)"
+    # 2. 安装 IstioCNI v1.28.6（YAML heredoc 代码块，使用 kubectl_apply_runme_block）
+    log_info "步骤 2: 安装 IstioCNI v1.28.6 (ambient profile)"
     kubectl_apply_runme_block "update-ambient:create-istio-cni" "/tmp/" || {
         log_error "安装 IstioCNI 失败"
         return 1
@@ -47,8 +47,8 @@ test_updating_ambient_components() {
         return 1
     }
 
-    # 4. 安装 Istio 控制面 v1.28.3
-    log_info "步骤 4: 安装 Istio 控制面 v1.28.3 (ambient profile, InPlace)"
+    # 4. 安装 Istio 控制面 v1.28.6
+    log_info "步骤 4: 安装 Istio 控制面 v1.28.6 (ambient profile, InPlace)"
     kubectl_apply_runme_block "update-ambient:create-istio" "/tmp/" || {
         log_error "安装 Istio 控制面失败"
         return 1
@@ -61,8 +61,8 @@ test_updating_ambient_components() {
         return 1
     }
 
-    # 6. 安装 ZTunnel v1.28.3
-    log_info "步骤 6: 安装 ZTunnel v1.28.3"
+    # 6. 安装 ZTunnel v1.28.6
+    log_info "步骤 6: 安装 ZTunnel v1.28.6"
     kubectl_apply_runme_block "update-ambient:create-ztunnel" "/tmp/" || {
         log_error "安装 ZTunnel 失败"
         return 1
