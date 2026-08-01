@@ -132,6 +132,15 @@ You can deploy Istio in ambient mode on Alauda Container Platform with Alauda Se
     spec:
       version: v1.28.6
       namespace: ztunnel
+      values:
+        ztunnel:
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 1024Mi
     ```
 
 3. Apply the ZTunnel CR:
