@@ -42,6 +42,7 @@ test_ambient_l7_features() {
         return 1
     }
     log_success "HTTPRoute 已被接受"
+    sleep 1
 
     # 步骤 1.3: 验证流量分发（概率性输出，检查 reviews-v1 和 reviews-v2 都出现）
     log_info "步骤 1.3: 验证流量分发"
