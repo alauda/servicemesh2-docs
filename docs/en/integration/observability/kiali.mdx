@@ -72,7 +72,7 @@ Verify that the Operator installation status is reported as `Succeeded` in the *
     **Example output**
 
     ```bash {name=install-kiali:check-packagemanifest-versions-output}
-    CHANNEL  NAME                         VERSION
+    CHANNEL  NAME                       VERSION
     stable   kiali-operator.v2.27.1-r0  2.27.1-r0
     ```
 
@@ -165,7 +165,7 @@ Verify that the Operator installation status is reported as `Succeeded` in the *
     **Example output**
 
     ```bash {name=install-kiali:get-installplan-output}
-    NAME            CSV                           APPROVAL   APPROVED
+    NAME            CSV                         APPROVAL   APPROVED
     install-ddh84   kiali-operator.v2.27.1-r0   Manual     false
     ```
 
@@ -193,8 +193,8 @@ kubectl -n kiali-operator get csv
 **Example output**
 
 ```bash {name=install-kiali:check-csv-status-output}
-NAME                          DISPLAY                 VERSION       REPLACES   PHASE
-kiali-operator.v2.27.1-r0   Alauda Build of Kiali   2.27.1-r0              Succeeded
+NAME                        DISPLAY                 VERSION       REPLACES   PHASE
+kiali-operator.v2.27.1-r0   Alauda Build of Kiali   2.27.1-r0                Succeeded
 ```
 
 **Fields**
