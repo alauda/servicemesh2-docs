@@ -49,6 +49,14 @@ For the best development experience, we recommend:
 
 ### 更新 Kiali 版本
 
+使用如下脚本更新 `docs/en/integration/observability/kiali.mdx` 中的 Kiali 版本：
+
+```bash
+# 用法: ./hack/update-kiali-in-docs.sh <NEW_VERSION> <OLD_VERSION>
+./hack/update-kiali-in-docs.sh 2.27.1-rc.0 2.22.2
+./hack/update-kiali-in-docs.sh 2.27.1-r0 2.27.1-rc.0
+```
+
 ### Kiali 新版本内容同步更新
 
 让 AI 读取当前版本到新版本更新的内容：https://kiali.io/news/release-notes/。
