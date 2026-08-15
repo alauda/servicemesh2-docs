@@ -162,7 +162,7 @@ Alauda Build of Kiali is based on the [Kiali open source project](https://kiali.
 ### Integration and Dependencies
 
 - **Istio**: Required. Kiali queries Istio CRDs and telemetry to render the mesh state.
-- **Prometheus**: Required. Used for metrics and mesh topology visualization.
+- **Prometheus**: Required for metrics, request-based health, and mesh topology visualization. It can be turned off with `external_services.prometheus.enabled: false`, in which case those views are unavailable.
 - **Alauda Container Platform API**: Used to query and resolve relationships among cluster resources (e.g., services, workloads).
 - **Jaeger and OpenTelemetry**: Optional. Enables tracing views in the Kiali console.
 - **Grafana**: Optional. If installed, metrics pages in Kiali link to equivalent Grafana dashboards. Note: Grafana is not officially supported by Alauda Service Mesh.
@@ -178,6 +178,7 @@ Alauda Build of Kiali is based on the [Kiali open source project](https://kiali.
 - **Topology**: Visualizes service interactions and traffic flows in near real time.
 - **Metrics**: Includes default dashboards for supported runtimes (e.g., Go, Node.js, Spring Boot).
 - **Tracing**: Displays trace spans using Jaeger integration.
+- **Ambient**: Visualizes ambient mesh components, including ztunnel and waypoint proxy details, and overlays trace data on ambient traffic.
 - **Validation**: Checks for misconfigurations in Istio resources.
 - **Configuration**: Enables optional creation and editing of routing configurations via a UI wizard or YAML editor.
 
