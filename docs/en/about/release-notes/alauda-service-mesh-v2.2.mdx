@@ -37,7 +37,6 @@ Alauda Service Mesh v2.2 is built on the [Istio](https://istio.io/) project and 
     - **Mesh page**: Multi-mesh control plane donut chart.
     - **Deployment**: Prometheus can be enabled or disabled (`external_services.prometheus.enabled`), a pod disruption budget can be configured (`deployment.pod_disruption_budget`), and Prometheus is re-enabled automatically after an initial health check failure.
     - **Observability**: The `kiali_health_status` metric was redefined to produce a lower cardinality of time series and is now opt-in (`server.observability.metrics.health_status.enabled`).
-    - **AI integration**: Additional model providers, tool filtering, and token usage analytics for the AI chatbot and MCP integration, which remain a developer preview.
     - **Performance**: Faster traffic animation, `istio` graph appender, health cache memory usage, and workload fetching for single namespaces.
     - **Deprecated fields**: `spec.istio_labels.egress_gateway_label`, `spec.istio_labels.ingress_gateway_label`, `spec.istio_labels.injection_label_name`, and `spec.istio_labels.injection_label_rev` are ignored and replaced by standard constant values.
     - For the configuration changes that affect an upgrade, see [Upgrading Alauda Build of Kiali](../../updating/upgrade-kiali/index.mdx).
