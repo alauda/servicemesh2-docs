@@ -72,8 +72,8 @@ Verify that the Operator installation status is reported as `Succeeded` in the *
     **Example output**
 
     ```bash {name=install-kiali:check-packagemanifest-versions-output}
-    CHANNEL  NAME                       VERSION
-    stable   kiali-operator.v2.17.1-r1  2.17.1-r1
+    CHANNEL  NAME                         VERSION
+    stable   kiali-operator.v2.27.1-r0  2.27.1-r0
     ```
 
     **Fields**:
@@ -121,7 +121,7 @@ Verify that the Operator installation status is reported as `Succeeded` in the *
       name: kiali-operator
       source: platform
       sourceNamespace: cpaas-system
-      startingCSV: kiali-operator.v2.17.1-r1
+      startingCSV: kiali-operator.v2.27.1-r0
     EOF
     ```
 
@@ -165,8 +165,8 @@ Verify that the Operator installation status is reported as `Succeeded` in the *
     **Example output**
 
     ```bash {name=install-kiali:get-installplan-output}
-    NAME            CSV                         APPROVAL   APPROVED
-    install-ddh84   kiali-operator.v2.17.1-r1   Manual     false
+    NAME            CSV                           APPROVAL   APPROVED
+    install-ddh84   kiali-operator.v2.27.1-r0   Manual     false
     ```
 
     **Approve manually**
@@ -193,8 +193,8 @@ kubectl -n kiali-operator get csv
 **Example output**
 
 ```bash {name=install-kiali:check-csv-status-output}
-NAME                        DISPLAY                 VERSION     REPLACES   PHASE
-kiali-operator.v2.17.1-r1   Alauda Build of Kiali   2.17.1-r1              Succeeded
+NAME                          DISPLAY                 VERSION       REPLACES   PHASE
+kiali-operator.v2.27.1-r0   Alauda Build of Kiali   2.27.1-r0              Succeeded
 ```
 
 **Fields**
@@ -325,6 +325,10 @@ The following steps show how to integrate the Alauda Build of Kiali with monitor
     deployment:
       view_only_mode: false
       replicas: 1  # [!code callout]
+      # Uncomment in production, together with replicas >= 2
+      # pod_disruption_budget:
+      #   spec:
+      #     minAvailable: 1
       resources:
         requests:
           cpu: "100m"
@@ -369,7 +373,7 @@ The following steps show how to integrate the Alauda Build of Kiali with monitor
     6. `api_proxy_ca_data` is the base64‑encoded CA certificate used by **erebus**.
     7. `issuer_uri` is the OIDC issuer URL for **dex**.
     8. `client_id` is the OIDC client ID for **dex**.
-    9. `replicas` specifies the number of replicas for the Kiali deployment, should be at least `2` in production environments.
+    9. `replicas` specifies the number of replicas for the Kiali deployment, should be at least `2` in production environments. In that case, also uncomment `pod_disruption_budget` (available since Alauda Build of Kiali v2.27) so that voluntary node drains keep at least one Kiali pod running.
     10. `class_name` is the ingress class name for the Kiali ingress.
     11. Required in multi cluster mesh. `<mesh_id>` should be the same as the `.spec.values.global.meshId` in `Istio` resource.
     12. `username` references the monitoring basic‑auth username stored in the `kiali-monitoring-basic-auth` Secret.

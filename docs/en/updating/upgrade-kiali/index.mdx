@@ -4,7 +4,7 @@ weight: 1000
 
 # Upgrading Alauda Build of Kiali
 
-When you install the Kiali Operator, it will be configured to install a Kiali Server that is the same version as the operator itself. For example, if you have Kiali Operator v2.17.1 installed, that operator will install Kiali Server v2.17.1. If you upgrade the Kiali Operator, the operator will in turn upgrade the Kiali Server.
+When you install the Kiali Operator, it will be configured to install a Kiali Server that is the same version as the operator itself. For example, if you have Kiali Operator v2.27.1 installed, that operator will install Kiali Server v2.27.1. If you upgrade the Kiali Operator, the operator will in turn upgrade the Kiali Server.
 
 ## Upgrade Path
 
@@ -26,6 +26,34 @@ The latest patch versions for each release can be found in the [Release Notes](.
 ## Upgrade Steps
 
 When upgrading, you need to upgrade the <ExternalSiteLink name="acp" href="/extend/operator.html#upgrading-operators" children="Operator" /> version in sequence according to the upgrade path. Upgrading the Operator will automatically upgrade the `Kiali` instance (Kiali Server) version.
+
+## Upgrade Notes for Kiali v2.27
+
+Review the following changes before you upgrade from v2.22.z to v2.27.z. Neither change blocks the upgrade.
+
+### The `kiali_health_status` metric is now opt-in
+
+Kiali v2.22 wrote the `kiali_health_status` metric whenever the health cache and Kiali metrics were both enabled. The metric was redefined in v2.24 to produce a much lower cardinality of time series and is now disabled by default. If you built alerts or dashboards on this metric, enable it again after the upgrade:
+
+```yaml
+spec:
+  server:
+    observability:
+      metrics:
+        health_status:
+          enabled: true
+```
+
+The metric name is unchanged, but its attributes are different. Existing time series remain in Prometheus until they expire.
+
+### Deprecated `spec.istio_labels` fields
+
+Kiali v2.27 ignores the following fields and uses the standard constant values instead. Remove them from your `Kiali` resource:
+
+- `spec.istio_labels.egress_gateway_label`
+- `spec.istio_labels.ingress_gateway_label`
+- `spec.istio_labels.injection_label_name`
+- `spec.istio_labels.injection_label_rev`
 
 ## Post-Upgrade Verification
 

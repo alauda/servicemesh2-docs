@@ -1,0 +1,48 @@
+---
+weight: 8000
+---
+
+# Alauda Service Mesh v2.2
+
+Alauda Service Mesh v2.2 is built on the [Istio](https://istio.io/) project and is installed using a new Istio Operator derived from the [Sail Operator](https://github.com/istio-ecosystem/sail-operator) (hosted in the **istio-ecosystem** GitHub organization). The Operator provides an expanded set of custom resource definitions (CRDs) to manage Istio components.
+
+## Alauda Service Mesh v2.2.0
+
+### Supported component versions
+
+- `Istio` version: v1.28.6 and v1.30.3
+    - Istio 1.30 [supports Kubernetes](https://istio.io/latest/docs/releases/supported-releases/#support-status-of-istio-releases) 1.32, 1.33, 1.34, 1.35, 1.36
+    - Istio 1.28 [supports Kubernetes](https://istio.io/latest/docs/releases/supported-releases/#support-status-of-istio-releases) 1.30, 1.31, 1.32, 1.33, 1.34
+- `Kiali operator` version: v2.27.1
+
+### Istio Features
+
+- Updated Istio to version 1.30.3.
+    - **Ambient**: CIDR addresses in `ServiceEntry`, optional XFCC synthesis at waypoints, configurable HBONE window sizing, ztunnel runtime metrics, and DNS capture enabled by default.
+    - **Gateway API**: `TLSRoute` termination and mixed mode, TLS passthrough listeners on east-west gateways, and attached `ListenerSets` reported in the Gateway status.
+    - **Traffic management**: Namespace-level traffic distribution, configurable DNS upstream timeout and failover priority, and the new `TrafficExtension` API as a unified extension mechanism for Wasm and Lua.
+    - **Security**: XDS debug endpoint authentication enabled by default, certificate revocation list (CRL) support in ztunnel, and optional NetworkPolicy resources for istiod, istio-cni, and ztunnel.
+    - **Multi-cluster**: Multi-network multicluster ambient promoted to beta, with improved telemetry and peer metadata exchange.
+    - **Install & ops**: Helm v4 server-side apply support, configurable network gateway service ports, and istiod setting `GOMEMLIMIT` automatically to reduce the risk of out-of-memory failures.
+- References
+    - [Istio 1.29 Release Announcement](https://istio.io/latest/news/releases/1.29.x/announcing-1.29/)
+    - [Istio 1.30 Release Announcement](https://istio.io/latest/news/releases/1.30.x/announcing-1.30/)
+
+### Kiali Features
+
+- Updated Kiali to version 2.27.
+    - **Overview and namespaces**: New Overview and Namespaces pages, a dedicated namespace detail page, service insights that incorporate L4 metrics, and ambient and sidecar badges. Detail pages follow the same style.
+    - **Ambient**: Trace overlay for ambient traffic, improved inter-cluster telemetry, and fixes for ztunnel dump errors and missing heatmaps in ambient tracing namespaces.
+    - **Validation**: Multi-primary support for validations and `MeshConfig`, and removal of the Istio service registry dependency for validations.
+    - **Mesh page**: Multi-mesh control plane donut chart.
+    - **Deployment**: Prometheus can be enabled or disabled (`external_services.prometheus.enabled`), a pod disruption budget can be configured (`deployment.pod_disruption_budget`), and Prometheus is re-enabled automatically after an initial health check failure.
+    - **Observability**: The `kiali_health_status` metric was redefined to produce a lower cardinality of time series and is now opt-in (`server.observability.metrics.health_status.enabled`).
+    - **Performance**: Faster traffic animation, `istio` graph appender, health cache memory usage, and workload fetching for single namespaces.
+    - **Deprecated fields**: `spec.istio_labels.egress_gateway_label`, `spec.istio_labels.ingress_gateway_label`, `spec.istio_labels.injection_label_name`, and `spec.istio_labels.injection_label_rev` are ignored and replaced by standard constant values.
+    - For the configuration changes that affect an upgrade, see [Upgrading Alauda Build of Kiali](../../updating/upgrade-kiali/index.mdx).
+- References
+    - [Kiali 2.23.0 Release Notes](https://kiali.io/news/release-notes/#2230)
+    - [Kiali 2.24.0 Release Notes](https://kiali.io/news/release-notes/#2240)
+    - [Kiali 2.25.0 Release Notes](https://kiali.io/news/release-notes/#2250)
+    - [Kiali 2.26.0 Release Notes](https://kiali.io/news/release-notes/#2260)
+    - [Kiali 2.27.0 Release Notes](https://kiali.io/news/release-notes/#2270)

@@ -1,0 +1,23 @@
+---
+weight: 18000
+---
+
+# Alauda Service Mesh v2.2 known issues
+
+This section documents known issues and limitations that affect Alauda Service Mesh.
+
+## Kiali reports a stale KIA1313 validation for waypoint-enabled workloads
+
+In ambient mode, the workload detail page can keep reporting the validation `KIA1313 - This workload has annotated waypoint but it does not exist or is misconfigured` after the waypoint is deployed and running. The workload list page does not report the warning for the same workload, so the two views disagree.
+
+This occurs when the Kiali server starts before the waypoint exists, for example when you install Kiali, deploy an application, and then enroll it in ambient mode. Kiali caches waypoint lookups for four minutes, so the validation is computed while the cache is still empty. Its change detection tracks namespace and workload labels, but not the result of the waypoint lookup, so the stored validation is never recomputed and the detail page keeps serving the outdated result.
+
+**Workaround:** Restart the Kiali server to rebuild the cache and the stored validations:
+
+```shell
+kubectl -n istio-system rollout restart deployment/kiali
+```
+
+Changing any tracked value, such as adding a label to a namespace or a workload, also triggers a full revalidation.
+
+Confirm that the waypoint is healthy before you dismiss the warning, because the same validation is raised when a waypoint is genuinely missing or misconfigured.

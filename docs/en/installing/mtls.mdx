@@ -106,6 +106,6 @@ spec:
 
 The Kiali console offers several ways to validate whether or not your applications, services, and workloads have mTLS encryption enabled.
 
-- Navigate to the **Services Detail Overview** page.
-- A lock icon is displayed on graph edges where mTLS is active.
-- In the **Network** section of the UI, mTLS-enabled ports are also marked with a lock icon.
+- On the **Traffic Graph** page, select **Display** > **Security** to show a lock icon on every edge that carries mTLS traffic.
+- On the **Namespaces** page, the **mTLS** column reports the mode of each namespace, such as `Strict`, `Permissive`, or `Disabled`. The namespace detail page reports the same value in its **mTLS** field. Hover over the lock icon to see whether the mode is set on the namespace or inherited from the mesh-wide configuration.
+- On the **Mesh** page, select the control plane node to read the mesh-wide mTLS status in its side panel.
