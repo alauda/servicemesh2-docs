@@ -140,7 +140,8 @@ When updating Istio using the `RevisionBased` strategy, you can upgrade by more 
 - You are logged in to the Alauda Container Platform web console as **cluster-admin**.
 - You have deployed Istio, and upgraded the Alauda Service Mesh v2 Operator to a version that provides the new target Istio version. For more information, see [Understanding Operator updates and channels](../index.mdx#understanding-operator-updates-and-channels).
 - You have installed the Alauda Container Platform Networking for Multus plugin, and kube-ovn must be v4.1.5 or later.
-- If you use the Kubernetes Gateway API, you have upgraded the Gateway API CRDs to bundle version `v1.5.x`. For more information, see [Gateway API CRD requirements](../index.mdx#gateway-api-crd-requirements).
+- The cluster runs a Kubernetes version that the target Istio version supports. Istio 1.30 supports Kubernetes 1.32 to 1.36, and Istio 1.28 supports Kubernetes 1.30 to 1.34, so a cluster on Kubernetes 1.30 or 1.31 must be upgraded before you update Istio to 1.30.
+- If you use the Kubernetes Gateway API `TLSRoute` or `ListenerSet` resources, you have reviewed [Gateway API CRD requirements](../index.mdx#gateway-api-crd-requirements). Meshes that use only `Gateway` and `HTTPRoute` need no change.
 - You have installed `istioctl` on your local machine.
 - You have configured the Istio control plane to use the `RevisionBased` update strategy. In this example, the `Istio` resource named `default` is deployed in the `istio-system` namespace.
 - You have installed the Istio CNI plugin with the desired version. In this example, the `IstioCNI` resource named `default` is deployed in the `istio-cni` namespace.

@@ -20,25 +20,59 @@ The Alauda Service Mesh Operator includes additional Istio releases for upgrades
 
 ## Gateway API CRD requirements \{#gateway-api-crd-requirements}
 
-Istio 1.30 depends on Kubernetes Gateway API `v1.5.1` and reads `TLSRoute` from the standard channel (`gateway.networking.k8s.io/v1`). Istio 1.28 read it from `v1alpha2`.
+Istio processes a Gateway API CRD only when the `gateway.networking.k8s.io/bundle-version` annotation on that CRD is within the range the running Istio version accepts. The range is per CRD, not per cluster:
 
-Upgrade the Gateway API CRDs to bundle version `v1.5.x` **before** you update the control plane to Istio 1.30. Otherwise `TLSRoute` resources become invisible to the control plane: TLS passthrough `Gateway` listeners silently report `status.listeners[].attachedRoutes: 0` and the corresponding Envoy listener is never programmed. `HTTPRoute`, `GRPCRoute`, and `ReferenceGrant` are not affected.
+| CRD | Istio 1.28 | Istio 1.30 |
+| --- | --- | --- |
+| `tlsroutes.gateway.networking.k8s.io` | `v1.4.1` or earlier | `v1.5.0` or later |
+| `backendtlspolicies.gateway.networking.k8s.io` | `v1.4.0` or later | `v1.4.0` or later |
+| `grpcroutes.gateway.networking.k8s.io` | `v1.1.0` or later | `v1.1.0` or later |
+
+`Gateway`, `HTTPRoute`, and `ReferenceGrant` have no version requirement, so a mesh that uses only these resources needs no change.
+
+`TLSRoute` is the only resource whose requirement changed: Istio 1.28 reads it at `gateway.networking.k8s.io/v1alpha2`, and Istio 1.30 reads it at `gateway.networking.k8s.io/v1`. When the CRD is outside the accepted range, Istio ignores it and `TLSRoute` resources become invisible to the control plane: TLS passthrough `Gateway` listeners silently report `status.listeners[].attachedRoutes: 0` and the corresponding Envoy listener is never programmed.
+
+:::warning
+No bundle version satisfies Istio 1.28 and Istio 1.30 at the same time. `TLSRoute` is therefore unavailable between the moment you upgrade the CRDs and the moment the Istio 1.30 control plane serves your gateways:
+
+- With the `InPlace` strategy, upgrade the CRDs immediately before you update the control plane.
+- With the `RevisionBased` strategy, upgrade the CRDs immediately before you move the gateways that use `TLSRoute` to the new revision, not at the start of the update.
+:::
 
 **Procedure**
 
-1. Check the bundle version installed in the cluster:
+1. Check the bundle version and the channel of the `TLSRoute` CRD:
 
    ```bash
-   kubectl get crd gateways.gateway.networking.k8s.io -o jsonpath='{.metadata.annotations.gateway\.networking\.k8s\.io/bundle-version}'
+   kubectl get crd tlsroutes.gateway.networking.k8s.io \
+     -o custom-columns='BUNDLE:.metadata.annotations.gateway\.networking\.k8s\.io/bundle-version,CHANNEL:.metadata.annotations.gateway\.networking\.k8s\.io/channel'
    ```
 
-2. If the version is earlier than `v1.5.0`, install the CRDs from the standard channel:
+   If the command reports `NotFound`, the cluster does not use `TLSRoute` and no upgrade is required.
+
+2. Install bundle version `v1.5.1` from the channel that the previous command reported. Keep the channel unchanged: the channel selects which resources and which API versions the cluster serves, and both channels serve `TLSRoute` at `v1`.
 
    ```bash
-   kubectl apply -k "github.com/kubernetes-sigs/gateway-api/config/crd?ref=v1.5.1"
+   # Standard channel
+   kubectl apply -k "github.com/kubernetes-sigs/gateway-api/config/crd/standard?ref=v1.5.1"
    ```
 
-   If the cluster uses the experimental channel, apply `config/crd/experimental` instead.
+   ```bash
+   # Experimental channel
+   kubectl apply -k "github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v1.5.1"
+   ```
+
+   Switching from the experimental channel to the standard channel is a separate migration: the standard channel stops serving `TLSRoute` at `v1alpha2` and `v1alpha3`, and it does not include `TCPRoute`, `UDPRoute`, or the `gateway.networking.x-k8s.io` resources. Move your manifests to `v1` and retire the experimental resources before you consider it.
+
+3. Confirm that `v1` is served:
+
+   ```bash
+   kubectl get crd tlsroutes.gateway.networking.k8s.io -o jsonpath='{range .spec.versions[?(@.served)]}{.name}{" "}{end}'
+   ```
+
+:::note
+The `v1.5.x` bundle installs a `safe-upgrades.gateway.networking.k8s.io` validating admission policy that rejects any later attempt to install a bundle earlier than `v1.5.0`. Delete the policy first if you have to roll the CRDs back.
+:::
 
 ## Understanding Operator updates and channels \{#understanding-operator-updates-and-channels}
 
