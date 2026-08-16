@@ -151,7 +151,7 @@ The gateway injection technique leverages the same mechanism as Istio sidecar in
 1.  Execute the following command to create the `istio-ingressgateway` deployment and service:
 
     ```shell {name=bookinfo:gw-inject-create-gateway}
-    kubectl -n bookinfo apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/refs/heads/main/chart/samples/ingress-gateway.yaml
+    kubectl -n bookinfo apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/refs/heads/release-2.2/chart/samples/ingress-gateway.yaml
     ```
 
 2.  Configure the `bookinfo` application to use the newly created gateway by running this command:

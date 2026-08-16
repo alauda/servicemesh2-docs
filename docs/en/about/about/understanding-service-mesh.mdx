@@ -75,7 +75,7 @@ To list all available configuration options:
 kubectl explain istios.spec.values
 ```
 
-To perform canary updates of the control plane, Alauda Service Mesh supports multiple Istio versions. You can set the `version` field to the new version by either using the full version or the `v<x>.<y>-latest` alias to automatically select the latest version for a specific minor version. For example, setting `v1.23-latest` ensures that the Operator maintains the latest version of Istio 1.23.
+To perform canary updates of the control plane, Alauda Service Mesh supports multiple Istio versions. You can set the `version` field to the new version by either using the full version or the `v<x>.<y>-latest` alias to automatically select the latest version for a specific minor version. For example, setting `v1.30-latest` ensures that the Operator maintains the latest version of Istio 1.30.
 
 Alauda Service Mesh supports the following control plane update strategies:
 
@@ -149,6 +149,31 @@ spec:
 ```
 
 To upgrade the plugin, update the `spec.version` field.
+
+### `ZTunnel` resource
+
+In ambient mode, the ZTunnel proxy provides the node-level secure overlay. To install it, you create a `ZTunnel` resource. Like the `IstioCNI` resource, it is cluster-scoped because it installs a daemon set that operates on all nodes of your cluster.
+
+The `spec.namespace` field must match the `spec.values.pilot.trustedZtunnelNamespace` field of the `Istio` resource.
+
+**Example `ZTunnel` resource**
+
+```yaml
+apiVersion: sailoperator.io/v1
+kind: ZTunnel
+metadata:
+  name: default
+spec:
+  version: v1.30.3
+  namespace: ztunnel
+  targetRef:  # [!code callout]
+    kind: Istio
+    name: default
+```
+
+<Callouts>
+  1. Optional. References the `Istio` or `IstioRevision` resource that this ZTunnel instance belongs to; an `Istio` resource always resolves to its active revision. Set it when the control plane does not use the `default` revision. The `spec.values.global`, `spec.values.meshConfig`, and `spec.values.revision` settings are copied from the referenced revision, while any setting in the `ZTunnel` spec takes precedence.
+</Callouts>
 
 ## Alauda Build of Kiali
 

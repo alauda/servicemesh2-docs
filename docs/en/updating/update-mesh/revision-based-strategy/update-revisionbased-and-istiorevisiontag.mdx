@@ -158,6 +158,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
 - You are logged in to the Alauda Container Platform web console as **cluster-admin**.
 - You have deployed Istio, and upgraded the Alauda Service Mesh v2 Operator to a version that provides the new target Istio version. For more information, see [Understanding Operator updates and channels](../index.mdx#understanding-operator-updates-and-channels).
 - You have installed the Alauda Container Platform Networking for Multus plugin, and kube-ovn must be v4.1.5 or later.
+- If you use the Kubernetes Gateway API, you have upgraded the Gateway API CRDs to bundle version `v1.5.x`. For more information, see [Gateway API CRD requirements](../index.mdx#gateway-api-crd-requirements).
 - You have installed `istioctl` on your local machine.
 - You have configured the Istio control plane to use the `RevisionBased` update strategy. In this example, the `Istio` resource named `default` is deployed in the `istio-system` namespace.
 - You have created an `IstioRevisionTag` resource where the `targetRef` field correctly points to the desired `Istio` resource.
