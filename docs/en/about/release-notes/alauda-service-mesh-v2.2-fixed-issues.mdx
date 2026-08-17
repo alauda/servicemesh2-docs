@@ -1,0 +1,39 @@
+---
+weight: 17000
+---
+
+# Alauda Service Mesh v2.2 fixed issues
+
+This section documents issues that are fixed in Alauda Service Mesh.
+
+## Ambient health check rules are not repaired after an external firewall reload
+
+In ambient mode, the `istio-cni-node` agent installs rules in the host network namespace that exempt kubelet health probes from ztunnel capture, by translating the source address of a probe to `169.254.7.127`:
+
+```text
+-I POSTROUTING 1 -j ISTIO_POSTRT
+-A ISTIO_POSTRT -m owner --socket-exists -p tcp -m set --match-set istio-inpod-probes-v4 dst -j SNAT --to-source 169.254.7.127
+```
+
+The agent installed these rules only when it started, and never checked them again. Anything that removed them while the agent kept running, such as a `firewalld` reload or an `iptables-restore` from an operating system persistence unit, therefore went unnoticed.
+
+Under a STRICT `PeerAuthentication` policy, the probe then reached the pod with the node address instead of the exempted one, was redirected into ztunnel, and was rejected:
+
+```text
+connection closed due to policy rejection: explicitly denied by: istio-system/istio_converted_static_strict
+```
+
+The probe received a TCP reset, so the workload became `NotReady` and was removed from the endpoints of its service. The node did not recover on its own: the rules returned only after a restart of the `istio-cni-node` DaemonSet. The `cni.ambient.reconcileIptablesOnStartup` option did not help, because it runs only at startup and covers only the rules inside the pod.
+
+**Fixed in:** Istio v1.30.3. The agent now verifies the host rules periodically and reinstalls them when they no longer match. Set the interval in the `IstioCNI` resource, where `"0"` disables the check:
+
+```yaml
+kind: IstioCNI
+spec:
+  values:
+    cni:
+      ambient:
+        reconcileHostRulesInterval: "30s"
+```
+
+The `nodeagent_host_rules_reconciles_total` metric counts the repairs, labeled `result=repaired` or `result=failed`.
