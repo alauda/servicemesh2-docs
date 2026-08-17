@@ -57,7 +57,7 @@ Use this approach for sidecar-based deployments where you already use Istio `Gat
 3.  Deploy the `httpbin` sample service by running the following command:
 
     ```shell {name=istio-gw:deploy-httpbin}
-    kubectl apply -n httpbin -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/httpbin/httpbin.yaml
+    kubectl apply -n httpbin -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/httpbin/httpbin.yaml
     ```
 
 4.  Create a file named `httpbin-gw.yaml` that contains an Istio `Gateway` resource definition. This resource configures the gateway proxies to open port 80 (HTTP) for the host `httpbin.example.com`.
@@ -140,7 +140,7 @@ Use this approach for sidecar-based deployments where you already use Istio `Gat
 2.  Deploy the `curl` client with the following command:
 
     ```shell {name=istio-gw:deploy-curl}
-    kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/curl/curl.yaml
+    kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/curl/curl.yaml
     ```
 
 3. Store the name of the `curl` pod in a `CURL_POD` variable by running this command:

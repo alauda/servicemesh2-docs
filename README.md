@@ -74,6 +74,15 @@ For the best development experience, we recommend:
 ./hack/update-istio-in-docs.sh 1.26.3 1.24.6
 ```
 
+### 更新文档中的版本链接
+
+使用如下脚本更新 `docs/en` 下 `.mdx` 文档中 Istio 和 Sail Operator GitHub 链接的 release 分支版本，包括 raw 文件链接和 `github.com` 文件浏览链接。版本参数不需要包含 `release-` 前缀：
+
+```bash
+# 用法: ./hack/update-links-in-docs.sh <NEW_ISTIO_VERSION> <OLD_ISTIO_VERSION> <NEW_SAIL_VERSION> <OLD_SAIL_VERSION>
+./hack/update-links-in-docs.sh 1.31 1.30 2.3 2.2
+```
+
 ### Sail Operator 和 Istio 新版本内容同步更新
 
 让 AI 读取当前版本到新版本更新的内容：

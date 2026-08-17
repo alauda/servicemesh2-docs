@@ -28,6 +28,21 @@ Alauda Service Mesh v2.2 is built on the [Istio](https://istio.io/) project and 
     - [Istio 1.29 Release Announcement](https://istio.io/latest/news/releases/1.29.x/announcing-1.29/)
     - [Istio 1.30 Release Announcement](https://istio.io/latest/news/releases/1.30.x/announcing-1.30/)
 
+### Upgrade considerations
+
+The following Istio 1.29 and 1.30 changes affect existing meshes when you update from Istio 1.28:
+
+- **Kubernetes**: Istio 1.30 requires Kubernetes 1.32 or later. Upgrade the cluster before you update the control plane if it runs Kubernetes 1.30 or 1.31, which are valid versions for Istio 1.28.
+- **Gateway API `TLSRoute`**: Istio 1.30 reads `TLSRoute` at `gateway.networking.k8s.io/v1` and ignores the CRD below bundle version `v1.5.0`, whereas Istio 1.28 reads it at `v1alpha2` and ignores the CRD above bundle version `v1.4.1`. No bundle version serves both, so `TLSRoute` is unavailable for the duration of the update and TLS passthrough listeners report `attachedRoutes: 0` while the CRD is ignored. `Gateway` and `HTTPRoute` are not affected. See [Gateway API CRD requirements](../../updating/update-mesh/index.mdx#gateway-api-crd-requirements).
+- **Gateway API `ListenerSet`**: Istio 1.28 read the experimental `XListenerSet` resource (`gateway.networking.x-k8s.io/v1alpha1`); Istio 1.30 reads `ListenerSet` (`gateway.networking.k8s.io/v1`) instead. These are separate CRDs, so upgrading the Gateway API bundle does not migrate existing objects: Istio 1.30 ignores every `XListenerSet` and stops programming the listeners it contributed. After you upgrade the CRDs to `v1.5.x`, recreate each object as a `ListenerSet`, set `spec.listeners[].port`, which is now a required field, and update the `parentRefs` of the routes that attach to it. `Gateway.spec.allowedListeners` is unchanged.
+- **Ambient tracing**: waypoint proxies report spans under the waypoint service name instead of the destination service name. Set `external_services.tracing.use_waypoint_name` to `true` in the `Kiali` resource, otherwise Kiali shows no traces for ambient workloads. See [Updating the Kiali tracing configuration](../../updating/update-ambient-mode/updating-ambient-components.mdx#updating-the-kiali-tracing-configuration).
+- **Ambient CNI**: the Istio CNI agent now honors `values.cni.excludeNamespaces`. Ambient workloads in an excluded namespace are removed from the mesh.
+- **Ambient DNS**: DNS capture is enabled by default for ambient workloads, and the Istio CNI reconciles the in-pod rules of existing workloads when it starts.
+- **Metrics**: the `sidecar.istio.io/statsCompression` annotation was removed; use the `statsCompression` option in `proxyConfig` instead. Circuit breaker `remaining` metrics are no longer tracked by default; set `DISABLE_TRACK_REMAINING_CB_METRICS=false` to restore them.
+- **Service selection**: when a hostname exists in several namespaces, sidecars now prefer a Kubernetes `Service` over other service types. Set `PILOT_SIDECAR_PICK_BEST_SERVICE_NAMESPACE` to `false`, or set `spec.values.compatibilityVersion` to `1.28`, to restore the previous behavior.
+- **Debug endpoints**: XDS debug endpoints on port 15010 now require authentication, and debug endpoints on port 15014 are restricted per namespace. Set `ENABLE_DEBUG_ENDPOINT_AUTH=false` to restore the previous behavior.
+- **Istio CNI**: CNI configuration files are written with `0600` permissions. Set `values.cni.env.CNI_CONF_GROUP_READ` to `true` if a non-root group must read them.
+
 ### Kiali Features
 
 - Updated Kiali to version 2.27.

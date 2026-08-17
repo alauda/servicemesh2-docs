@@ -100,7 +100,7 @@ The gateway in each cluster must be reachable from the other cluster.
      :::
 
      ```bash {name=multi-primary-multi-network:create-eastwest-gw-east}
-     kubectl --context "${CTX_CLUSTER1}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net1.yaml
+     kubectl --context "${CTX_CLUSTER1}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/release-2.2/docs/deployment-models/resources/east-west-gateway-net1.yaml
      ```
 
      <details>
@@ -138,7 +138,7 @@ The gateway in each cluster must be reachable from the other cluster.
   4. Expose the services through the gateway by running the following command:
 
      ```bash {name=multi-primary-multi-network:expose-services-east}
-     kubectl --context "${CTX_CLUSTER1}" apply -n istio-system -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/expose-services.yaml
+     kubectl --context "${CTX_CLUSTER1}" apply -n istio-system -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/release-2.2/docs/deployment-models/resources/expose-services.yaml
      ```
 
   ### Install IstioCNI on the **West** cluster
@@ -199,7 +199,7 @@ The gateway in each cluster must be reachable from the other cluster.
      :::
 
      ```bash {name=multi-primary-multi-network:create-eastwest-gw-west}
-     kubectl --context "${CTX_CLUSTER2}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/east-west-gateway-net2.yaml
+     kubectl --context "${CTX_CLUSTER2}" apply -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/release-2.2/docs/deployment-models/resources/east-west-gateway-net2.yaml
      ```
 
      <details>
@@ -237,7 +237,7 @@ The gateway in each cluster must be reachable from the other cluster.
   4. Expose the services through the gateway by running the following command:
 
      ```bash {name=multi-primary-multi-network:expose-services-west}
-     kubectl --context "${CTX_CLUSTER2}" apply -n istio-system -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/main/docs/deployment-models/resources/expose-services.yaml
+     kubectl --context "${CTX_CLUSTER2}" apply -n istio-system -f https://raw.githubusercontent.com/alauda-mesh/sail-operator/release-2.2/docs/deployment-models/resources/expose-services.yaml
      ```
 
   ### Install a remote secret on the **East** cluster that provides access to the API server on the **West** cluster
@@ -292,7 +292,7 @@ This cluster will host the `v1` version of the `helloworld` service.
     ```shell {name=multi-primary-multi-network:deploy-helloworld-svc-east}
     kubectl --context="${CTX_CLUSTER1}" apply \
       -l service=helloworld -n sample \
-      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/helloworld/helloworld.yaml
     ```
 
     b.  Then, deploy the `v1` instance of the `helloworld` application.
@@ -300,7 +300,7 @@ This cluster will host the `v1` version of the `helloworld` service.
     ```shell {name=multi-primary-multi-network:deploy-helloworld-v1-east}
     kubectl --context="${CTX_CLUSTER1}" apply \
       -l version=v1 -n sample \
-      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/helloworld/helloworld.yaml
     ```
 
 4.  Deploy the `sleep` application, which will act as a client for sending test requests.
@@ -308,7 +308,7 @@ This cluster will host the `v1` version of the `helloworld` service.
     ```shell {name=multi-primary-multi-network:deploy-sleep-east}
     kubectl --context="${CTX_CLUSTER1}" apply \
       -n sample \
-      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/sleep/sleep.yaml
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/sleep/sleep.yaml
     ```
 
 5.  Pause the process until the `helloworld-v1` deployment is fully available and ready.
@@ -346,7 +346,7 @@ This cluster will host the `v2` version of the `helloworld` service.
     ```shell {name=multi-primary-multi-network:deploy-helloworld-svc-west}
     kubectl --context="${CTX_CLUSTER2}" apply \
       -l service=helloworld -n sample \
-      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/helloworld/helloworld.yaml
     ```
 
     b.  Deploy the `v2` instance of the `helloworld` application.
@@ -354,7 +354,7 @@ This cluster will host the `v2` version of the `helloworld` service.
     ```shell {name=multi-primary-multi-network:deploy-helloworld-v2-west}
     kubectl --context="${CTX_CLUSTER2}" apply \
       -l version=v2 -n sample \
-      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/helloworld/helloworld.yaml
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/helloworld/helloworld.yaml
     ```
 
 4.  Deploy the client `sleep` application on the `West` cluster.
@@ -362,7 +362,7 @@ This cluster will host the `v2` version of the `helloworld` service.
     ```shell {name=multi-primary-multi-network:deploy-sleep-west}
     kubectl --context="${CTX_CLUSTER2}" apply \
       -n sample \
-      -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/sleep/sleep.yaml
+      -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/sleep/sleep.yaml
     ```
 
 5.  Wait for the `helloworld-v2` deployment to become fully available.

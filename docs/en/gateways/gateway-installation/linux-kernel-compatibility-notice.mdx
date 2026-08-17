@@ -117,9 +117,10 @@ Skip this section if your kernel version is 4.11 or later.
            valueFrom:
              resourceFieldRef:
                resource: limits.cpu
+               divisor: "1"
          - name: PROXY_CONFIG
            value: |
-                 {{ protoToJSON .ProxyConfig }}
+                  {{ protoToJSON .ProxyConfig }}
          - name: ISTIO_META_POD_PORTS
            value: |-
              [
@@ -137,10 +138,12 @@ Skip this section if your kernel version is 4.11 or later.
            valueFrom:
              resourceFieldRef:
                resource: limits.memory
+               divisor: "1"
          - name: GOMAXPROCS
            valueFrom:
              resourceFieldRef:
                resource: limits.cpu
+               divisor: "1"
          {{- if .CompliancePolicy }}
          - name: COMPLIANCE_POLICY
            value: "{{ .CompliancePolicy }}"
@@ -167,6 +170,10 @@ Skip this section if your kernel version is 4.11 or later.
          - name: ISTIO_META_OWNER
            value: kubernetes://apis/{{ .TypeMeta.APIVersion }}/namespaces/{{ valueOrDefault .DeploymentMeta.Namespace `default` }}/{{ toLower .TypeMeta.Kind}}s/{{ .DeploymentMeta.Name }}
          {{- end}}
+         {{- if (isset .ObjectMeta.Annotations `sidecar.istio.io/bootstrapOverride`) }}
+         - name: ISTIO_BOOTSTRAP_OVERRIDE
+           value: "/etc/istio/custom-bootstrap/custom_bootstrap.json"
+         {{- end }}
          {{- if .Values.global.meshID }}
          - name: ISTIO_META_MESH_ID
            value: "{{ .Values.global.meshID }}"
@@ -210,6 +217,10 @@ Skip this section if your kernel version is 4.11 or later.
          {{- end }}
          - mountPath: /var/lib/istio/data
            name: istio-data
+         {{ if (isset .ObjectMeta.Annotations `sidecar.istio.io/bootstrapOverride`) }}
+         - mountPath: /etc/istio/custom-bootstrap
+           name: custom-bootstrap-volume
+         {{- end }}
          # SDS channel between istioagent and Envoy
          - mountPath: /etc/istio/proxy
            name: istio-envoy
@@ -224,7 +235,7 @@ Skip this section if your kernel version is 4.11 or later.
          - name: istio-podinfo
            mountPath: /etc/istio/pod
        volumes:
-       - emptyDir: {}
+       - emptyDir:
          name: workload-socket
        - emptyDir: {}
          name: credential-socket
@@ -235,6 +246,11 @@ Skip this section if your kernel version is 4.11 or later.
        {{- else}}
        - emptyDir: {}
          name: workload-certs
+       {{- end }}
+       {{- if (isset .ObjectMeta.Annotations `sidecar.istio.io/bootstrapOverride`) }}
+       - name: custom-bootstrap-volume
+         configMap:
+           name: {{ annotation .ObjectMeta `sidecar.istio.io/bootstrapOverride` "" }}
        {{- end }}
        # SDS channel between istioagent and Envoy
        - emptyDir:
@@ -264,11 +280,11 @@ Skip this section if your kernel version is 4.11 or later.
          projected:
            sources:
            - clusterTrustBundle:
-             name: istio.io:istiod-ca:root-cert
-             path: root-cert.pem
+               name: istio.io:istiod-ca:{{ .Values.global.trustBundleName | default "root-cert" }}
+               path: root-cert.pem
        {{- else }}
          configMap:
-           name: istio-ca-root-cert
+           name: {{ .Values.global.trustBundleName | default "istio-ca-root-cert" }}
        {{- end }}
        {{- end }}
        {{- if .Values.global.mountMtlsCerts }}

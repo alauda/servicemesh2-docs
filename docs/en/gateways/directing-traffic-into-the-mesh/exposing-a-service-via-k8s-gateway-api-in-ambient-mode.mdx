@@ -19,6 +19,7 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
 - Alauda Service Mesh v2 Operator is installed.
 - The `Istio` and `IstioCNI` resources are configured with the ambient profile.
 - A `Ztunnel` resource has been created.
+- Gateway API CRDs are installed.
 - Confirm [Linux kernel compatibility](../gateway-installation/linux-kernel-compatibility-notice.mdx#linux-kernel-compatibility-notice).
 - Your Kubernetes cluster supports external load balancers (i.e., Services of type `LoadBalancer`).
 
@@ -46,7 +47,7 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
 4.  Deploy the `httpbin` sample service:
 
     ```shell {name=ambient-gw-api:deploy-httpbin}
-    kubectl apply -n httpbin -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/httpbin/httpbin.yaml
+    kubectl apply -n httpbin -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/httpbin/httpbin.yaml
     ```
 
 5.  Create a file named `httpbin-waypoint.yaml` to define a waypoint proxy. This `Gateway` resource uses the `istio-waypoint` gateway class to process L7 traffic for services in the namespace.
@@ -283,7 +284,7 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
 2.  Deploy the `curl` client:
 
     ```shell {name=ambient-gw-api:deploy-curl}
-    kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/master/samples/curl/curl.yaml
+    kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/curl/curl.yaml
     ```
 
 3. Add the `istio-discovery=enabled` label to the `curl` namespace:
