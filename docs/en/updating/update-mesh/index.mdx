@@ -54,13 +54,15 @@ No bundle version satisfies Istio 1.28 and Istio 1.30 at the same time. `TLSRout
 
    ```bash
    # Standard channel
-   kubectl apply -k "github.com/kubernetes-sigs/gateway-api/config/crd/standard?ref=v1.5.1"
+   kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml
    ```
 
    ```bash
    # Experimental channel
-   kubectl apply -k "github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v1.5.1"
+   kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/experimental-install.yaml
    ```
+
+   Use `--server-side`. A client-side apply fails on the `HTTPRoute` CRD with `metadata.annotations: Too long`, because the definition exceeds the 256 KB limit of the `kubectl.kubernetes.io/last-applied-configuration` annotation, which leaves the bundle partially upgraded. Add `--force-conflicts` if the CRDs were previously installed with a client-side apply.
 
    Switching from the experimental channel to the standard channel is a separate migration: the standard channel stops serving `TLSRoute` at `v1alpha2` and `v1alpha3`, and it does not include `TCPRoute`, `UDPRoute`, or the `gateway.networking.x-k8s.io` resources. Move your manifests to `v1` and retire the experimental resources before you consider it.
 
@@ -71,7 +73,7 @@ No bundle version satisfies Istio 1.28 and Istio 1.30 at the same time. `TLSRout
    ```
 
 :::note
-The `v1.5.x` bundle installs a `safe-upgrades.gateway.networking.k8s.io` validating admission policy that rejects any later attempt to install a bundle earlier than `v1.5.0`. Delete the policy first if you have to roll the CRDs back.
+The `v1.5.x` bundle installs a `safe-upgrades.gateway.networking.k8s.io` validating admission policy that rejects any later attempt to install a bundle earlier than `v1.5.0`. Rolling the CRDs back takes two steps: delete the policy and its binding, and remove `v1` from `status.storedVersions` on the `TLSRoute` CRD, which the earlier bundle does not define. Delete your `TLSRoute` resources before you patch that field and recreate them afterward, because it records the version they are persisted at.
 :::
 
 ## Understanding Operator updates and channels \{#understanding-operator-updates-and-channels}
