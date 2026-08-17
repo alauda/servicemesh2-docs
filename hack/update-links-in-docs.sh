@@ -2,8 +2,8 @@
 
 # ============================================================================
 # 说明：
-#   更新 docs/en 下所有 .mdx 文档中 Istio 和 Sail Operator raw GitHub 链接的
-#   release 分支版本。脚本仅修改以下两个仓库的链接：
+#   更新 docs/en 下所有 .mdx 文档中 Istio 和 Sail Operator GitHub 链接的
+#   release 分支版本。脚本仅修改以下两个仓库的目标版本链接：
 #   - istio/istio
 #   - alauda-mesh/sail-operator
 #
@@ -54,14 +54,28 @@ fi
 
 OLD_ISTIO_LINK_PREFIX="https://raw.githubusercontent.com/istio/istio/refs/heads/release-${OLD_ISTIO_VERSION}/"
 NEW_ISTIO_LINK_PREFIX="https://raw.githubusercontent.com/istio/istio/refs/heads/release-${NEW_ISTIO_VERSION}/"
-OLD_SAIL_LINK_PREFIX="https://raw.githubusercontent.com/alauda-mesh/sail-operator/refs/heads/release-${OLD_SAIL_VERSION}/"
-NEW_SAIL_LINK_PREFIX="https://raw.githubusercontent.com/alauda-mesh/sail-operator/refs/heads/release-${NEW_SAIL_VERSION}/"
+
+# Sail Operator 文档中同时存在三种分支链接格式，需要逐一匹配。
+OLD_SAIL_LINK_PREFIXES=(
+    "https://raw.githubusercontent.com/alauda-mesh/sail-operator/refs/heads/release-${OLD_SAIL_VERSION}/"
+    "https://raw.githubusercontent.com/alauda-mesh/sail-operator/release-${OLD_SAIL_VERSION}/"
+    "https://github.com/alauda-mesh/sail-operator/blob/release-${OLD_SAIL_VERSION}/"
+)
+NEW_SAIL_LINK_PREFIXES=(
+    "https://raw.githubusercontent.com/alauda-mesh/sail-operator/refs/heads/release-${NEW_SAIL_VERSION}/"
+    "https://raw.githubusercontent.com/alauda-mesh/sail-operator/release-${NEW_SAIL_VERSION}/"
+    "https://github.com/alauda-mesh/sail-operator/blob/release-${NEW_SAIL_VERSION}/"
+)
 
 # 转义 sed 搜索表达式中的点号；版本参数已限制为数字和点号。
 OLD_ISTIO_VERSION_PATTERN=${OLD_ISTIO_VERSION//./\\.}
 OLD_SAIL_VERSION_PATTERN=${OLD_SAIL_VERSION//./\\.}
 ISTIO_SED_EXPRESSION="s|https://raw\\.githubusercontent\\.com/istio/istio/refs/heads/release-${OLD_ISTIO_VERSION_PATTERN}/|${NEW_ISTIO_LINK_PREFIX}|g"
-SAIL_SED_EXPRESSION="s|https://raw\\.githubusercontent\\.com/alauda-mesh/sail-operator/refs/heads/release-${OLD_SAIL_VERSION_PATTERN}/|${NEW_SAIL_LINK_PREFIX}|g"
+SAIL_SED_EXPRESSIONS=(
+    "s|https://raw\\.githubusercontent\\.com/alauda-mesh/sail-operator/refs/heads/release-${OLD_SAIL_VERSION_PATTERN}/|${NEW_SAIL_LINK_PREFIXES[0]}|g"
+    "s|https://raw\\.githubusercontent\\.com/alauda-mesh/sail-operator/release-${OLD_SAIL_VERSION_PATTERN}/|${NEW_SAIL_LINK_PREFIXES[1]}|g"
+    "s|https://github\\.com/alauda-mesh/sail-operator/blob/release-${OLD_SAIL_VERSION_PATTERN}/|${NEW_SAIL_LINK_PREFIXES[2]}|g"
+)
 
 # 兼容 GNU sed 和 macOS 自带的 BSD sed。
 SED_IN_PLACE=(-i)
@@ -82,10 +96,17 @@ while IFS= read -r -d '' file; do
         sed_expressions+=(-e "$ISTIO_SED_EXPRESSION")
     fi
 
-    if [[ "$NEW_SAIL_VERSION" != "$OLD_SAIL_VERSION" ]] && grep -Fq -- "$OLD_SAIL_LINK_PREFIX" "$file"; then
-        match_count=$(grep -Fo -- "$OLD_SAIL_LINK_PREFIX" "$file" | wc -l | tr -d '[:space:]')
-        sail_link_count=$((sail_link_count + match_count))
-        sed_expressions+=(-e "$SAIL_SED_EXPRESSION")
+    if [[ "$NEW_SAIL_VERSION" != "$OLD_SAIL_VERSION" ]]; then
+        for index in "${!OLD_SAIL_LINK_PREFIXES[@]}"; do
+            old_sail_link_prefix=${OLD_SAIL_LINK_PREFIXES[$index]}
+            if ! grep -Fq -- "$old_sail_link_prefix" "$file"; then
+                continue
+            fi
+
+            match_count=$(grep -Fo -- "$old_sail_link_prefix" "$file" | wc -l | tr -d '[:space:]')
+            sail_link_count=$((sail_link_count + match_count))
+            sed_expressions+=(-e "${SAIL_SED_EXPRESSIONS[$index]}")
+        done
     fi
 
     if [ "${#sed_expressions[@]}" -eq 0 ]; then
