@@ -22,9 +22,9 @@ The Alauda Service Mesh Operator includes additional Istio releases for upgrades
 
 Istio processes a Gateway API CRD only when the `gateway.networking.k8s.io/bundle-version` annotation on that CRD is within the range the running Istio version accepts. The range is per CRD, not per cluster:
 
-| CRD | Istio 1.28 | Istio 1.30 |
+| CRD | Istio 1.28.6 | Istio 1.30 |
 | --- | --- | --- |
-| `tlsroutes.gateway.networking.k8s.io` | `v1.4.1` or earlier | `v1.5.0` or later |
+| `tlsroutes.gateway.networking.k8s.io` | `v1.4.0` or earlier | `v1.5.0` or later |
 | `backendtlspolicies.gateway.networking.k8s.io` | `v1.4.0` or later | `v1.4.0` or later |
 | `grpcroutes.gateway.networking.k8s.io` | `v1.1.0` or later | `v1.1.0` or later |
 
@@ -33,48 +33,29 @@ Istio processes a Gateway API CRD only when the `gateway.networking.k8s.io/bundl
 `TLSRoute` is the only resource whose requirement changed: Istio 1.28 reads it at `gateway.networking.k8s.io/v1alpha2`, and Istio 1.30 reads it at `gateway.networking.k8s.io/v1`. When the CRD is outside the accepted range, Istio ignores it and `TLSRoute` resources become invisible to the control plane: TLS passthrough `Gateway` listeners silently report `status.listeners[].attachedRoutes: 0` and the corresponding Envoy listener is never programmed.
 
 :::warning
-No bundle version satisfies Istio 1.28 and Istio 1.30 at the same time. `TLSRoute` is therefore unavailable between the moment you upgrade the CRDs and the moment the Istio 1.30 control plane serves your gateways:
-
-- With the `InPlace` strategy, upgrade the CRDs immediately before you update the control plane.
-- With the `RevisionBased` strategy, upgrade the CRDs immediately before you move the gateways that use `TLSRoute` to the new revision, not at the start of the update.
+Alauda Container Platform installs and manages the Gateway API CRDs: 4.3 provides `TLSRoute` at bundle version `v1.4.1`, and 4.4 provides it at `v1.5.1`. Istio 1.28.6 accepts neither, and no bundle version satisfies Istio 1.28.6 and Istio 1.30 at the same time. `TLSRoute` is therefore unavailable for as long as the mesh runs Istio 1.28.6, and it works again only once Istio 1.30 runs on Alauda Container Platform 4.4. Meshes still on Istio 1.26.3, 1.28.1, or 1.28.3 keep `TLSRoute` working on both platform versions.
 :::
 
 **Procedure**
 
-1. Check the bundle version and the channel of the `TLSRoute` CRD:
+1. Check the bundle version of the `TLSRoute` CRD:
 
    ```bash
    kubectl get crd tlsroutes.gateway.networking.k8s.io \
-     -o custom-columns='BUNDLE:.metadata.annotations.gateway\.networking\.k8s\.io/bundle-version,CHANNEL:.metadata.annotations.gateway\.networking\.k8s\.io/channel'
+     -o jsonpath='{.metadata.annotations.gateway\.networking\.k8s\.io/bundle-version}'
    ```
 
-   If the command reports `NotFound`, the cluster does not use `TLSRoute` and no upgrade is required.
+   If the command reports `NotFound`, the cluster does not use `TLSRoute` and no action is required.
 
-2. Install bundle version `v1.5.1` from the channel that the previous command reported. Keep the channel unchanged: the channel selects which resources and which API versions the cluster serves, and both channels serve `TLSRoute` at `v1`.
+2. If the reported version is earlier than `v1.5.0`, update Alauda Container Platform to 4.4 before you update the mesh.
 
-   ```bash
-   # Standard channel
-   kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml
-   ```
+   Do not install the Gateway API CRDs yourself. The platform owns them, and a bundle that stops serving `TLSRoute` at `v1alpha2` leaves any control plane older than Istio 1.28.6 permanently unready instead of degrading to `attachedRoutes: 0`.
 
-   ```bash
-   # Experimental channel
-   kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/experimental-install.yaml
-   ```
-
-   Use `--server-side`. A client-side apply fails on the `HTTPRoute` CRD with `metadata.annotations: Too long`, because the definition exceeds the 256 KB limit of the `kubectl.kubernetes.io/last-applied-configuration` annotation, which leaves the bundle partially upgraded. Add `--force-conflicts` if the CRDs were previously installed with a client-side apply.
-
-   Switching from the experimental channel to the standard channel is a separate migration: the standard channel stops serving `TLSRoute` at `v1alpha2` and `v1alpha3`, and it does not include `TCPRoute`, `UDPRoute`, or the `gateway.networking.x-k8s.io` resources. Move your manifests to `v1` and retire the experimental resources before you consider it.
-
-3. Confirm that `v1` is served:
+3. Update the mesh to Istio 1.30, then confirm that `v1` is served:
 
    ```bash
    kubectl get crd tlsroutes.gateway.networking.k8s.io -o jsonpath='{range .spec.versions[?(@.served)]}{.name}{" "}{end}'
    ```
-
-:::note
-The `v1.5.x` bundle installs a `safe-upgrades.gateway.networking.k8s.io` validating admission policy that rejects any later attempt to install a bundle earlier than `v1.5.0`. Rolling the CRDs back takes two steps: delete the policy and its binding, and remove `v1` from `status.storedVersions` on the `TLSRoute` CRD, which the earlier bundle does not define. Delete your `TLSRoute` resources before you patch that field and recreate them afterward, because it records the version they are persisted at.
-:::
 
 ## Understanding Operator updates and channels \{#understanding-operator-updates-and-channels}
 
