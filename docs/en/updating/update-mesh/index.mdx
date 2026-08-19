@@ -18,6 +18,28 @@ Alauda Service Mesh follows Semantic Versioning for all product releases. Semant
 
 The Alauda Service Mesh Operator includes additional Istio releases for upgrades but supports only the latest Istio version available for each Operator version. See the "[Release Notes](../../about/release-notes/index.mdx)" to identify the supported Istio version for each Operator release.
 
+## Upgrade Path
+
+The table below contains the complete upgrade path for a mesh in sidecar mode. When upgrading, you need to upgrade the Operator versions in sequence, and update the Istio control plane to the Istio version of each step before you move on to the next one.
+
+| No. | Alauda Service Mesh | Istio  |
+| --- | ------------------- | ------ |
+| 1   | 2.0.z               | 1.26.z |
+| 2   | 2.1.z               | 1.28.z |
+| 3   | 2.2.z               | 1.30.z |
+
+Each Operator version bundles the Istio version of the previous step as well, so the control plane never has to jump over a step: after you upgrade the Operator, the mesh keeps running the Istio version it was on, and you then update the `Istio` resource to the Istio version of the new step.
+
+:::info
+In the version numbers above, the `.z` indicates the latest available patch version for that minor release.
+When performing an upgrade, you should always use the most recent patch version to ensure you benefit from the latest security updates and bug fixes.
+The latest patch versions for each release can be found in the [Release Notes](../../about/release-notes/).
+:::
+
+:::warning
+Istio 1.30 requires Kubernetes 1.32 or later. Before you update the control plane to Istio 1.30, verify that the cluster meets this requirement and review the [compatibility and support matrix](../../about/release-notes/compatibility-support-matrix.mdx).
+:::
+
 ## Gateway API CRD requirements \{#gateway-api-crd-requirements}
 
 Istio processes a Gateway API CRD only when the `gateway.networking.k8s.io/bundle-version` annotation on that CRD is within the range the running Istio version accepts. The range is per CRD, not per cluster:

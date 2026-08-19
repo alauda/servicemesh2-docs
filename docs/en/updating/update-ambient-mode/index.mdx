@@ -14,6 +14,25 @@ Ambient mode supports only the `InPlace` update strategy. ZTunnel follows a clus
 Ambient mode remains a Technology Preview feature. For installation instructions, see [Istio ambient mode](../../installing/ambient-mode/index.mdx).
 :::
 
+## Upgrade Path
+
+The table below contains the complete upgrade path for a mesh in ambient mode. Ambient mode was introduced in Alauda Service Mesh v2.1, so the path starts at that release. When upgrading, you need to upgrade the Operator versions in sequence, and update the mesh components to the Istio version of each step before you move on to the next one.
+
+| No. | Alauda Service Mesh | Istio  |
+| --- | ------------------- | ------ |
+| 1   | 2.1.z               | 1.28.z |
+| 2   | 2.2.z               | 1.30.z |
+
+:::info
+In the version numbers above, the `.z` indicates the latest available patch version for that minor release.
+When performing an upgrade, you should always use the most recent patch version to ensure you benefit from the latest security updates and bug fixes.
+The latest patch versions for each release can be found in the [Release Notes](../../about/release-notes/).
+:::
+
+:::warning
+Istio 1.30 requires Kubernetes 1.32 or later. Before you update the mesh components to Istio 1.30, verify that the cluster meets this requirement and review the [compatibility and support matrix](../../about/release-notes/compatibility-support-matrix.mdx).
+:::
+
 ## Update sequence
 
 Update the mesh components in the following order:
