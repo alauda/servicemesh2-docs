@@ -36,10 +36,6 @@ When performing an upgrade, you should always use the most recent patch version 
 The latest patch versions for each release can be found in the [Release Notes](../../about/release-notes/).
 :::
 
-:::warning
-Istio 1.30 requires Kubernetes 1.32 or later. Before you update the control plane to Istio 1.30, verify that the cluster meets this requirement and review the [compatibility and support matrix](../../about/release-notes/compatibility-support-matrix.mdx).
-:::
-
 ## Gateway API CRD requirements \{#gateway-api-crd-requirements}
 
 Istio processes a Gateway API CRD only when the `gateway.networking.k8s.io/bundle-version` annotation on that CRD is within the range the running Istio version accepts. The range is per CRD, not per cluster:
