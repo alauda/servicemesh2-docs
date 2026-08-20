@@ -82,7 +82,7 @@ test_install_multi_primary_multi_network() {
     sleep 3
 
     log_info "步骤 1.4: East 部署东西向网关"
-    runme run multi-primary-multi-network:create-eastwest-gw-east || {
+    runme_run_with_assets multi-primary-multi-network:create-eastwest-gw-east || {
         log_error "East 东西向网关部署失败"; return 1
     }
 
@@ -90,7 +90,7 @@ test_install_multi_primary_multi_network() {
     _wait_for_ingress_lb istio-system istio-eastwestgateway "$CTX_CLUSTER1" || return 1
 
     log_info "步骤 1.5: East 暴露服务"
-    runme run multi-primary-multi-network:expose-services-east || {
+    runme_run_with_assets multi-primary-multi-network:expose-services-east || {
         log_error "East 暴露服务失败"; return 1
     }
 
@@ -114,14 +114,14 @@ test_install_multi_primary_multi_network() {
     sleep 3
 
     log_info "步骤 1.9: West 部署东西向网关"
-    runme run multi-primary-multi-network:create-eastwest-gw-west || {
+    runme_run_with_assets multi-primary-multi-network:create-eastwest-gw-west || {
         log_error "West 东西向网关部署失败"; return 1
     }
 
     _wait_for_ingress_lb istio-system istio-eastwestgateway "$CTX_CLUSTER2" || return 1
 
     log_info "步骤 1.10: West 暴露服务"
-    runme run multi-primary-multi-network:expose-services-west || {
+    runme_run_with_assets multi-primary-multi-network:expose-services-west || {
         log_error "West 暴露服务失败"; return 1
     }
 

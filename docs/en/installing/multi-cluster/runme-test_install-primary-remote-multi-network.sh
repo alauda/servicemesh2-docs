@@ -110,19 +110,19 @@ test_install_primary_remote_multi_network() {
     sleep 3
 
     log_info "步骤 1.5: East 部署东西向网关"
-    runme run primary-remote-multi-network:create-eastwest-gw-east || {
+    runme_run_with_assets primary-remote-multi-network:create-eastwest-gw-east || {
         log_error "East 东西向网关部署失败"; return 1
     }
 
     _wait_for_ingress_lb istio-system istio-eastwestgateway "$CTX_CLUSTER1" || return 1
 
     log_info "步骤 1.6: East 暴露 istiod 控制面"
-    runme run primary-remote-multi-network:expose-istiod-east || {
+    runme_run_with_assets primary-remote-multi-network:expose-istiod-east || {
         log_error "East 暴露 istiod 失败"; return 1
     }
 
     log_info "步骤 1.7: East 暴露应用服务"
-    runme run primary-remote-multi-network:expose-services-east || {
+    runme_run_with_assets primary-remote-multi-network:expose-services-east || {
         log_error "East 暴露应用服务失败"; return 1
     }
 
@@ -165,7 +165,7 @@ test_install_primary_remote_multi_network() {
     sleep 3
 
     log_info "步骤 1.14: West 部署东西向网关"
-    runme run primary-remote-multi-network:create-eastwest-gw-west || {
+    runme_run_with_assets primary-remote-multi-network:create-eastwest-gw-west || {
         log_error "West 东西向网关部署失败"; return 1
     }
 
