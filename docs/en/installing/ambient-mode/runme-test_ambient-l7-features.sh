@@ -175,7 +175,7 @@ cleanup_ambient_l7_features() {
     }
 
     # 清理授权策略资源
-    runme run ambient-l7-features:cleanup-authorization-policy || {
+    runme_run_with_assets ambient-l7-features:cleanup-authorization-policy || {
         log_error "清理授权策略资源失败"
         return 1
     }
