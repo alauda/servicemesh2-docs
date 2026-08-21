@@ -34,7 +34,7 @@ test_mtls() {
 
     # 步骤 1：渲染文档代码块并下发 PeerAuthentication(STRICT)
     # 取 mtls.mdx 的 {name=mtls:peerauthentication-strict} 块（第 39-48 行），
-    # 将占位符 <namespace> 替换为 $ns，并去除行尾 # [!code callout] 文档渲染标记。
+    # 将占位符 <namespace> 替换为 ${ns}，并去除行尾 # [!code callout] 文档渲染标记。
     log_info "步骤 1: 渲染并下发 PeerAuthentication(STRICT) 到命名空间 $ns"
     local manifest
     manifest=$(runme print mtls:peerauthentication-strict \
