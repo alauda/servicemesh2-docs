@@ -282,10 +282,12 @@ EOF
     log_success "bookinfo pods 验证通过"
 
     # 26. 验证 ztunnel 仍代理工作负载（HBONE 协议；输出含动态 IP/pod 名，使用 __cmp_lines）
+    # 同 deploying-ambient-bookinfo 步骤 9：ztunnel 重建后要过一小会儿才重新纳管
+    # 已有 pod，这期间 PROTOCOL 列是 TCP 而不是 HBONE，且命令退出码始终为 0，
+    # 只重试退出码没用，必须按内容重试。
     log_info "步骤 26: 验证 ztunnel workloads (HBONE)"
-    output=$(runme run update-ambient:verify-ztunnel-workloads 2>&1)
-
-    if ! __cmp_lines "$output" "$(cat <<'EOF'
+    local ztunnel_expected
+    ztunnel_expected="$(cat <<'EOF'
 + bookinfo
 + details-v1
 + productpage-v1
@@ -295,7 +297,12 @@ EOF
 + reviews-v3
 + HBONE
 EOF
-    )"; then
+    )"
+    _verify_ztunnel_workloads() {
+        output="$(runme run update-ambient:verify-ztunnel-workloads 2>&1)"
+        __cmp_lines "$output" "$ztunnel_expected"
+    }
+    if ! retry_command _verify_ztunnel_workloads 30 5; then
         log_error "验证 ztunnel workloads 失败"
         log_error "实际输出: $output"
         return 1

@@ -98,12 +98,17 @@ EOF
     }
 
     # 9. 验证 ztunnel 代理
-    # 输出包含动态值（IP、pod 名称后缀），使用 __cmp_lines 验证关键字段
+    # 输出包含动态值（IP、pod 名称后缀），使用 __cmp_lines 验证关键字段。
+    #
+    # 必须按内容重试：步骤 8 给命名空间打上 ambient 标签后，ztunnel 要过一小会儿
+    # 才把已有 pod 纳管，这期间 `istioctl ztunnel-config workload` 的 PROTOCOL 列
+    # 仍是 TCP，要等纳管完成才变成 HBONE。命令本身退出码一直是 0，所以只重试
+    # 退出码没用。已在 ACP 4.3.1 单节点环境实测：同一份镜像连跑两次，一次赶上
+    # 一次没赶上，是典型竞态。
     log_info "步骤 9: 验证 ztunnel 代理"
-    local ztunnel_output
-    ztunnel_output=$(runme run ambient-bookinfo:verify-ztunnel 2>&1)
-
-    if ! __cmp_lines "$ztunnel_output" "$(cat <<'EOF'
+    local ztunnel_output=""
+    local ztunnel_expected
+    ztunnel_expected="$(cat <<'EOF'
 + details-v1
 + productpage-v1
 + ratings-v1
@@ -112,7 +117,12 @@ EOF
 + reviews-v3
 + HBONE
 EOF
-    )"; then
+    )"
+    _verify_ztunnel_enrolled() {
+        ztunnel_output="$(runme run ambient-bookinfo:verify-ztunnel 2>&1)"
+        __cmp_lines "$ztunnel_output" "$ztunnel_expected"
+    }
+    if ! retry_command _verify_ztunnel_enrolled 30 5; then
         log_error "ZTunnel 验证失败"
         log_error "实际输出: $ztunnel_output"
         return 1
