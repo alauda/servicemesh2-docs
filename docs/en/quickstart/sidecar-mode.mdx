@@ -1,0 +1,30 @@
+---
+weight: 10
+---
+
+# Sidecar Mode Quick Start
+
+This quick start lists the operations required to build, and then remove, a complete Alauda Service Mesh v2 environment in sidecar mode, together with the sample application and the observability stack.
+
+Each item names the operations involved and links to the document that covers them in detail.
+
+## Installation
+
+Perform the following operations in order:
+
+1. **Install Alauda Service Mesh** — Install the Alauda Service Mesh v2 Operator, then create the `IstioCNI` and `Istio` resources to deploy the Istio control plane. See [Installing Alauda Service Mesh](../installing/installing-service-mesh/install-mesh.mdx).
+2. **Configure monitoring** — Create the `ServiceMonitor`, `PodMonitor`, and `Telemetry` resources so that the control plane and the sidecar proxies expose metrics. Monitoring is required to run Kiali, the dedicated console for Istio. See [Metrics and Service Mesh](../integration/observability/metrics-and-mesh.mdx).
+3. **Deploy the Bookinfo application** — Create the `bookinfo` namespace, enable sidecar injection on it, deploy the sample application, and expose it through a gateway. See [Deploying the Bookinfo Application](../installing/installing-service-mesh/application-deployment/deploying-the-bookinfo-application.mdx).
+4. **Install Alauda Distributed Tracing** — Install the Alauda Build of OpenTelemetry v2 Operator, then deploy a Jaeger v2 instance backed by OpenSearch and an OpenTelemetry Collector. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-opensearch.html" children="Installing Alauda Distributed Tracing with OpenSearch" />.
+5. **Configure tracing for the mesh** — Enable tracing and define the OpenTelemetry extension provider on the `Istio` resource, then reference that provider and set the sampling rate on the `Telemetry` resource. See [Configuring distributed tracing platform with Service Mesh](../integration/observability/distributed-tracing/config-with-service-mesh.mdx).
+6. **Install Alauda Build of Kiali** — Install the Alauda Build of Kiali Operator, create the `Kiali` resource, connect it to the monitoring data source, and integrate it with the distributed tracing platform. See [Alauda Build of Kiali](../integration/observability/kiali.mdx).
+
+## Cleanup
+
+Perform the following operations in order to remove everything created above:
+
+1. **Uninstall Alauda Build of Kiali** — Delete the `Kiali` resource and uninstall the Alauda Build of Kiali Operator. See [Uninstalling Alauda Build of Kiali](../uninstalling/uninstalling-alauda-build-of-kiali.mdx).
+2. **Remove the mesh tracing configuration** — Remove the `tracing` section from the `Telemetry` resource and disable tracing on the `Istio` resource. See [Removing the Service Mesh tracing configuration](../integration/observability/distributed-tracing/config-with-service-mesh.mdx#removing-the-service-mesh-tracing-configuration).
+3. **Uninstall Alauda Distributed Tracing** — Delete the OpenTelemetry Collector and the Jaeger v2 instance, and uninstall the Alauda Build of OpenTelemetry v2 Operator. See <ExternalSiteLink name="distributed-tracing" href="/uninstalling/uninstalling-distributed-tracing.html" children="Uninstalling Alauda Distributed Tracing" />.
+4. **Remove the Bookinfo application** — Delete the `bookinfo` namespace, which also removes the associated gateway resources. See [Removing the Bookinfo Application](../installing/installing-service-mesh/application-deployment/deploying-the-bookinfo-application.mdx#removing-the-bookinfo-application).
+5. **Uninstall Alauda Service Mesh** — Delete the `Istio` and `IstioCNI` resources, uninstall the Alauda Service Mesh v2 Operator, and delete the `istio-system` and `istio-cni` namespaces. See [Uninstalling Alauda Service Mesh](../uninstalling/uninstalling-alauda-service-mesh.mdx).
