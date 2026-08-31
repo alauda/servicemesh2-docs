@@ -169,10 +169,10 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
 
 ### Procedure
 
-1. Change the version in the `Istio` resource. For example, to update to Istio `1.30.3`, set the spec.version field to `v1.30.3` by running the following command:
+1. Change the version in the `Istio` resource. For example, to update to Istio `1.30.4`, set the spec.version field to `v1.30.4` by running the following command:
 
    ```bash {name=update-revisionbased-tag:patch-istio-version}
-   kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.30.3"}}'
+   kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.30.4"}}'
    ```
 
    **Version update in Istio CR**
@@ -180,7 +180,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
    ```yaml
    kind: Istio
    spec:
-     version: v1.30.3
+     version: v1.30.4
      updateStrategy:
        type: RevisionBased
    ```
@@ -199,7 +199,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
 
       ```text {name=update-revisionbased-tag:get-istio-update-output}
       NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
-      default   istio-system             2           2       2        default-v1-30-3   Healthy   v1.30.3   12m
+      default   istio-system             2           2       2        default-v1-30-4   Healthy   v1.30.4   12m
       ```
 
    b. Confirm that `IstioRevision` resource is ready by running the following command:
@@ -213,7 +213,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
       ```text {name=update-revisionbased-tag:get-istiorevision-update-output}
       NAME              NAMESPACE      PROFILE   READY   STATUS    IN USE   VERSION   AGE
       default-v1-28-6   istio-system             True    Healthy   True     v1.28.6   13m
-      default-v1-30-3   istio-system             True    Healthy   True     v1.30.3   52s
+      default-v1-30-4   istio-system             True    Healthy   True     v1.30.4   52s
       ```
 
    c. Confirm that `IstioRevisionTag` resource is ready by running the following command:
@@ -226,7 +226,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
 
       ```text {name=update-revisionbased-tag:get-revisiontag-update-output}
       NAME      STATUS    IN USE   REVISION          AGE
-      default   Healthy   True     default-v1-30-3   9m53s
+      default   Healthy   True     default-v1-30-4   9m53s
       ```
 
 3. Confirm that there are two control plane pods running, one for each revision by running the following command:
@@ -240,7 +240,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
    ```text {name=update-revisionbased-tag:get-pods-update-output}
    NAME                                      READY   STATUS    RESTARTS   AGE
    istiod-default-v1-28-6-79c8fddcf7-qnfmb   1/1     Running   0          14m
-   istiod-default-v1-30-3-79b66bfb5f-2nq6q   1/1     Running   0          108s
+   istiod-default-v1-30-4-79b66bfb5f-2nq6q   1/1     Running   0          108s
    ```
 
 4. Confirm that the workload sidecars are still connected to the previous control plane by running the following command:
@@ -277,7 +277,7 @@ With the `RevisionBased` update strategy for Istio, an `IstioRevisionTag` resour
 1. Verify that the new version of the sidecar is running by entering the following command:
 
    ```bash {name=update-revisionbased-tag:verify-proxy-new}
-   # <new_revision_name> example: default-v1-30-3
+   # <new_revision_name> example: default-v1-30-4
    istioctl proxy-status --revision <new_revision_name>
    ```
 
