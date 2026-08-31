@@ -74,6 +74,16 @@ For the best development experience, we recommend:
 ./hack/update-istio-in-docs.sh 1.26.3 1.24.6
 ```
 
+### 更新 servicemesh-operator2 版本
+
+Istio 版本更新会产出新的 Operator 构建，使用如下脚本更新 `docs/en/installing/installing-service-mesh/install-mesh.mdx` 中 servicemesh-operator2 的安装版本（`startingCSV` 与示例输出中的 CSV 名称、VERSION 列）。版本化订阅通道（如 `stable-2.1` 更新为 `stable-2.2`）由版本号推断，不需要额外参数；版本号长度变化时，示例输出中的表格会按原有列间距自动重新对齐：
+
+```bash
+# 用法: ./hack/update-operator-in-docs.sh <NEW_VERSION> <OLD_VERSION>
+./hack/update-operator-in-docs.sh 2.2.0-r1 2.1.0
+./hack/update-operator-in-docs.sh 2.2.0-r2 2.2.0-r1
+```
+
 ### 更新文档中的版本链接
 
 使用如下脚本更新 `docs/en` 下 `.mdx` 文档中 Istio 和 Sail Operator GitHub 链接的 release 分支版本，包括 raw 文件链接和 `github.com` 文件浏览链接。版本参数不需要包含 `release-` 前缀：

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Ambient 模式组件升级文档测试脚本
 # 流程：铺垫安装 v1.28.6 ambient 环境（Istio/IstioCNI/ZTunnel + bookinfo）
-#       → 按 控制面 → IstioCNI → ZTunnel 顺序升级到 v1.30.3 → 验证工作负载
+#       → 按 控制面 → IstioCNI → ZTunnel 顺序升级到 v1.30.4 → 验证工作负载
 # 清理：cleanup 函数执行文档 update-ambient:cleanup 块（含 bookinfo 与三组件回收）
 
 set -e
@@ -118,11 +118,11 @@ test_updating_ambient_components() {
     maybe_gen_bookinfo_traffic
 
     # ==========================================
-    # Section 2: 升级 Istio 控制面 → v1.30.3
+    # Section 2: 升级 Istio 控制面 → v1.30.4
     # ==========================================
 
     # 13. 升级控制面版本
-    log_info "步骤 13: 升级 Istio 控制面版本至 v1.30.3"
+    log_info "步骤 13: 升级 Istio 控制面版本至 v1.30.4"
     runme run update-ambient:patch-istio-version || {
         log_error "升级 Istio 控制面版本失败"
         return 1
@@ -137,28 +137,28 @@ test_updating_ambient_components() {
     }
 
     # 15. 验证控制面版本（输出含动态 AGE 值，使用 __cmp_lines 验证关键字段）
-    log_info "步骤 15: 验证控制面已升级到 v1.30.3"
+    log_info "步骤 15: 验证控制面已升级到 v1.30.4"
     output=$(runme run update-ambient:get-istio-update 2>&1)
 
     if ! __cmp_lines "$output" "$(cat <<'EOF'
 + default
 + ambient
 + Healthy
-+ v1.30.3
++ v1.30.4
 EOF
     )"; then
         log_error "验证控制面版本失败"
         log_error "实际输出: $output"
         return 1
     fi
-    log_success "控制面版本验证通过 (v1.30.3)"
+    log_success "控制面版本验证通过 (v1.30.4)"
 
     # ==========================================
-    # Section 3: 升级 IstioCNI → v1.30.3
+    # Section 3: 升级 IstioCNI → v1.30.4
     # ==========================================
 
     # 16. 升级 IstioCNI 版本
-    log_info "步骤 16: 升级 IstioCNI 版本至 v1.30.3"
+    log_info "步骤 16: 升级 IstioCNI 版本至 v1.30.4"
     runme run update-ambient:patch-istiocni-version || {
         log_error "升级 IstioCNI 版本失败"
         return 1
@@ -180,7 +180,7 @@ EOF
     }
 
     # 19. 验证 IstioCNI 版本（输出含动态 AGE 值，使用 __cmp_lines 验证关键字段）
-    log_info "步骤 19: 验证 IstioCNI 已升级到 v1.30.3"
+    log_info "步骤 19: 验证 IstioCNI 已升级到 v1.30.4"
     output=$(runme run update-ambient:get-istiocni-update 2>&1)
 
     if ! __cmp_lines "$output" "$(cat <<'EOF'
@@ -188,21 +188,21 @@ EOF
 + istio-cni
 + True
 + Healthy
-+ v1.30.3
++ v1.30.4
 EOF
     )"; then
         log_error "验证 IstioCNI 版本失败"
         log_error "实际输出: $output"
         return 1
     fi
-    log_success "IstioCNI 版本验证通过 (v1.30.3)"
+    log_success "IstioCNI 版本验证通过 (v1.30.4)"
 
     # ==========================================
-    # Section 4: 升级 ZTunnel → v1.30.3
+    # Section 4: 升级 ZTunnel → v1.30.4
     # ==========================================
 
     # 20. 升级 ZTunnel 版本
-    log_info "步骤 20: 升级 ZTunnel 版本至 v1.30.3"
+    log_info "步骤 20: 升级 ZTunnel 版本至 v1.30.4"
     runme run update-ambient:patch-ztunnel-version || {
         log_error "升级 ZTunnel 版本失败"
         return 1
@@ -224,7 +224,7 @@ EOF
     }
 
     # 23. 验证 ZTunnel 版本（输出含动态 AGE 值，使用 __cmp_lines 验证关键字段）
-    log_info "步骤 23: 验证 ZTunnel 已升级到 v1.30.3"
+    log_info "步骤 23: 验证 ZTunnel 已升级到 v1.30.4"
     output=$(runme run update-ambient:get-ztunnel-update 2>&1)
 
     if ! __cmp_lines "$output" "$(cat <<'EOF'
@@ -232,14 +232,14 @@ EOF
 + ztunnel
 + True
 + Healthy
-+ v1.30.3
++ v1.30.4
 EOF
     )"; then
         log_error "验证 ZTunnel 版本失败"
         log_error "实际输出: $output"
         return 1
     fi
-    log_success "ZTunnel 版本验证通过 (v1.30.3)"
+    log_success "ZTunnel 版本验证通过 (v1.30.4)"
 
     # 24. 验证 ztunnel pods（输出含动态 pod 名/IP/AGE，使用 __cmp_lines 验证关键字段）
     log_info "步骤 24: 验证 ztunnel pods 运行状态"

@@ -25,7 +25,7 @@ connection closed due to policy rejection: explicitly denied by: istio-system/is
 
 The probe received a TCP reset, so the workload became `NotReady` and was removed from the endpoints of its service. The node did not recover on its own: the rules returned only after a restart of the `istio-cni-node` DaemonSet. The `cni.ambient.reconcileIptablesOnStartup` option did not help, because it runs only at startup and covers only the rules inside the pod.
 
-**Fixed in:** Istio v1.30.3. The agent now verifies the host rules periodically and reinstalls them when they no longer match. Set the interval in the `IstioCNI` resource, where `"0"` disables the check:
+**Fixed in:** Istio v1.30.4. The agent now verifies the host rules periodically and reinstalls them when they no longer match. Set the interval in the `IstioCNI` resource, where `"0"` disables the check:
 
 ```yaml
 kind: IstioCNI
