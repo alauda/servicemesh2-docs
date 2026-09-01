@@ -57,7 +57,7 @@ spec:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 1Gi
+              storage: 4Gi
     - name: cache
       persistentVolumeClaim:
         claimName: doc-build-cache
