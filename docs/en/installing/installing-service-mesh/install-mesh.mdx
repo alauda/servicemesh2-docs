@@ -90,9 +90,9 @@ Verify that the Operator installation status is reported as `Succeeded` in the *
     **Example output**
     
     ```bash {name=install-mesh:check-packagemanifest-versions-output}
-    CHANNEL     NAME                          VERSION
-    stable      servicemesh-operator2.v2.1.0  2.1.0
-    stable-2.1  servicemesh-operator2.v2.1.0  2.1.0
+    CHANNEL     NAME                             VERSION
+    stable      servicemesh-operator2.v2.2.0-r1  2.2.0-r1
+    stable-2.2  servicemesh-operator2.v2.2.0-r1  2.2.0-r1
     ```
 
     **Fields**:
@@ -140,7 +140,7 @@ Verify that the Operator installation status is reported as `Succeeded` in the *
       name: servicemesh-operator2
       source: platform
       sourceNamespace: cpaas-system
-      startingCSV: servicemesh-operator2.v2.1.0
+      startingCSV: servicemesh-operator2.v2.2.0-r1
     EOF
     ```
     
@@ -184,8 +184,8 @@ Verify that the Operator installation status is reported as `Succeeded` in the *
     **Example output**
     
     ```bash {name=install-mesh:get-installplan-output}
-    NAME            CSV                            APPROVAL   APPROVED
-    install-rlgnp   servicemesh-operator2.v2.1.0   Manual     false
+    NAME            CSV                               APPROVAL   APPROVED
+    install-rlgnp   servicemesh-operator2.v2.2.0-r1   Manual     false
     ```
     
     **Approve manually**
@@ -212,8 +212,8 @@ kubectl -n sail-operator get csv
 **Example output**
 
 ```bash {name=install-mesh:check-csv-status-output}
-NAME                           DISPLAY                  VERSION   REPLACES   PHASE
-servicemesh-operator2.v2.1.0   Alauda Service Mesh v2   2.1.0                Succeeded
+NAME                              DISPLAY                  VERSION    REPLACES   PHASE
+servicemesh-operator2.v2.2.0-r1   Alauda Service Mesh v2   2.2.0-r1              Succeeded
 ```
 
 **Fields**
@@ -310,7 +310,7 @@ Wait until the `.status.state` field of the `IstioCNI` resource to be `Healthy`.
     metadata:
       name: default
     spec:
-      version: v1.30.3
+      version: v1.30.4
       namespace: istio-cni
       values:
         cni:
@@ -381,7 +381,7 @@ Wait until the `.status.state` field of the `Istio` resource to be `Healthy`.
     metadata:
       name: default
     spec:
-      version: v1.30.3
+      version: v1.30.4
       namespace: istio-system
     EOF
     ```
