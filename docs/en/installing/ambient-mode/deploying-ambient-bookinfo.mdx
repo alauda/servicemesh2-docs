@@ -6,7 +6,9 @@ weight: 30
 
 You can deploy the Bookinfo sample application in ambient mode without sidecar injection by relying on the ZTunnel proxy. For background on the Bookinfo application, see [Deploying the Bookinfo Application](../installing-service-mesh/application-deployment/deploying-the-bookinfo-application.mdx).
 
-## Prerequisites
+## Deploying the Bookinfo Application
+
+### Prerequisites
 
 - An active ACP CLI (`kubectl`) session by a cluster administrator with the `cluster-admin` role.
 - You have `istioctl` installed locally so that you can use to run these instructions.
@@ -14,7 +16,7 @@ You can deploy the Bookinfo sample application in ambient mode without sidecar i
 - An `IstioCNI` resource has been created, and the Operator has deployed the required `IstioCNI` pods.
 - A `ZTunnel` resource has been created, and the Operator has deployed the required `ZTunnel` pods.
 
-## Procedure
+### Procedure
 
 1. Create the `bookinfo` namespace:
 
@@ -40,7 +42,45 @@ You can deploy the Bookinfo sample application in ambient mode without sidecar i
     kubectl apply -n bookinfo -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/bookinfo/platform/kube/bookinfo-versions.yaml
     ```
 
-4. Verify that the Bookinfo pods are running:
+4. Enroll the Bookinfo application in the ambient mesh by labeling either the entire namespace or individual pods:
+
+    - To include all workloads in the `bookinfo` namespace:
+
+        ```bash {name=ambient-bookinfo:enroll-ambient}
+        kubectl label namespace bookinfo istio.io/dataplane-mode=ambient
+        ```
+
+    - To include only specific workloads, apply the `istio.io/dataplane-mode=ambient` label directly to individual pods. See the [Additional resources](#additional-resources) section for details on the labels used to add or exclude workloads from the mesh.
+
+        :::note
+        Enrolling workloads in the ambient mesh does not require restarting or redeploying application pods. Unlike sidecar mode, the number of containers in each pod remains unchanged.
+        :::
+
+### Verification
+
+1. To confirm the `bookinfo` services are available, run this command:
+
+    ```bash {name=ambient-bookinfo:verify-services}
+    kubectl get services -n bookinfo
+    ```
+
+    **Example output**
+
+    ```text {name=ambient-bookinfo:verify-services-output}
+    NAME             TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
+    details          ClusterIP   10.4.119.2     <none>        9080/TCP   2m35s
+    details-v1       ClusterIP   10.4.1.117     <none>        9080/TCP   2m30s
+    productpage      ClusterIP   10.4.103.113   <none>        9080/TCP   2m35s
+    productpage-v1   ClusterIP   10.4.18.45     <none>        9080/TCP   2m30s
+    ratings          ClusterIP   10.4.59.87     <none>        9080/TCP   2m35s
+    ratings-v1       ClusterIP   10.4.176.204   <none>        9080/TCP   2m30s
+    reviews          ClusterIP   10.4.210.99    <none>        9080/TCP   2m35s
+    reviews-v1       ClusterIP   10.4.46.223    <none>        9080/TCP   2m30s
+    reviews-v2       ClusterIP   10.4.195.242   <none>        9080/TCP   2m30s
+    reviews-v3       ClusterIP   10.4.2.53      <none>        9080/TCP   2m30s
+    ```
+
+2. To check that the `bookinfo` pods are available, execute the following command:
 
     ```bash {name=ambient-bookinfo:verify-pods}
     kubectl get pods -n bookinfo
@@ -58,7 +98,9 @@ You can deploy the Bookinfo sample application in ambient mode without sidecar i
     reviews-v3-5d7d6bddd8-2wr5w       1/1     Running   0          2m29s
     ```
 
-5. Confirm that the Bookinfo application is responding:
+    Because ambient mode does not inject a proxy sidecar, the `Ready` column shows `1/1`. Ensure the `Status` column for each pod shows `Running`.
+
+3. Confirm the `bookinfo` application is running by sending a request to its `product page`. Execute this command:
 
     ```bash {name=ambient-bookinfo:verify-application}
     kubectl exec "$(kubectl get pod -l app=ratings -n bookinfo \
@@ -73,21 +115,7 @@ You can deploy the Bookinfo sample application in ambient mode without sidecar i
     <title>Simple Bookstore App</title>
     ```
 
-6. Enroll the Bookinfo application in the ambient mesh by labeling either the entire namespace or individual pods:
-
-    - To include all workloads in the `bookinfo` namespace:
-
-        ```bash {name=ambient-bookinfo:enroll-ambient}
-        kubectl label namespace bookinfo istio.io/dataplane-mode=ambient
-        ```
-
-    - To include only specific workloads, apply the `istio.io/dataplane-mode=ambient` label directly to individual pods. See the [Additional resources](#additional-resources) section for details on the labels used to add or exclude workloads from the mesh.
-
-        :::note
-        Enrolling workloads in the ambient mesh does not require restarting or redeploying application pods. Unlike sidecar mode, the number of containers in each pod remains unchanged.
-        :::
-
-7. Confirm that the ZTunnel proxy has successfully established listening sockets in the pod network namespaces:
+4. Confirm that the ZTunnel proxy has successfully established listening sockets in the pod network namespaces:
 
     ```bash {name=ambient-bookinfo:verify-ztunnel}
     istioctl -n ztunnel ztunnel-config workloads
@@ -110,7 +138,95 @@ You can deploy the Bookinfo sample application in ambient mode without sidecar i
     ztunnel      ztunnel-lf7c9                   10.3.0.142 192.168.131.32 None     TCP
     ```
 
+## Accessing the Bookinfo Application via a Gateway
+
+Gateways are not deployed by the Alauda Service Mesh v2 Operator because they are not considered part of the control plane. In ambient mode, the Kubernetes Gateway API is the only supported way to configure ingress traffic: a gateway is deployed through the creation of a `Gateway` resource, and the routing rules are defined with an `HTTPRoute` resource.
+
+:::warning
+In ambient mode, `VirtualService` resources have limited compatibility and should not be combined with Gateway API configuration. Use Kubernetes Gateway API resources as the standard approach for traffic routing in ambient mode.
+:::
+
+### Prerequisites
+
+- The `bookinfo` application is deployed and enrolled in the ambient mesh, as described in the previous procedure.
+- Gateway API CRDs are installed.
+- Your Kubernetes cluster supports external load balancers (i.e., Services of type `LoadBalancer`).
+
+### Procedure
+
+1.  Create and configure a gateway with the `Gateway` and `HTTPRoute` resources by executing the command below:
+
+    ```bash {name=ambient-bookinfo:gw-api-create-gateway}
+    kubectl -n bookinfo apply -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/bookinfo/gateway-api/bookinfo-gateway.yaml
+    ```
+
+    :::note
+    This example uses a sample gateway configuration file to configure a gateway for the `bookinfo` application via the Gateway API. This file must be applied in the application's namespace.
+    :::
+
+2.  Ensure the Gateway API service is ready and has an address by running the following command:
+
+    ```bash {name=ambient-bookinfo:gw-api-wait-programmed}
+    kubectl wait --for=condition=programmed gtw bookinfo-gateway -n bookinfo
+    ```
+
+3.  Retrieve the host with this command:
+
+    ```bash {name=ambient-bookinfo:gw-api-get-host}
+    export INGRESS_HOST=$(kubectl get gtw bookinfo-gateway -n bookinfo -o jsonpath='{.status.addresses[0].value}')
+    echo "INGRESS_HOST=$INGRESS_HOST"
+    ```
+
+4.  Retrieve the port with this command:
+
+    ```bash {name=ambient-bookinfo:gw-api-get-port}
+    export INGRESS_PORT=$(kubectl get gtw bookinfo-gateway -n bookinfo -o jsonpath='{.spec.listeners[?(@.name=="http")].port}')
+    echo "INGRESS_PORT=$INGRESS_PORT"
+    ```
+
+5.  Retrieve the gateway URL with this command:
+
+    :::info
+    If `$INGRESS_HOST` is an IPv6 address, enclose it in square brackets when constructing the URL. For example:
+
+    ```bash {name=ambient-bookinfo:gw-api-get-url-ipv6}
+    export GATEWAY_URL=[$INGRESS_HOST]:$INGRESS_PORT
+    ```
+    :::
+
+    ```bash {name=ambient-bookinfo:gw-api-get-url}
+    export GATEWAY_URL=$INGRESS_HOST:$INGRESS_PORT
+    ```
+
+6.  Get the full URL for the product page by running the following command:
+
+    ```bash {name=ambient-bookinfo:gw-api-echo-url}
+    echo "http://${GATEWAY_URL}/productpage"
+    ```
+
+### Verification
+
+  - Confirm that the **productpage** is accessible with the `curl` command:
+
+    ```bash {name=ambient-bookinfo:gw-api-verify}
+    curl -sS -g "http://${GATEWAY_URL}/productpage" | grep -o "<title>.*</title>"
+    ```
+
+    **Example output**
+
+    ```html {name=ambient-bookinfo:gw-api-verify-output}
+    <title>Simple Bookstore App</title>
+    ```
+
+  - Confirm that the **productpage** is accessible in a web browser.
+
+    Point your browser to `http://${GATEWAY_URL}/productpage` to view the Bookinfo web page.
+
+    When you refresh the page several times, you should see different versions of reviews shown in `productpage`, presented in a round robin style (red stars, black stars, no stars), since we haven't yet used Istio to control the version routing.
+
 ## Cleanup \{#cleanup}
+
+When you are finished exploring the Bookinfo application, remove the application and all of its associated gateway resources by deleting the `bookinfo` namespace:
 
 ```bash {name=ambient-bookinfo:cleanup}
 # Remove the namespace from the ambient data plane
@@ -122,3 +238,4 @@ kubectl delete namespace bookinfo
 ## Additional resources \{#additional-resources}
 
 - [Adding workloads to a mesh in ambient mode](https://istio.io/latest/docs/ambient/usage/add-workloads/) (Istio documentation)
+- [Exposing a service via Kubernetes Gateway API in ambient mode](../../gateways/directing-traffic-into-the-mesh/exposing-a-service-via-k8s-gateway-api-in-ambient-mode.mdx)
