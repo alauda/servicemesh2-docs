@@ -110,7 +110,95 @@ You can deploy the Bookinfo sample application in ambient mode without sidecar i
     ztunnel      ztunnel-lf7c9                   10.3.0.142 192.168.131.32 None     TCP
     ```
 
+## Accessing the Bookinfo Application via a Gateway
+
+Gateways are not deployed by the Alauda Service Mesh v2 Operator because they are not considered part of the control plane. In ambient mode, the Kubernetes Gateway API is the only supported way to configure ingress traffic: a gateway is deployed through the creation of a `Gateway` resource, and the routing rules are defined with an `HTTPRoute` resource.
+
+:::warning
+In ambient mode, `VirtualService` resources have limited compatibility and should not be combined with Gateway API configuration. Use Kubernetes Gateway API resources as the standard approach for traffic routing in ambient mode.
+:::
+
+### Prerequisites
+
+- The `bookinfo` application is deployed and enrolled in the ambient mesh, as described in the previous procedure.
+- Gateway API CRDs are installed.
+- Your Kubernetes cluster supports external load balancers (i.e., Services of type `LoadBalancer`).
+
+### Procedure
+
+1.  Create and configure a gateway with the `Gateway` and `HTTPRoute` resources by executing the command below:
+
+    ```bash {name=ambient-bookinfo:gw-api-create-gateway}
+    kubectl -n bookinfo apply -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/bookinfo/gateway-api/bookinfo-gateway.yaml
+    ```
+
+    :::note
+    This example uses a sample gateway configuration file to configure a gateway for the `bookinfo` application via the Gateway API. This file must be applied in the application's namespace.
+    :::
+
+2.  Ensure the Gateway API service is ready and has an address by running the following command:
+
+    ```bash {name=ambient-bookinfo:gw-api-wait-programmed}
+    kubectl wait --for=condition=programmed gtw bookinfo-gateway -n bookinfo
+    ```
+
+3.  Retrieve the host with this command:
+
+    ```bash {name=ambient-bookinfo:gw-api-get-host}
+    export INGRESS_HOST=$(kubectl get gtw bookinfo-gateway -n bookinfo -o jsonpath='{.status.addresses[0].value}')
+    echo "INGRESS_HOST=$INGRESS_HOST"
+    ```
+
+4.  Retrieve the port with this command:
+
+    ```bash {name=ambient-bookinfo:gw-api-get-port}
+    export INGRESS_PORT=$(kubectl get gtw bookinfo-gateway -n bookinfo -o jsonpath='{.spec.listeners[?(@.name=="http")].port}')
+    echo "INGRESS_PORT=$INGRESS_PORT"
+    ```
+
+5.  Retrieve the gateway URL with this command:
+
+    :::info
+    If `$INGRESS_HOST` is an IPv6 address, enclose it in square brackets when constructing the URL. For example:
+
+    ```bash {name=ambient-bookinfo:gw-api-get-url-ipv6}
+    export GATEWAY_URL=[$INGRESS_HOST]:$INGRESS_PORT
+    ```
+    :::
+
+    ```bash {name=ambient-bookinfo:gw-api-get-url}
+    export GATEWAY_URL=$INGRESS_HOST:$INGRESS_PORT
+    ```
+
+6.  Get the full URL for the product page by running the following command:
+
+    ```bash {name=ambient-bookinfo:gw-api-echo-url}
+    echo "http://${GATEWAY_URL}/productpage"
+    ```
+
+### Verification
+
+  - Confirm that the **productpage** is accessible with the `curl` command:
+
+    ```bash {name=ambient-bookinfo:gw-api-verify}
+    curl -sS -g "http://${GATEWAY_URL}/productpage" | grep -o "<title>.*</title>"
+    ```
+
+    **Example output**
+
+    ```html {name=ambient-bookinfo:gw-api-verify-output}
+    <title>Simple Bookstore App</title>
+    ```
+
+  - Confirm that the **productpage** is accessible in a web browser.
+
+    Point your browser to `http://${GATEWAY_URL}/productpage` to view the Bookinfo web page.
+
+    When you refresh the page several times, you should see different versions of reviews shown in `productpage`, presented in a round robin style (red stars, black stars, no stars), since we haven't yet used Istio to control the version routing.
+
 ## Cleanup \{#cleanup}
+
+When you are finished exploring the Bookinfo application, remove the application and all of its associated gateway resources by deleting the `bookinfo` namespace:
 
 ```bash {name=ambient-bookinfo:cleanup}
 # Remove the namespace from the ambient data plane
@@ -122,3 +210,4 @@ kubectl delete namespace bookinfo
 ## Additional resources \{#additional-resources}
 
 - [Adding workloads to a mesh in ambient mode](https://istio.io/latest/docs/ambient/usage/add-workloads/) (Istio documentation)
+- [Exposing a service via Kubernetes Gateway API in ambient mode](../../gateways/directing-traffic-into-the-mesh/exposing-a-service-via-k8s-gateway-api-in-ambient-mode.mdx)

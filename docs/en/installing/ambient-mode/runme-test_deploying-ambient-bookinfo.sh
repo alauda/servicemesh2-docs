@@ -12,6 +12,34 @@ source "$FRAMEWORK_ROOT/projects/mesh/project.sh"
 
 # runme 命令可以在项目的任意目录中执行
 
+# 经 bookinfo 的 ratings pod 在集群内执行「文档 curl 验证命令」并断言包含 expected（带重试）
+# 用法: _verify_gateway_via_ratings_pod <doc_curl_grep_cmd> <expected_title>
+# 说明:
+#   - doc_curl_grep_cmd 为文档验证块原文（形如 curl ... "URL" | grep -o "<title>..."）；
+#   - 复用文档既有 ratings-pod curl 手法（ambient-bookinfo:verify-application），并与本仓
+#     directing-traffic-into-the-mesh/*.sh 一致——对外访问经集群内 pod 发起：将命令开头的 curl
+#     重定位进 ratings pod 执行（`-- curl ...`），`| grep` 仍留宿主侧（不依赖 ratings 容器带 grep），
+#     避开宿主到网关 / LoadBalancer 地址的可达性与本地代理干扰；命令中的 ${GATEWAY_URL} 等由本 shell 展开；
+#   - Gateway/HTTPRoute 配置下发到数据面有短延迟，故重试若干次。
+_verify_gateway_via_ratings_pod() {
+    local doc_cmd="$1" expected="$2"
+    local ratings_pod output="" attempt
+    for ((attempt=1; attempt<=12; attempt++)); do
+        ratings_pod=$(kubectl get pod -l app=ratings -n bookinfo \
+            -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) || true
+        if [ -n "$ratings_pod" ]; then
+            output=$(eval "kubectl exec \"$ratings_pod\" -c ratings -n bookinfo -- ${doc_cmd}" 2>/dev/null || true)
+            if __cmp_contains "$output" "$expected"; then
+                return 0
+            fi
+        fi
+        log_warn "网关访问验证未通过，重试中 ($attempt/12): 实际=[$output]"
+        sleep 5
+    done
+    log_error "网关访问验证最终失败: 期待包含=[$expected] 实际=[$output]"
+    return 1
+}
+
 test_deploying_bookinfo() {
     log_info "=========================================="
     log_info "开始 Ambient 模式 Bookinfo 应用部署测试"
@@ -132,6 +160,103 @@ EOF
     # 10. (可选) 生成请求流量（AUTO_GEN_BOOKINFO_TRAFFIC=true 时在 ratings pod 后台起流量）
     maybe_gen_bookinfo_traffic
 
+    # ==========================================
+    # 网关部分：Kubernetes Gateway API
+    # ambient 模式只支持 Gateway API（不使用注入网关 / Istio Gateway + VirtualService）。
+    # Gateway 会生成 LoadBalancer 类型 Service，需要外部地址池；
+    # 与 sidecar 版 bookinfo 测试一致：ENABLE_METALLB != true 时跳过整节。
+    # ==========================================
+    if [ "${ENABLE_METALLB:-false}" = "true" ]; then
+        # 步骤 11: 创建外部 IP 地址池（供 Gateway 生成的 LoadBalancer Service 取址）
+        log_info "步骤 11: 创建外部 IP 地址池（MetalLB）"
+        setup_external_ip_pools "$SINGLE_CLUSTER_NAME" || return 1
+
+        # 步骤 12: 创建 Gateway + HTTPRoute
+        log_info "步骤 12: 创建 Gateway 与 HTTPRoute"
+        kubectl_apply_with_mirror ambient-bookinfo:gw-api-create-gateway || {
+            log_error "创建 Gateway/HTTPRoute 失败"
+            return 1
+        }
+
+        # 步骤 13: 内核兼容——给 Gateway 挂 parametersRef 并等待生成的 Deployment 重建就绪
+        #          （监听 80 特权端口，run_as_root=true；门控关闭时 no-op）
+        log_info "步骤 13: Gateway API 内核兼容处理（如启用）"
+        apply_kernel_compat_k8s_gateway_api bookinfo bookinfo-gateway true || {
+            log_error "Gateway API 内核兼容处理失败"
+            return 1
+        }
+
+        # 步骤 14: 等待 Gateway programmed（LoadBalancer 地址就绪、配置下发完成）
+        log_info "步骤 14: 等待 Gateway programmed"
+        runme run ambient-bookinfo:gw-api-wait-programmed || {
+            log_error "等待 Gateway programmed 失败"
+            return 1
+        }
+        # Gateway 生成的 Service 名为 <gateway-name>-istio；再确认 LoadBalancer 地址已下发，
+        # 避免下一步取到空的 INGRESS_HOST
+        _wait_for_ingress_lb bookinfo bookinfo-gateway-istio || return 1
+
+        # 步骤 15: 获取 INGRESS_HOST（LoadBalancer 地址）
+        log_info "步骤 15: 获取 INGRESS_HOST"
+        eval "$(runme print ambient-bookinfo:gw-api-get-host)" || {
+            log_error "获取 INGRESS_HOST 失败"
+            return 1
+        }
+        export INGRESS_HOST
+        if [ -z "$INGRESS_HOST" ]; then
+            log_error "INGRESS_HOST 为空（Gateway 未分配到 LoadBalancer 地址）"
+            return 1
+        fi
+        log_info "INGRESS_HOST=$INGRESS_HOST"
+
+        # 步骤 16: 获取 INGRESS_PORT
+        log_info "步骤 16: 获取 INGRESS_PORT"
+        eval "$(runme print ambient-bookinfo:gw-api-get-port)" || {
+            log_error "获取 INGRESS_PORT 失败"
+            return 1
+        }
+        export INGRESS_PORT
+        log_info "INGRESS_PORT=$INGRESS_PORT"
+
+        # 步骤 17: 获取 GATEWAY_URL（按 INGRESS_HOST 是否为 IPv6 选择对应代码块）
+        log_info "步骤 17: 获取 GATEWAY_URL"
+        if [[ "$INGRESS_HOST" == *:* ]]; then
+            log_info "检测到 IPv6 地址，使用 IPv6 GATEWAY_URL 代码块"
+            eval "$(runme print ambient-bookinfo:gw-api-get-url-ipv6)" || {
+                log_error "获取 GATEWAY_URL (IPv6) 失败"
+                return 1
+            }
+        else
+            eval "$(runme print ambient-bookinfo:gw-api-get-url)" || {
+                log_error "获取 GATEWAY_URL 失败"
+                return 1
+            }
+        fi
+        export GATEWAY_URL
+        log_info "GATEWAY_URL=$GATEWAY_URL"
+
+        # 步骤 18: 打印 productpage 完整 URL（覆盖文档 echo 代码块）
+        log_info "步骤 18: 打印 productpage 完整 URL"
+        runme run ambient-bookinfo:gw-api-echo-url || {
+            log_error "打印完整 URL 失败"
+            return 1
+        }
+
+        # 步骤 19: 验证——取文档验证命令（ambient-bookinfo:gw-api-verify），经 ratings 服务在集群内执行，
+        #          断言 ambient-bookinfo:gw-api-verify-output（命令内 ${GATEWAY_URL} 由本 shell 展开）
+        log_info "步骤 19: 经 ratings 服务验证 Gateway API 访问"
+        local gwapi_cmd gwapi_expected
+        gwapi_cmd=$(runme print ambient-bookinfo:gw-api-verify)
+        gwapi_expected=$(runme print ambient-bookinfo:gw-api-verify-output)
+        if ! _verify_gateway_via_ratings_pod "$gwapi_cmd" "$gwapi_expected"; then
+            log_error "Gateway API 访问验证失败"
+            return 1
+        fi
+        log_success "Gateway API 访问验证通过"
+    else
+        log_warn "ENABLE_METALLB != true，跳过 Gateway API 网关测试"
+    fi
+
     log_success "=========================================="
     log_success "Ambient 模式 Bookinfo 应用部署测试完成，所有验证通过！"
     log_success "=========================================="
@@ -144,11 +269,17 @@ cleanup_deploying_bookinfo() {
     log_info "清理 Ambient Bookinfo 测试资源"
     log_info "=========================================="
 
+    local rc=0
+
+    # 删除 bookinfo 命名空间（回收应用与 Gateway API 的全部命名空间内资源）
     runme run ambient-bookinfo:cleanup || {
         log_error "清理资源失败"
-        return 1
+        rc=1
     }
 
-    log_success "测试资源清理完成"
-    return 0
+    # 回收外部 IP 地址池（仅 ENABLE_METALLB=true 生效，否则 no-op）
+    teardown_external_ip_pools "$SINGLE_CLUSTER_NAME" || rc=1
+
+    [ "$rc" -eq 0 ] && log_success "测试资源清理完成"
+    return "$rc"
 }
