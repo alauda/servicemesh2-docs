@@ -129,6 +129,7 @@ This section exists so that you can walk through the update process from a known
 
     ```shell {name=update-ambient:create-bookinfo-ns}
     kubectl create namespace bookinfo
+    kubectl label namespace bookinfo pod-security.kubernetes.io/enforce=restricted --overwrite
     kubectl label namespace bookinfo istio-discovery=enabled
     ```
 

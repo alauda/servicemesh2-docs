@@ -14,4 +14,9 @@ kubectl create namespace <namespace-name>
 
 ## Creating a namespace via the Alauda Container Platform web console
 
-When creating a namespace from the Alauda Container Platform **Projects → Namespace** page, you must update the **Pod Security Admission** setting. The `Enforce` security mode must **not** be set to `Restricted`; it is recommended to change it to `Baseline`.
+When creating a namespace from the Alauda Container Platform **Projects → Namespace** page, you must set the **Pod Security Admission** setting to a mode that the injected sidecar satisfies:
+
+- If the `Istio` resource sets `spec.values.global.proxy.seccompProfile.type` to `RuntimeDefault`, you can leave the `Enforce` security mode set to `Restricted`.
+- Otherwise, the `Enforce` security mode must **not** be set to `Restricted`; it is recommended to change it to `Baseline`.
+
+For more information, see [Pod Security Admission](../../pod-security-admission.mdx#sidecars).

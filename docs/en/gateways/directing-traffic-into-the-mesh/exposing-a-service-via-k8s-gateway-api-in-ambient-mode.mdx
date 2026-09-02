@@ -30,6 +30,7 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
 
     ```shell {name=ambient-gw-api:create-httpbin-ns}
     kubectl create namespace httpbin
+    kubectl label namespace httpbin pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2. Add the `istio-discovery=enabled` label to the `httpbin` namespace:
@@ -47,10 +48,18 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
 4.  Deploy the `httpbin` sample service:
 
     ```shell {name=ambient-gw-api:deploy-httpbin}
-    kubectl apply -n httpbin -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/httpbin/httpbin.yaml
+    kubectl apply -n httpbin -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/httpbin/httpbin.yaml
     ```
 
-5.  Create a file named `httpbin-waypoint.yaml` to define a waypoint proxy. This `Gateway` resource uses the `istio-waypoint` gateway class to process L7 traffic for services in the namespace.
+5.  Add the `istio` and `istio-waypoint` gateway class overlays to the `Istio` resource so that the gateway and waypoint pods are admitted into the `Restricted` `httpbin` namespace:
+
+    ```bash {name=ambient-gw-api:patch-gatewayclass}
+    kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}},"istio-waypoint":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
+    ```
+
+    For more information, see [Pod Security Admission](../../installing/pod-security-admission.mdx#gateway-api).
+
+6.  Create a file named `httpbin-waypoint.yaml` to define a waypoint proxy. This `Gateway` resource uses the `istio-waypoint` gateway class to process L7 traffic for services in the namespace.
 
     ```yaml {name=ambient-gw-api:waypoint-yaml}
     apiVersion: gateway.networking.k8s.io/v1
@@ -73,13 +82,13 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
         2.  Specifies the `istio-waypoint` gateway class, which deploys a waypoint proxy instead of a standard ingress gateway.
     </Callouts>
 
-6.  Apply the waypoint proxy configuration:
+7.  Apply the waypoint proxy configuration:
 
     ```shell {name=ambient-gw-api:apply-waypoint}
     kubectl apply -f httpbin-waypoint.yaml
     ```
 
-7.  Label the `httpbin` service to direct ingress traffic through the waypoint proxy:
+8.  Label the `httpbin` service to direct ingress traffic through the waypoint proxy:
 
     ```shell {name=ambient-gw-api:label-svc-waypoint}
     kubectl label service httpbin -n httpbin istio.io/ingress-use-waypoint=true
@@ -91,13 +100,13 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
 
     </Directive>
 
-8.  Associate all services in the namespace with the waypoint proxy by labeling the namespace:
+9.  Associate all services in the namespace with the waypoint proxy by labeling the namespace:
 
     ```shell {name=ambient-gw-api:label-ns-waypoint}
     kubectl label ns httpbin istio.io/use-waypoint=httpbin-waypoint
     ```
 
-9.  Create a file named `httpbin-gw.yaml` that defines a Kubernetes `Gateway` resource. This configures the gateway proxies to accept HTTP traffic on port 80 for the host `httpbin.example.com`.
+10. Create a file named `httpbin-gw.yaml` that defines a Kubernetes `Gateway` resource. This configures the gateway proxies to accept HTTP traffic on port 80 for the host `httpbin.example.com`.
 
     ```yaml {name=ambient-gw-api:gateway-yaml}
     apiVersion: gateway.networking.k8s.io/v1
@@ -124,13 +133,13 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
         2.  Specifies the virtual hostname that clients use when accessing a mesh service on this port.
     </Callouts>
 
-10. Apply the gateway configuration:
+11. Apply the gateway configuration:
 
     ```shell {name=ambient-gw-api:apply-gateway}
     kubectl apply -f httpbin-gw.yaml
     ```
 
-11. Create a file named `httpbin-ingress-hr.yaml` that defines an `HTTPRoute` resource for the ingress gateway. This resource specifies how traffic is routed from the gateway proxy to the `httpbin` service.
+12. Create a file named `httpbin-ingress-hr.yaml` that defines an `HTTPRoute` resource for the ingress gateway. This resource specifies how traffic is routed from the gateway proxy to the `httpbin` service.
 
     ```yaml {name=ambient-gw-api:ingress-hr-yaml}
     apiVersion: gateway.networking.k8s.io/v1
@@ -155,13 +164,13 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
         2.  Routes matching traffic to the `httpbin` service on port 8000.
     </Callouts>
 
-12. Apply the ingress HTTPRoute:
+13. Apply the ingress HTTPRoute:
 
     ```shell {name=ambient-gw-api:apply-ingress-hr}
     kubectl apply -f httpbin-ingress-hr.yaml
     ```
 
-13. Create a file named `httpbin-waypoint-hr.yaml` that defines an `HTTPRoute` resource for the waypoint proxy. This resource configures path-based routing rules that the waypoint enforces.
+14. Create a file named `httpbin-waypoint-hr.yaml` that defines an `HTTPRoute` resource for the waypoint proxy. This resource configures path-based routing rules that the waypoint enforces.
 
     ```yaml {name=ambient-gw-api:waypoint-hr-yaml}
     apiVersion: gateway.networking.k8s.io/v1
@@ -193,7 +202,7 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
         2.  Forwards matching traffic to the `httpbin` service on port 8000.
     </Callouts>
 
-14. Apply the waypoint HTTPRoute:
+15. Apply the waypoint HTTPRoute:
 
     ```shell {name=ambient-gw-api:apply-waypoint-hr}
     kubectl apply -f httpbin-waypoint-hr.yaml
@@ -205,13 +214,13 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
 
     </Directive>
 
-15. Wait for the waypoint proxy to become ready:
+16. Wait for the waypoint proxy to become ready:
 
     ```shell {name=ambient-gw-api:wait-waypoint}
     kubectl wait --for=condition=programmed gtw httpbin-waypoint -n httpbin
     ```
 
-16. *Optional* : Deploy the gateway to <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />:
+17. *Optional* : Deploy the gateway to <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />:
 
     <details>
       <summary>Click to expand</summary>
@@ -279,12 +288,13 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
 
     ```shell {name=ambient-gw-api:create-curl-ns}
     kubectl create namespace curl
+    kubectl label namespace curl pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2.  Deploy the `curl` client:
 
     ```shell {name=ambient-gw-api:deploy-curl}
-    kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/curl/curl.yaml
+    kubectl apply -n curl -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/curl/curl.yaml
     ```
 
 3. Add the `istio-discovery=enabled` label to the `curl` namespace:

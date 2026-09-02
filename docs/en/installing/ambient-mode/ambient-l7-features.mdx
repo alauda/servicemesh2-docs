@@ -72,6 +72,7 @@ Most responses (80%) will contain `reviews-v1` output, while a smaller portion (
 
 <details>
 <summary>**Example output**</summary>
+
 ```shell
 reviews-v1
 reviews-v2
@@ -94,6 +95,7 @@ reviews-v2
 reviews-v1
 reviews-v1
 ```
+
 </details>
 
 **Clean up the routing configuration**
@@ -148,12 +150,13 @@ Use an L7 authorization policy to explicitly allow the `curl` service to send GE
 
     ```bash {name=ambient-l7-features:create-ns-curl}
     kubectl create namespace curl
+    kubectl label namespace curl pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2. Deploy the curl client:
 
     ```bash {name=ambient-l7-features:deploy-curl}
-    kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/curl/curl.yaml
+    kubectl apply -n curl -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/curl/curl.yaml
     ```
 
 3. Add the `istio-discovery=enabled` label to the `curl` namespace:
@@ -221,7 +224,7 @@ kubectl delete -n bookinfo authorizationpolicy productpage-waypoint
 # Remove the namespace from the ambient data plane
 kubectl label namespace curl istio.io/dataplane-mode-
 # Remove the Curl deployment and namespace
-kubectl delete -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/curl/curl.yaml
+kubectl delete -n curl -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/curl/curl.yaml
 kubectl delete namespace curl
 ```
 

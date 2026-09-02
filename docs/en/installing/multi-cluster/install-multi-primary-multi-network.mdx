@@ -84,6 +84,9 @@ The gateway in each cluster must be reachable from the other cluster.
            network: network1
            multiCluster:
              clusterName: cluster1
+           proxy:
+             seccompProfile:
+               type: RuntimeDefault
      EOF
      ```
 
@@ -183,6 +186,9 @@ The gateway in each cluster must be reachable from the other cluster.
            network: network2
            multiCluster:
              clusterName: cluster2
+           proxy:
+             seccompProfile:
+               type: RuntimeDefault
      EOF
      ```
 
@@ -277,6 +283,7 @@ This cluster will host the `v1` version of the `helloworld` service.
 
     ```shell {name=multi-primary-multi-network:create-sample-ns-east}
     kubectl --context="${CTX_CLUSTER1}" create namespace sample
+    kubectl --context="${CTX_CLUSTER1}" label namespace sample pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2.  Enable automatic Istio sidecar injection for the `sample` namespace by applying the required label.
@@ -292,7 +299,7 @@ This cluster will host the `v1` version of the `helloworld` service.
     ```shell {name=multi-primary-multi-network:deploy-helloworld-svc-east}
     kubectl --context="${CTX_CLUSTER1}" apply \
       -l service=helloworld -n sample \
-      -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/helloworld/helloworld.yaml
+      -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/helloworld/helloworld.yaml
     ```
 
     b.  Then, deploy the `v1` instance of the `helloworld` application.
@@ -300,7 +307,7 @@ This cluster will host the `v1` version of the `helloworld` service.
     ```shell {name=multi-primary-multi-network:deploy-helloworld-v1-east}
     kubectl --context="${CTX_CLUSTER1}" apply \
       -l version=v1 -n sample \
-      -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/helloworld/helloworld.yaml
+      -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/helloworld/helloworld.yaml
     ```
 
 4.  Deploy the `sleep` application, which will act as a client for sending test requests.
@@ -308,7 +315,7 @@ This cluster will host the `v1` version of the `helloworld` service.
     ```shell {name=multi-primary-multi-network:deploy-sleep-east}
     kubectl --context="${CTX_CLUSTER1}" apply \
       -n sample \
-      -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/sleep/sleep.yaml
+      -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/sleep/sleep.yaml
     ```
 
 5.  Pause the process until the `helloworld-v1` deployment is fully available and ready.
@@ -331,6 +338,7 @@ This cluster will host the `v2` version of the `helloworld` service.
 
     ```shell {name=multi-primary-multi-network:create-sample-ns-west}
     kubectl --context="${CTX_CLUSTER2}" create namespace sample
+    kubectl --context="${CTX_CLUSTER2}" label namespace sample pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2.  Enable Istio sidecar injection for this namespace as well.
@@ -346,7 +354,7 @@ This cluster will host the `v2` version of the `helloworld` service.
     ```shell {name=multi-primary-multi-network:deploy-helloworld-svc-west}
     kubectl --context="${CTX_CLUSTER2}" apply \
       -l service=helloworld -n sample \
-      -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/helloworld/helloworld.yaml
+      -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/helloworld/helloworld.yaml
     ```
 
     b.  Deploy the `v2` instance of the `helloworld` application.
@@ -354,7 +362,7 @@ This cluster will host the `v2` version of the `helloworld` service.
     ```shell {name=multi-primary-multi-network:deploy-helloworld-v2-west}
     kubectl --context="${CTX_CLUSTER2}" apply \
       -l version=v2 -n sample \
-      -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/helloworld/helloworld.yaml
+      -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/helloworld/helloworld.yaml
     ```
 
 4.  Deploy the client `sleep` application on the `West` cluster.
@@ -362,7 +370,7 @@ This cluster will host the `v2` version of the `helloworld` service.
     ```shell {name=multi-primary-multi-network:deploy-sleep-west}
     kubectl --context="${CTX_CLUSTER2}" apply \
       -n sample \
-      -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/sleep/sleep.yaml
+      -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/sleep/sleep.yaml
     ```
 
 5.  Wait for the `helloworld-v2` deployment to become fully available.
@@ -393,6 +401,7 @@ With the applications deployed and running on both clusters, the next step is to
 
     <details>
     <summary>**Example output**</summary>
+
     ```shell {name=multi-primary-multi-network:test-traffic-east-output}
     Hello version: v1, instance: helloworld-v1-644474db4b-7cwhz
     Hello version: v2, instance: helloworld-v2-645cb7fc46-lnbb7
@@ -405,6 +414,7 @@ With the applications deployed and running on both clusters, the next step is to
     Hello version: v2, instance: helloworld-v2-645cb7fc46-lnbb7
     Hello version: v1, instance: helloworld-v1-644474db4b-7cwhz
     ```
+    
     </details>
 
 2.  Perform the same test from the `West` cluster.
