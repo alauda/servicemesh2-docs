@@ -335,6 +335,7 @@ If the gateway still cannot listen on ports below 1024 after adding the `NET_BIN
 2. **Run the gateway as root**
    - Set `runAsUser: 0`, `runAsGroup: 0`, and `runAsNonRoot: false` in the container's `securityContext`. This grants full privileges to the gateway process. Evaluate the security implications carefully before using this approach.
    - Also set `runAsNonRoot: false` on the `istio-proxy` container in your `gateway-deployment.yaml` (or remove the field) to keep it consistent with this template. Otherwise its container-level `runAsNonRoot: true` overrides the template, and the gateway pod is rejected with `container's runAsUser breaks non-root policy`.
+   - Running the gateway as root is incompatible with the `Restricted` Pod Security Admission profile, which forbids root containers. The gateway namespace must enforce the `Baseline` profile or lower. For more information, see [Pod Security Admission](../../installing/pod-security-admission.mdx).
 :::
 
 ### Apply the injection template
@@ -433,6 +434,7 @@ If the gateway still cannot listen on ports below 1024 after adding the `NET_BIN
 
 1. **Use ports 1024 or above** (recommended) — Reconfigure your gateway listeners to use ports ≥ 1024 to avoid privilege issues entirely.
 2. **Run the gateway as root** — Set `runAsUser: 0`, `runAsGroup: 0`, and `runAsNonRoot: false` in the container's `securityContext`. This grants full privileges to the gateway process. Evaluate the security implications carefully before using this approach.
+   Running the gateway as root is incompatible with the `Restricted` Pod Security Admission profile, which forbids root containers. The gateway namespace must enforce the `Baseline` profile or lower. For more information, see [Pod Security Admission](../../installing/pod-security-admission.mdx).
 :::
 
 ### Apply the ConfigMap

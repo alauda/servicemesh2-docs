@@ -22,6 +22,7 @@ You can deploy the Bookinfo sample application in ambient mode without sidecar i
 
     ```bash {name=ambient-bookinfo:create-namespace}
     kubectl create namespace bookinfo
+    kubectl label namespace bookinfo pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2. Add the `istio-discovery=enabled` label to the `bookinfo` namespace:
@@ -154,7 +155,15 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
 
 ### Procedure
 
-1.  Create and configure a gateway with the `Gateway` and `HTTPRoute` resources by executing the command below:
+1.  Add the `istio` gateway class overlay to the `Istio` resource so that the gateway pod is admitted into the `Restricted` `bookinfo` namespace:
+
+    ```bash {name=ambient-bookinfo:gw-api-patch-gatewayclass}
+    kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
+    ```
+
+    For more information, see [Pod Security Admission](../pod-security-admission.mdx#gateway-api).
+
+2.  Create and configure a gateway with the `Gateway` and `HTTPRoute` resources by executing the command below:
 
     ```bash {name=ambient-bookinfo:gw-api-create-gateway}
     kubectl -n bookinfo apply -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/bookinfo/gateway-api/bookinfo-gateway.yaml
@@ -164,27 +173,27 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
     This example uses a sample gateway configuration file to configure a gateway for the `bookinfo` application via the Gateway API. This file must be applied in the application's namespace.
     :::
 
-2.  Ensure the Gateway API service is ready and has an address by running the following command:
+3.  Ensure the Gateway API service is ready and has an address by running the following command:
 
     ```bash {name=ambient-bookinfo:gw-api-wait-programmed}
     kubectl wait --for=condition=programmed gtw bookinfo-gateway -n bookinfo
     ```
 
-3.  Retrieve the host with this command:
+4.  Retrieve the host with this command:
 
     ```bash {name=ambient-bookinfo:gw-api-get-host}
     export INGRESS_HOST=$(kubectl get gtw bookinfo-gateway -n bookinfo -o jsonpath='{.status.addresses[0].value}')
     echo "INGRESS_HOST=$INGRESS_HOST"
     ```
 
-4.  Retrieve the port with this command:
+5.  Retrieve the port with this command:
 
     ```bash {name=ambient-bookinfo:gw-api-get-port}
     export INGRESS_PORT=$(kubectl get gtw bookinfo-gateway -n bookinfo -o jsonpath='{.spec.listeners[?(@.name=="http")].port}')
     echo "INGRESS_PORT=$INGRESS_PORT"
     ```
 
-5.  Retrieve the gateway URL with this command:
+6.  Retrieve the gateway URL with this command:
 
     :::info
     If `$INGRESS_HOST` is an IPv6 address, enclose it in square brackets when constructing the URL. For example:
@@ -198,7 +207,7 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
     export GATEWAY_URL=$INGRESS_HOST:$INGRESS_PORT
     ```
 
-6.  Get the full URL for the product page by running the following command:
+7.  Get the full URL for the product page by running the following command:
 
     ```bash {name=ambient-bookinfo:gw-api-echo-url}
     echo "http://${GATEWAY_URL}/productpage"

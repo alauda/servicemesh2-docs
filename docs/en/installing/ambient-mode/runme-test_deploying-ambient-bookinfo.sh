@@ -204,23 +204,32 @@ EOF
         log_info "步骤 12: 创建外部 IP 地址池（MetalLB）"
         setup_external_ip_pools "$SINGLE_CLUSTER_NAME" || return 1
 
-        # 步骤 13: 创建 Gateway + HTTPRoute
-        log_info "步骤 13: 创建 Gateway 与 HTTPRoute"
+        # 步骤 13: 为 istio 网关类打 seccompProfile overlay
+        # bookinfo 命名空间启用 Restricted PSA，网关 pod 需要 RuntimeDefault seccomp 才能准入；
+        # 必须在创建 Gateway 之前打，否则网关 Deployment 会被准入控制拒绝
+        log_info "步骤 13: 为 istio 网关类打 seccompProfile overlay"
+        runme run ambient-bookinfo:gw-api-patch-gatewayclass || {
+            log_error "配置 istio 网关类 seccompProfile 失败"
+            return 1
+        }
+
+        # 步骤 14: 创建 Gateway + HTTPRoute
+        log_info "步骤 14: 创建 Gateway 与 HTTPRoute"
         kubectl_apply_with_mirror ambient-bookinfo:gw-api-create-gateway || {
             log_error "创建 Gateway/HTTPRoute 失败"
             return 1
         }
 
-        # 步骤 14: 内核兼容——给 Gateway 挂 parametersRef 并等待生成的 Deployment 重建就绪
+        # 步骤 15: 内核兼容——给 Gateway 挂 parametersRef 并等待生成的 Deployment 重建就绪
         #          （监听 80 特权端口，run_as_root=true；门控关闭时 no-op）
-        log_info "步骤 14: Gateway API 内核兼容处理（如启用）"
+        log_info "步骤 15: Gateway API 内核兼容处理（如启用）"
         apply_kernel_compat_k8s_gateway_api bookinfo bookinfo-gateway true || {
             log_error "Gateway API 内核兼容处理失败"
             return 1
         }
 
-        # 步骤 15: 等待 Gateway programmed（LoadBalancer 地址就绪、配置下发完成）
-        log_info "步骤 15: 等待 Gateway programmed"
+        # 步骤 16: 等待 Gateway programmed（LoadBalancer 地址就绪、配置下发完成）
+        log_info "步骤 16: 等待 Gateway programmed"
         runme run ambient-bookinfo:gw-api-wait-programmed || {
             log_error "等待 Gateway programmed 失败"
             return 1
@@ -229,8 +238,8 @@ EOF
         # 避免下一步取到空的 INGRESS_HOST
         _wait_for_ingress_lb bookinfo bookinfo-gateway-istio || return 1
 
-        # 步骤 16: 获取 INGRESS_HOST（LoadBalancer 地址）
-        log_info "步骤 16: 获取 INGRESS_HOST"
+        # 步骤 17: 获取 INGRESS_HOST（LoadBalancer 地址）
+        log_info "步骤 17: 获取 INGRESS_HOST"
         eval "$(runme print ambient-bookinfo:gw-api-get-host)" || {
             log_error "获取 INGRESS_HOST 失败"
             return 1
@@ -242,8 +251,8 @@ EOF
         fi
         log_info "INGRESS_HOST=$INGRESS_HOST"
 
-        # 步骤 17: 获取 INGRESS_PORT
-        log_info "步骤 17: 获取 INGRESS_PORT"
+        # 步骤 18: 获取 INGRESS_PORT
+        log_info "步骤 18: 获取 INGRESS_PORT"
         eval "$(runme print ambient-bookinfo:gw-api-get-port)" || {
             log_error "获取 INGRESS_PORT 失败"
             return 1
@@ -251,8 +260,8 @@ EOF
         export INGRESS_PORT
         log_info "INGRESS_PORT=$INGRESS_PORT"
 
-        # 步骤 18: 获取 GATEWAY_URL（按 INGRESS_HOST 是否为 IPv6 选择对应代码块）
-        log_info "步骤 18: 获取 GATEWAY_URL"
+        # 步骤 19: 获取 GATEWAY_URL（按 INGRESS_HOST 是否为 IPv6 选择对应代码块）
+        log_info "步骤 19: 获取 GATEWAY_URL"
         if [[ "$INGRESS_HOST" == *:* ]]; then
             log_info "检测到 IPv6 地址，使用 IPv6 GATEWAY_URL 代码块"
             eval "$(runme print ambient-bookinfo:gw-api-get-url-ipv6)" || {
@@ -268,16 +277,16 @@ EOF
         export GATEWAY_URL
         log_info "GATEWAY_URL=$GATEWAY_URL"
 
-        # 步骤 19: 打印 productpage 完整 URL（覆盖文档 echo 代码块）
-        log_info "步骤 19: 打印 productpage 完整 URL"
+        # 步骤 20: 打印 productpage 完整 URL（覆盖文档 echo 代码块）
+        log_info "步骤 20: 打印 productpage 完整 URL"
         runme run ambient-bookinfo:gw-api-echo-url || {
             log_error "打印完整 URL 失败"
             return 1
         }
 
-        # 步骤 20: 验证——取文档验证命令（ambient-bookinfo:gw-api-verify），经 ratings 服务在集群内执行，
+        # 步骤 21: 验证——取文档验证命令（ambient-bookinfo:gw-api-verify），经 ratings 服务在集群内执行，
         #          断言 ambient-bookinfo:gw-api-verify-output（命令内 ${GATEWAY_URL} 由本 shell 展开）
-        log_info "步骤 20: 经 ratings 服务验证 Gateway API 访问"
+        log_info "步骤 21: 经 ratings 服务验证 Gateway API 访问"
         local gwapi_cmd gwapi_expected
         gwapi_cmd=$(runme print ambient-bookinfo:gw-api-verify)
         gwapi_expected=$(runme print ambient-bookinfo:gw-api-verify-output)

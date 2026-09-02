@@ -20,6 +20,7 @@ This guide demonstrates how to use the Kubernetes Gateway API together with a wa
 
     ```shell {name=ambient-egress:create-namespace}
     kubectl create namespace egress-gateway
+    kubectl label namespace egress-gateway pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2. Add the `istio-discovery=enabled` label to the `egress-gateway` namespace:
@@ -64,7 +65,15 @@ This guide demonstrates how to use the Kubernetes Gateway API together with a wa
     kubectl apply -f egress-se.yaml
     ```
 
-6.  Create a YAML file named `waypoint.yaml` that deploys a waypoint proxy in the `egress-gateway` namespace. The waypoint proxy intercepts and processes L7 traffic for services in this namespace.
+6.  Add the `istio-waypoint` gateway class overlay to the `Istio` resource so that the waypoint pod is admitted into the `Restricted` `egress-gateway` namespace:
+
+    ```bash {name=ambient-egress:patch-gatewayclass}
+    kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio-waypoint":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
+    ```
+
+    For more information, see [Pod Security Admission](../../installing/pod-security-admission.mdx#gateway-api).
+
+7.  Create a YAML file named `waypoint.yaml` that deploys a waypoint proxy in the `egress-gateway` namespace. The waypoint proxy intercepts and processes L7 traffic for services in this namespace.
 
     ```yaml {name=ambient-egress:waypoint-yaml}
     apiVersion: gateway.networking.k8s.io/v1
@@ -87,7 +96,7 @@ This guide demonstrates how to use the Kubernetes Gateway API together with a wa
         2.  Specifies the `istio-waypoint` gateway class, which deploys a waypoint proxy rather than a standard ingress gateway.
     </Callouts>
 
-7.  Apply the waypoint proxy configuration:
+8.  Apply the waypoint proxy configuration:
 
     ```shell {name=ambient-egress:apply-waypoint}
     kubectl apply -f waypoint.yaml
@@ -105,7 +114,7 @@ This guide demonstrates how to use the Kubernetes Gateway API together with a wa
 
     </Directive>
 
-8.  *Optional* : Deploy the gateway to <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />:
+9.  *Optional* : Deploy the gateway to <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />:
 
     <details>
       <summary>Click to expand</summary>
@@ -187,7 +196,7 @@ This guide demonstrates how to use the Kubernetes Gateway API together with a wa
 2.  Deploy the `curl` client in the `egress-gateway` namespace:
 
     ```shell {name=ambient-egress:deploy-curl}
-    kubectl apply -n egress-gateway -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/curl/curl.yaml
+    kubectl apply -n egress-gateway -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/curl/curl.yaml
     ```
 
 3.  Store the name of the `curl` pod in a variable:

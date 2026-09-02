@@ -40,7 +40,15 @@ You can deploy a waypoint proxy in the Bookinfo application namespace to route t
 
 **Procedure**
 
-1. Create a waypoint proxy in the `bookinfo` namespace. Save the following as `waypoint.yaml`:
+1. Add the `istio-waypoint` gateway class overlay to the `Istio` resource so that the waypoint pod is admitted into the `Restricted` `bookinfo` namespace:
+
+    ```bash {name=ambient-waypoint:patch-gatewayclass}
+    kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio-waypoint":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
+    ```
+
+    For more information, see [Pod Security Admission](../pod-security-admission.mdx#gateway-api).
+
+2. Create a waypoint proxy in the `bookinfo` namespace. Save the following as `waypoint.yaml`:
 
     ```yaml {name=ambient-waypoint:gateway-yaml}
     apiVersion: gateway.networking.k8s.io/v1
@@ -62,13 +70,13 @@ You can deploy a waypoint proxy in the Bookinfo application namespace to route t
         1. The `istio.io/waypoint-for: service` label indicates that this waypoint processes traffic for services. The label value determines the type of traffic handled. For details, see [Waypoint traffic types](https://istio.io/latest/docs/ambient/usage/waypoint/#waypoint-traffic-types) (Istio documentation).
     </Callouts>
 
-2. Apply the waypoint custom resource (CR):
+3. Apply the waypoint custom resource (CR):
 
     ```bash {name=ambient-waypoint:apply-gateway}
     kubectl apply -f waypoint.yaml
     ```
 
-3. Enroll the `bookinfo` namespace to use the waypoint:
+4. Enroll the `bookinfo` namespace to use the waypoint:
 
     ```bash {name=ambient-waypoint:label-namespace}
     kubectl label namespace bookinfo istio.io/use-waypoint=waypoint

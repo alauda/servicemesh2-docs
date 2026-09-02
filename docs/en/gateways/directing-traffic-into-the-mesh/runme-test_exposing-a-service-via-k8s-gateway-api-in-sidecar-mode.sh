@@ -39,8 +39,17 @@ test_exposing_a_service_via_k8s_gateway_api_in_sidecar_mode() {
     }
     _wait_for_deployment httpbin httpbin
 
-    # 步骤 3: 写入 gateway YAML + 应用
-    log_info "步骤 3: 部署 ingress gateway"
+    # 步骤 3: 为 istio 网关类打 seccompProfile overlay
+    # httpbin 命名空间启用 Restricted PSA，网关 pod 需要 RuntimeDefault seccomp 才能准入；
+    # 必须在创建 Gateway 之前打，否则网关 Deployment 会被准入控制拒绝
+    log_info "步骤 3: 为 istio 网关类打 seccompProfile overlay"
+    runme run sidecar-gw-api:patch-gatewayclass || {
+        log_error "配置 istio 网关类 seccompProfile 失败"
+        return 1
+    }
+
+    # 步骤 4: 写入 gateway YAML + 应用
+    log_info "步骤 4: 部署 ingress gateway"
     runme print sidecar-gw-api:gateway-yaml > /tmp/httpbin-k8s-gw.yaml || {
         log_error "生成 gateway YAML 失败"
         return 1
@@ -50,11 +59,11 @@ test_exposing_a_service_via_k8s_gateway_api_in_sidecar_mode() {
         return 1
     }
 
-    # 步骤 3a: (仅 ENABLE_GW_LINUX_KERNEL_COMPAT=true 生效) ingress gateway 监听 80 特权端口，按 Scenario 2 以 root 处理
+    # 步骤 4a: (仅 ENABLE_GW_LINUX_KERNEL_COMPAT=true 生效) ingress gateway 监听 80 特权端口，按 Scenario 2 以 root 处理
     apply_kernel_compat_k8s_gateway_api httpbin httpbin-gateway || return 1
 
-    # 步骤 4: 写入 HTTPRoute YAML + 应用
-    log_info "步骤 4: 部署 HTTPRoute"
+    # 步骤 5: 写入 HTTPRoute YAML + 应用
+    log_info "步骤 5: 部署 HTTPRoute"
     runme print sidecar-gw-api:httproute-yaml > /tmp/httpbin-hr.yaml || {
         log_error "生成 HTTPRoute YAML 失败"
         return 1
@@ -64,8 +73,8 @@ test_exposing_a_service_via_k8s_gateway_api_in_sidecar_mode() {
         return 1
     }
 
-    # 步骤 5: 等待 gateway 就绪
-    log_info "步骤 5: 等待 gateway 就绪"
+    # 步骤 6: 等待 gateway 就绪
+    log_info "步骤 6: 等待 gateway 就绪"
     runme run sidecar-gw-api:wait-programmed || {
         log_error "等待 gateway 就绪失败"
         return 1
@@ -75,23 +84,23 @@ test_exposing_a_service_via_k8s_gateway_api_in_sidecar_mode() {
     # Section 2: Verification（验证流量路由）
     # ==========================================
 
-    # 步骤 6: 创建 curl 命名空间
-    log_info "步骤 6: 创建 curl 命名空间"
+    # 步骤 7: 创建 curl 命名空间
+    log_info "步骤 7: 创建 curl 命名空间"
     _create_namespace_safe sidecar-gw-api:create-curl-ns curl || {
         log_error "创建 curl 命名空间失败"
         return 1
     }
 
-    # 步骤 7: 部署 curl 客户端
-    log_info "步骤 7: 部署 curl 客户端"
+    # 步骤 8: 部署 curl 客户端
+    log_info "步骤 8: 部署 curl 客户端"
     kubectl_apply_with_mirror sidecar-gw-api:deploy-curl || {
         log_error "部署 curl 客户端失败"
         return 1
     }
     _wait_for_deployment curl curl
 
-    # 步骤 8: 获取 curl pod 名称（设置环境变量）
-    log_info "步骤 8: 获取 curl pod 名称"
+    # 步骤 9: 获取 curl pod 名称（设置环境变量）
+    log_info "步骤 9: 获取 curl pod 名称"
     eval "$(runme print sidecar-gw-api:get-curl-pod)" || {
         log_error "获取 curl pod 名称失败"
         return 1
@@ -99,8 +108,8 @@ test_exposing_a_service_via_k8s_gateway_api_in_sidecar_mode() {
     export CURL_POD
     log_info "CURL_POD=$CURL_POD"
 
-    # 步骤 9: 测试 /headers 端点（期望 200 OK）
-    log_info "步骤 9: 测试 /headers 端点"
+    # 步骤 10: 测试 /headers 端点（期望 200 OK）
+    log_info "步骤 10: 测试 /headers 端点"
     local headers_output headers_expected
     headers_output=$(eval "$(runme print sidecar-gw-api:test-headers)" 2>&1) || {
         log_error "测试 /headers 端点失败"
@@ -116,8 +125,8 @@ test_exposing_a_service_via_k8s_gateway_api_in_sidecar_mode() {
     fi
     log_success "/headers 端点验证通过（HTTP 200 OK）"
 
-    # 步骤 10: 测试 /get 端点（期望 404 Not Found）
-    log_info "步骤 10: 测试 /get 端点"
+    # 步骤 11: 测试 /get 端点（期望 404 Not Found）
+    log_info "步骤 11: 测试 /get 端点"
     local get_output get_expected
     get_output=$(eval "$(runme print sidecar-gw-api:test-get)" 2>&1) || true
     get_expected=$(runme print sidecar-gw-api:test-get-output)
@@ -129,8 +138,8 @@ test_exposing_a_service_via_k8s_gateway_api_in_sidecar_mode() {
     fi
     log_success "/get 端点验证通过（HTTP 404 Not Found）"
 
-    # 步骤 11: 暴露 gateway 为 LoadBalancer
-    log_info "步骤 11: 暴露 gateway 为 LoadBalancer"
+    # 步骤 12: 暴露 gateway 为 LoadBalancer
+    log_info "步骤 12: 暴露 gateway 为 LoadBalancer"
     runme run sidecar-gw-api:expose-lb || {
         log_error "暴露 gateway 为 LoadBalancer 失败"
         return 1
@@ -138,8 +147,8 @@ test_exposing_a_service_via_k8s_gateway_api_in_sidecar_mode() {
     # 等待 svc 的 LoadBalancer ingress 可用
     _wait_for_ingress_lb httpbin httpbin-gateway-istio || return 1
 
-    # 步骤 12: 获取 INGRESS_HOST
-    log_info "步骤 12: 获取 INGRESS_HOST"
+    # 步骤 13: 获取 INGRESS_HOST
+    log_info "步骤 13: 获取 INGRESS_HOST"
     eval "$(runme print sidecar-gw-api:get-ingress-host)" || {
         log_error "获取 INGRESS_HOST 失败"
         return 1
@@ -147,8 +156,8 @@ test_exposing_a_service_via_k8s_gateway_api_in_sidecar_mode() {
     export INGRESS_HOST
     log_info "INGRESS_HOST=$INGRESS_HOST"
 
-    # 步骤 13: 获取 INGRESS_PORT
-    log_info "步骤 13: 获取 INGRESS_PORT"
+    # 步骤 14: 获取 INGRESS_PORT
+    log_info "步骤 14: 获取 INGRESS_PORT"
     eval "$(runme print sidecar-gw-api:get-ingress-port)" || {
         log_error "获取 INGRESS_PORT 失败"
         return 1
@@ -156,11 +165,11 @@ test_exposing_a_service_via_k8s_gateway_api_in_sidecar_mode() {
     export INGRESS_PORT
     log_info "INGRESS_PORT=$INGRESS_PORT"
 
-    # 步骤 14: 外部访问测试
+    # 步骤 15: 外部访问测试
     # 根据 INGRESS_HOST 是否为 IPv6 地址（含冒号）选择 IPv4 / IPv6 测试命令；
     # 文档示例由本地终端执行，测试改为经 curl pod 在集群内发起，避免本地代理等干扰。
     # 文档对外部访问无 -output 块，使用 __cmp_lines 校验关键行（对响应头顺序免疫）。
-    log_info "步骤 14: 外部访问测试"
+    log_info "步骤 15: 外部访问测试"
     local external_cmd external_output
     if [[ "$INGRESS_HOST" == *:* ]]; then
         log_info "检测到 IPv6 地址，使用 IPv6 测试命令"
