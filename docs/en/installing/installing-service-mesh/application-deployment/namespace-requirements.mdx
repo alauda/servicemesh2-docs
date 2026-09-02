@@ -14,4 +14,43 @@ kubectl create namespace <namespace-name>
 
 ## Creating a namespace via the Alauda Container Platform web console
 
-When creating a namespace from the Alauda Container Platform **Projects → Namespace** page, you must update the **Pod Security Admission** setting. The `Enforce` security mode must **not** be set to `Restricted`; it is recommended to change it to `Baseline`.
+When creating a namespace from the Alauda Container Platform **Projects → Namespace** page, you must set the **Pod Security Admission** setting to a mode that the injected sidecar satisfies:
+
+- If the `Istio` resource sets `spec.values.global.proxy.seccompProfile.type` to `RuntimeDefault`, you can leave the `Enforce` security mode set to `Restricted`.
+- Otherwise, the `Enforce` security mode must **not** be set to `Restricted`; it is recommended to change it to `Baseline`.
+
+## Pod Security Admission modes \{#pod-security-admission-modes}
+
+The [Pod Security Admission (PSA)](https://kubernetes.io/docs/concepts/security/pod-security-admission/) mode that a namespace enforces determines whether the pods of an injected workload are admitted:
+
+- **`Baseline`**: Injected sidecars are admitted with the default control plane configuration. Use this mode when the `Istio` resource does not configure a seccomp profile for the proxy.
+
+- **`Restricted`**: Injected sidecars are admitted only when both of the following conditions are met. Otherwise the pods of the namespace are rejected, for example with `seccompProfile ... must be set to "RuntimeDefault" or "Localhost"`.
+
+    - The `IstioCNI` resource is deployed, so that the control plane injects the unprivileged `istio-validation` container instead of the privileged `istio-init` container. This is the default installation flow described in [Installing Alauda Service Mesh](../install-mesh.mdx).
+
+    - The `Istio` resource sets `spec.values.global.proxy.seccompProfile.type` to `RuntimeDefault`:
+
+        ```yaml
+        apiVersion: sailoperator.io/v1
+        kind: Istio
+        metadata:
+          name: default
+        spec:
+          values:
+            global:
+              proxy:
+                seccompProfile:
+                  type: RuntimeDefault
+        ```
+
+        This setting applies to the `istio-validation` and `istio-proxy` containers only. Gateways that are installed through gateway injection are not covered by it; see [Installing a gateway via injection](../../../gateways/gateway-installation/installing-a-gateway-via-injection.mdx).
+
+:::note
+Changing the `spec.values` field of the `Istio` resource updates the injection template, but running pods keep the sidecar that was injected when they were created. Restart the affected workloads so that they pick up the new seccomp profile.
+:::
+
+## Reference
+
+- [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/) (Kubernetes documentation)
+- [Restrict a Container's Syscalls with seccomp](https://kubernetes.io/docs/tutorials/security/seccomp/) (Kubernetes documentation)

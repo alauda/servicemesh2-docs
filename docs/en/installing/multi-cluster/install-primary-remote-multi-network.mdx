@@ -91,10 +91,14 @@ Services in `cluster2` will reach the control plane in `cluster1` via the same e
              clusterName: cluster1
            network: network1
            externalIstiod: true  # [!code callout]
+           proxy:
+             seccompProfile:
+               type: RuntimeDefault  # [!code callout]
      ```
 
      <Callouts>
        1. This enables the control plane installed on the **East** cluster to serve as an external control plane for other remote clusters.
+       2. `spec.values.global.proxy.seccompProfile.type` set to `RuntimeDefault` lets the injected sidecars satisfy the `Restricted` Pod Security Admission profile. Because this control plane also injects the workloads of the remote **West** cluster, the setting covers both clusters. For more information, see [Namespace Requirements](../installing-service-mesh/application-deployment/namespace-requirements.mdx#pod-security-admission-modes).
      </Callouts>
 
      Using `kubectl` to apply the `Istio` resource:

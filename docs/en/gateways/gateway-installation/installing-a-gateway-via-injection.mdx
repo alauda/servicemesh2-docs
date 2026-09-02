@@ -104,6 +104,8 @@ The following procedure applies to both ingress and egress gateway deployments.
                privileged: false
                readOnlyRootFilesystem: true
                runAsNonRoot: true
+               seccompProfile:
+                 type: RuntimeDefault  # [!code callout]
              ports:
                - containerPort: 15090
                  protocol: TCP
@@ -132,9 +134,12 @@ The following procedure applies to both ingress and egress gateway deployments.
      3. Enables gateway injection by setting the `sidecar.istio.io/inject` label to `true`.
         If the name of the Istio resource is not default you must use the `istio.io/rev: <istio_revision>` label instead, where the revision represents the active revision of the Istio resource.
      4. Sets the image field to `auto` so that the image automatically updates each time the pod starts.
-     5. Sets the `serviceAccountName` to the name of the `ServiceAccount` created previously.
-     6. (Optional) Uncomment to set node selectors that schedule the gateway pods on <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />.
-     7. (Optional) Uncomment to set tolerations that allow the gateway pods to be scheduled on <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />.
+     5. Adds the `RuntimeDefault` seccomp profile so that the gateway pod satisfies the `Restricted` Pod Security Admission profile.
+        The `gateway` injection template does not read `spec.values.global.proxy.seccompProfile` from the `Istio` resource, so the profile must be set on the gateway deployment itself.
+        Remove this field if the gateway namespace does not enforce the `Restricted` profile.
+     6. Sets the `serviceAccountName` to the name of the `ServiceAccount` created previously.
+     7. (Optional) Uncomment to set node selectors that schedule the gateway pods on <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />.
+     8. (Optional) Uncomment to set tolerations that allow the gateway pods to be scheduled on <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />.
    </Callouts>
 
 6. Apply the YAML file by running the following command:

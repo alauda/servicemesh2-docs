@@ -84,6 +84,9 @@ The gateway in each cluster must be reachable from the other cluster.
            network: network1
            multiCluster:
              clusterName: cluster1
+           proxy:
+             seccompProfile:
+               type: RuntimeDefault
      EOF
      ```
 
@@ -183,6 +186,9 @@ The gateway in each cluster must be reachable from the other cluster.
            network: network2
            multiCluster:
              clusterName: cluster2
+           proxy:
+             seccompProfile:
+               type: RuntimeDefault
      EOF
      ```
 
