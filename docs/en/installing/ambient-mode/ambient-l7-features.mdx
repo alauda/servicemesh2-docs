@@ -148,7 +148,7 @@ Use an L7 authorization policy to explicitly allow the `curl` service to send GE
 
     ```bash {name=ambient-l7-features:create-ns-curl}
     kubectl create namespace curl
-    kubectl label namespace curl pod-security.kubernetes.io/enforce=restricted
+    kubectl label namespace curl pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2. Deploy the curl client:

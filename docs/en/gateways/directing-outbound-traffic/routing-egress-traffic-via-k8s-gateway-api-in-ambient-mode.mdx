@@ -20,7 +20,7 @@ This guide demonstrates how to use the Kubernetes Gateway API together with a wa
 
     ```shell {name=ambient-egress:create-namespace}
     kubectl create namespace egress-gateway
-    kubectl label namespace egress-gateway pod-security.kubernetes.io/enforce=restricted
+    kubectl label namespace egress-gateway pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2. Add the `istio-discovery=enabled` label to the `egress-gateway` namespace:

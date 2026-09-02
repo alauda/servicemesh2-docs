@@ -20,7 +20,7 @@ You can use the Kubernetes Gateway API to create `Gateway` and `HTTPRoute` resou
 
     ```shell {name=sidecar-gw-api:create-httpbin-ns}
     kubectl create namespace httpbin
-    kubectl label namespace httpbin pod-security.kubernetes.io/enforce=restricted
+    kubectl label namespace httpbin pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2.  Deploy the `httpbin` sample service with this command:
@@ -193,7 +193,7 @@ You can use the Kubernetes Gateway API to create `Gateway` and `HTTPRoute` resou
 
     ```shell {name=sidecar-gw-api:create-curl-ns}
     kubectl create namespace curl
-    kubectl label namespace curl pod-security.kubernetes.io/enforce=restricted
+    kubectl label namespace curl pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2.  Deploy a `curl` client using the command below:

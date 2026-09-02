@@ -21,7 +21,7 @@ Use this approach for sidecar-based deployments where you already use Istio `Gat
 
     ```shell {name=istio-gw:create-httpbin-ns}
     kubectl create namespace httpbin
-    kubectl label namespace httpbin pod-security.kubernetes.io/enforce=restricted
+    kubectl label namespace httpbin pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2.  Enable sidecar injection for the namespace. If your setup uses the `InPlace` upgrade strategy, run this command:
@@ -136,7 +136,7 @@ Use this approach for sidecar-based deployments where you already use Istio `Gat
 
     ```shell {name=istio-gw:create-curl-ns}
     kubectl create namespace curl
-    kubectl label namespace curl pod-security.kubernetes.io/enforce=restricted
+    kubectl label namespace curl pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2.  Deploy the `curl` client with the following command:

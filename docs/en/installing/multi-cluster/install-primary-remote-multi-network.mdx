@@ -305,7 +305,7 @@ This cluster will host the `v1` version of the `helloworld` service.
 
     ```shell {name=primary-remote-multi-network:create-sample-ns-east}
     kubectl --context="${CTX_CLUSTER1}" create namespace sample
-    kubectl --context="${CTX_CLUSTER1}" label namespace sample pod-security.kubernetes.io/enforce=restricted
+    kubectl --context="${CTX_CLUSTER1}" label namespace sample pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2.  Enable automatic Istio sidecar injection for the `sample` namespace by applying the required label.
@@ -360,7 +360,7 @@ This cluster will host the `v2` version of the `helloworld` service.
 
     ```shell {name=primary-remote-multi-network:create-sample-ns-west}
     kubectl --context="${CTX_CLUSTER2}" create namespace sample
-    kubectl --context="${CTX_CLUSTER2}" label namespace sample pod-security.kubernetes.io/enforce=restricted
+    kubectl --context="${CTX_CLUSTER2}" label namespace sample pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2.  Enable Istio sidecar injection for this namespace as well.

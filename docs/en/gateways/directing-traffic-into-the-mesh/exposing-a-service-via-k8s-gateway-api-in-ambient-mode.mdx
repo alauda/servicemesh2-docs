@@ -30,7 +30,7 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
 
     ```shell {name=ambient-gw-api:create-httpbin-ns}
     kubectl create namespace httpbin
-    kubectl label namespace httpbin pod-security.kubernetes.io/enforce=restricted
+    kubectl label namespace httpbin pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2. Add the `istio-discovery=enabled` label to the `httpbin` namespace:
@@ -288,7 +288,7 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
 
     ```shell {name=ambient-gw-api:create-curl-ns}
     kubectl create namespace curl
-    kubectl label namespace curl pod-security.kubernetes.io/enforce=restricted
+    kubectl label namespace curl pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2.  Deploy the `curl` client:

@@ -95,13 +95,13 @@ Create the following namespaces, each hosting the `tcp-echo` service with a spec
 
    ```bash {name=dual-stack:create-namespaces}
    kubectl create namespace dual-stack
-   kubectl label namespace dual-stack pod-security.kubernetes.io/enforce=restricted
+   kubectl label namespace dual-stack pod-security.kubernetes.io/enforce=restricted --overwrite
    kubectl create namespace ipv4
-   kubectl label namespace ipv4 pod-security.kubernetes.io/enforce=restricted
+   kubectl label namespace ipv4 pod-security.kubernetes.io/enforce=restricted --overwrite
    kubectl create namespace ipv6
-   kubectl label namespace ipv6 pod-security.kubernetes.io/enforce=restricted
+   kubectl label namespace ipv6 pod-security.kubernetes.io/enforce=restricted --overwrite
    kubectl create namespace sleep
-   kubectl label namespace sleep pod-security.kubernetes.io/enforce=restricted
+   kubectl label namespace sleep pod-security.kubernetes.io/enforce=restricted --overwrite
    ```
 
 ### Enable sidecar injection for the namespaces

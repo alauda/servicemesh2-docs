@@ -32,7 +32,7 @@ Additional details can be found in the upstream Istio documentation for the [Boo
 
     ```shell {name=bookinfo:create-namespace}
     kubectl create namespace bookinfo
-    kubectl label namespace bookinfo pod-security.kubernetes.io/enforce=restricted
+    kubectl label namespace bookinfo pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 

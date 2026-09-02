@@ -99,7 +99,7 @@ You can use the following section to understand the update process. You can skip
 
    ```shell {name=update-revisionbased-tag:create-bookinfo-ns}
    kubectl create ns bookinfo
-   kubectl label namespace bookinfo pod-security.kubernetes.io/enforce=restricted
+   kubectl label namespace bookinfo pod-security.kubernetes.io/enforce=restricted --overwrite
    ```
 
    b. Apply a label to the `bookinfo` namespace to activate automatic sidecar injection. Use the following command:

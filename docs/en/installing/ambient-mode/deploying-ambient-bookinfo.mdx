@@ -22,7 +22,7 @@ You can deploy the Bookinfo sample application in ambient mode without sidecar i
 
     ```bash {name=ambient-bookinfo:create-namespace}
     kubectl create namespace bookinfo
-    kubectl label namespace bookinfo pod-security.kubernetes.io/enforce=restricted
+    kubectl label namespace bookinfo pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2. Add the `istio-discovery=enabled` label to the `bookinfo` namespace:

@@ -20,7 +20,7 @@ Use this approach for sidecar-based deployments. In ambient mode, configure egre
 
     ```shell {name=istio-egress:create-curl-ns}
     kubectl create namespace curl
-    kubectl label namespace curl pod-security.kubernetes.io/enforce=restricted
+    kubectl label namespace curl pod-security.kubernetes.io/enforce=restricted --overwrite
     ```
 
 2.  Enable sidecar injection for the namespace. If your setup uses the `InPlace` upgrade strategy, run this command:
