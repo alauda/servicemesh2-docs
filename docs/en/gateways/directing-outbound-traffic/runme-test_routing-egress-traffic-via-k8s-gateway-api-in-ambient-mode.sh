@@ -52,30 +52,39 @@ test_ambient_egress_gateway() {
         return 1
     }
 
-    # 步骤 6: 生成 waypoint.yaml 文件
-    log_info "步骤 6: 生成 waypoint.yaml 文件"
+    # 步骤 6: 为 istio-waypoint 网关类打 seccompProfile overlay
+    # egress-gateway 命名空间启用 Restricted PSA，waypoint pod 需要 RuntimeDefault seccomp 才能准入；
+    # 必须在创建 Gateway 之前打，否则 waypoint Deployment 会被准入控制拒绝
+    log_info "步骤 6: 为 istio-waypoint 网关类打 seccompProfile overlay"
+    runme run ambient-egress:patch-gatewayclass || {
+        log_error "配置 istio-waypoint 网关类 seccompProfile 失败"
+        return 1
+    }
+
+    # 步骤 7: 生成 waypoint.yaml 文件
+    log_info "步骤 7: 生成 waypoint.yaml 文件"
     runme print ambient-egress:waypoint-yaml > /tmp/waypoint.yaml || {
         log_error "生成 waypoint.yaml 失败"
         return 1
     }
 
-    # 步骤 7: 应用 waypoint 配置
-    log_info "步骤 7: 应用 waypoint 配置"
+    # 步骤 8: 应用 waypoint 配置
+    log_info "步骤 8: 应用 waypoint 配置"
     kubectl_apply_runme_block "ambient-egress:apply-waypoint" "/tmp/" || {
         log_error "应用 waypoint 失败"
         return 1
     }
 
-    # 步骤 7a: (仅 ENABLE_GW_LINUX_KERNEL_COMPAT=true 生效) waypoint 监听高端口，按 Scenario 1 非 root 处理
+    # 步骤 8a: (仅 ENABLE_GW_LINUX_KERNEL_COMPAT=true 生效) waypoint 监听高端口，按 Scenario 1 非 root 处理
     apply_kernel_compat_k8s_gateway_api egress-gateway waypoint false || return 1
 
-    # 步骤 8: 等待 waypoint 部署就绪
-    log_info "步骤 8: 等待 waypoint 部署就绪"
+    # 步骤 9: 等待 waypoint 部署就绪
+    log_info "步骤 9: 等待 waypoint 部署就绪"
     _wait_for_deployment egress-gateway waypoint
 
-    # 步骤 9: 验证 Gateway 状态
+    # 步骤 10: 验证 Gateway 状态
     # 输出包含动态值（ADDRESS、AGE），使用 __cmp_lines 验证关键字段
-    log_info "步骤 9: 验证 Gateway 状态"
+    log_info "步骤 10: 验证 Gateway 状态"
     local gw_output
     gw_output=$(runme run ambient-egress:verify-gateway 2>&1)
 
@@ -91,29 +100,29 @@ EOF
     fi
     log_success "Gateway 状态验证通过"
 
-    # 步骤 10: 部署 curl 客户端
-    log_info "步骤 10: 部署 curl 客户端"
+    # 步骤 11: 部署 curl 客户端
+    log_info "步骤 11: 部署 curl 客户端"
     kubectl_apply_with_mirror ambient-egress:deploy-curl || {
         log_error "部署 curl 客户端失败"
         return 1
     }
 
-    # 步骤 11: 等待 curl 部署就绪
-    log_info "步骤 11: 等待 curl 部署就绪"
+    # 步骤 12: 等待 curl 部署就绪
+    log_info "步骤 12: 等待 curl 部署就绪"
     _wait_for_deployment egress-gateway curl
 
-    # 步骤 12: 获取 curl pod 名称
-    log_info "步骤 12: 获取 curl pod 名称"
+    # 步骤 13: 获取 curl pod 名称
+    log_info "步骤 13: 获取 curl pod 名称"
     eval "$(runme print ambient-egress:get-curl-pod)" || {
         log_error "获取 curl pod 名称失败"
         return 1
     }
     log_info "CURL_POD=$CURL_POD"
 
-    # 步骤 13: 验证 egress 连通性
+    # 步骤 14: 验证 egress 连通性
     # 请求外部服务 httpbingo.org，可能受网络波动影响，使用 retry_command 重试
     # 输出包含动态值，使用 __cmp_lines 验证关键字段
-    log_info "步骤 13: 验证 egress 连通性"
+    log_info "步骤 14: 验证 egress 连通性"
     local egress_output
     egress_output=$(retry_command "runme run ambient-egress:verify-egress 2>&1" 10 5)
 

@@ -53,13 +53,13 @@ Patch the `Istio` resource before you create a `Gateway` resource in a namespace
 
 - For gateways that use the `istio` gateway class:
 
-    ```bash
+    ```bash {name=psa:patch-gatewayclass-istio}
     kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
     ```
 
 - For waypoint proxies, which use the `istio-waypoint` gateway class:
 
-    ```bash
+    ```bash {name=psa:patch-gatewayclass-waypoint}
     kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio-waypoint":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
     ```
 
@@ -69,13 +69,13 @@ The patch merges by key, so you can apply both commands and keep both overlays.
 
 Confirm that the control plane generated a ConfigMap for each patched gateway class by running the following command:
 
-```bash
+```bash {name=psa:verify-gatewayclass-configmaps}
 kubectl get configmap -n istio-system -l gateway.istio.io/defaults-for-class
 ```
 
 **Example output**
 
-```text
+```text {name=psa:verify-gatewayclass-configmaps-output}
 NAME                                        DATA   AGE
 istio-default-gatewayclass-istio            1      10s
 istio-default-gatewayclass-istio-waypoint   1      10s

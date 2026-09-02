@@ -24,7 +24,7 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
 
 2.  Add the `istio` gateway class overlay to the `Istio` resource so that the gateway pod is admitted into the `Restricted` `egress-gateway` namespace:
 
-    ```bash
+    ```bash {name=sidecar-egress:patch-gatewayclass}
     kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
     ```
 

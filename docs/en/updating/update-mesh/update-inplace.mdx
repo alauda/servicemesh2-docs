@@ -107,8 +107,15 @@ With the `InPlace` strategy, the `IstioRevision` resource that the Alauda Servic
      namespace: istio-system
      updateStrategy:
        type: InPlace
+     values:
+       global:
+         proxy:
+           seccompProfile:
+             type: RuntimeDefault
    EOF
    ```
+
+   The `spec.values.global.proxy.seccompProfile` setting lets the injected sidecars satisfy the `Restricted` Pod Security Admission profile that the `bookinfo` namespace enforces later in this procedure. For more information, see [Pod Security Admission](../../installing/pod-security-admission.mdx#sidecars).
 
 6. Wait for the Istio control plane to become ready by running the following command:
 

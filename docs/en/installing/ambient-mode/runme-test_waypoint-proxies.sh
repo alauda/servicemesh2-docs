@@ -17,34 +17,43 @@ test_waypoint_proxies() {
     log_info "开始 Waypoint 代理部署测试"
     log_info "=========================================="
 
-    # 步骤 1: 生成 Gateway YAML 到 /tmp
-    log_info "步骤 1: 生成 Gateway YAML 文件"
+    # 步骤 1: 为 istio-waypoint 网关类打 seccompProfile overlay
+    # bookinfo 命名空间启用 Restricted PSA，waypoint pod 需要 RuntimeDefault seccomp 才能准入；
+    # 必须在创建 Gateway 之前打，否则 waypoint Deployment 会被准入控制拒绝
+    log_info "步骤 1: 为 istio-waypoint 网关类打 seccompProfile overlay"
+    runme run ambient-waypoint:patch-gatewayclass || {
+        log_error "配置 istio-waypoint 网关类 seccompProfile 失败"
+        return 1
+    }
+
+    # 步骤 2: 生成 Gateway YAML 到 /tmp
+    log_info "步骤 2: 生成 Gateway YAML 文件"
     runme print ambient-waypoint:gateway-yaml > /tmp/waypoint.yaml || {
         log_error "生成 Gateway YAML 失败"
         return 1
     }
 
-    # 步骤 2: 应用 Gateway CR
-    log_info "步骤 2: 应用 Gateway CR"
+    # 步骤 3: 应用 Gateway CR
+    log_info "步骤 3: 应用 Gateway CR"
     kubectl_apply_runme_block "ambient-waypoint:apply-gateway" "/tmp/" || {
         log_error "应用 Gateway CR 失败"
         return 1
     }
 
-    # 步骤 3: 等待 waypoint deployment 就绪
-    log_info "步骤 3: 等待 waypoint deployment 就绪"
+    # 步骤 4: 等待 waypoint deployment 就绪
+    log_info "步骤 4: 等待 waypoint deployment 就绪"
     _wait_for_deployment bookinfo waypoint
 
-    # 步骤 4: 标记命名空间使用 waypoint
-    log_info "步骤 4: 标记命名空间使用 waypoint"
+    # 步骤 5: 标记命名空间使用 waypoint
+    log_info "步骤 5: 标记命名空间使用 waypoint"
     runme run ambient-waypoint:label-namespace || {
         log_error "标记命名空间使用 waypoint 失败"
         return 1
     }
 
-    # 步骤 5: 验证 ztunnel services
+    # 步骤 6: 验证 ztunnel services
     # 输出包含动态 VIP 地址，使用 __cmp_lines 验证关键字段
-    log_info "步骤 5: 验证 ztunnel services"
+    log_info "步骤 6: 验证 ztunnel services"
     local services_output
     services_output=$(runme run ambient-waypoint:verify-services 2>&1)
 

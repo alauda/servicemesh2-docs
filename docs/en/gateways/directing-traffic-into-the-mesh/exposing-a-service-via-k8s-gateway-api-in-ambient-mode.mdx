@@ -53,7 +53,7 @@ In ambient mode, `VirtualService` resources have limited compatibility and shoul
 
 5.  Add the `istio` and `istio-waypoint` gateway class overlays to the `Istio` resource so that the gateway and waypoint pods are admitted into the `Restricted` `httpbin` namespace:
 
-    ```bash
+    ```bash {name=ambient-gw-api:patch-gatewayclass}
     kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}},"istio-waypoint":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
     ```
 

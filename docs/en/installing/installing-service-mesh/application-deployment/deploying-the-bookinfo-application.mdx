@@ -250,7 +250,7 @@ With the Kubernetes Gateway API, a gateway is deployed through the creation of a
 
 1.  Add the `istio` gateway class overlay to the `Istio` resource so that the gateway pod is admitted into the `Restricted` `bookinfo` namespace:
 
-    ```bash
+    ```bash {name=bookinfo:gw-api-patch-gatewayclass}
     kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
     ```
 
