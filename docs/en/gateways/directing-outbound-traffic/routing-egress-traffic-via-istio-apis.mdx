@@ -20,6 +20,7 @@ Use this approach for sidecar-based deployments. In ambient mode, configure egre
 
     ```shell {name=istio-egress:create-curl-ns}
     kubectl create namespace curl
+    kubectl label namespace curl pod-security.kubernetes.io/enforce=restricted
     ```
 
 2.  Enable sidecar injection for the namespace. If your setup uses the `InPlace` upgrade strategy, run this command:
@@ -56,7 +57,7 @@ Use this approach for sidecar-based deployments. In ambient mode, configure egre
 3.  Deploy the `curl` application by running this command:
 
     ```shell {name=istio-egress:deploy-curl}
-    kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/curl/curl.yaml
+    kubectl apply -n curl -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/curl/curl.yaml
     ```
 
 4.  Initialize and export a `CURL_POD` environment variable containing the name of the curl pod:

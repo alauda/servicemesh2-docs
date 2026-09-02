@@ -122,6 +122,7 @@ With the `InPlace` strategy, the `IstioRevision` resource that the Alauda Servic
    
    ```shell {name=update-inplace:create-bookinfo-ns}
    kubectl create ns bookinfo
+   kubectl label namespace bookinfo pod-security.kubernetes.io/enforce=restricted
    ```
 
    b. Apply a label to the `bookinfo` namespace to activate automatic sidecar injection. Use the following command:

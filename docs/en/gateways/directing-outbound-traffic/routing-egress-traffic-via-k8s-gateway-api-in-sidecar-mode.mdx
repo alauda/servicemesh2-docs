@@ -19,9 +19,10 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
 
     ```shell {name=sidecar-egress:create-namespace}
     kubectl create namespace egress-gateway
+    kubectl label namespace egress-gateway pod-security.kubernetes.io/enforce=restricted
     ```
 
-2.  *Optional* : If the `egress-gateway` namespace enforces the `Restricted` Pod Security Admission profile, add the `istio` gateway class overlay to the `Istio` resource. Without it, the gateway pod is rejected:
+2.  Add the `istio` gateway class overlay to the `Istio` resource so that the gateway pod is admitted into the `Restricted` `egress-gateway` namespace:
 
     ```bash
     kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
@@ -194,6 +195,7 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
 
     ```shell {name=sidecar-egress:create-curl-ns}
     kubectl create namespace curl
+    kubectl label namespace curl pod-security.kubernetes.io/enforce=restricted
     ```
 
 2.  Enable sidecar injection for the namespace. If your setup uses the `InPlace` upgrade strategy, run this command:
@@ -230,7 +232,7 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
 3.  Deploy the `curl` application by running this command:
 
     ```shell {name=sidecar-egress:deploy-curl}
-    kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/curl/curl.yaml
+    kubectl apply -n curl -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/curl/curl.yaml
     ```
 
 4.  Initialize and export a `CURL_POD` environment variable containing the name of the curl pod:

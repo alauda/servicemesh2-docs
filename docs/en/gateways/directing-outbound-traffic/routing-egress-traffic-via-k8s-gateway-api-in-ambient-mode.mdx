@@ -20,6 +20,7 @@ This guide demonstrates how to use the Kubernetes Gateway API together with a wa
 
     ```shell {name=ambient-egress:create-namespace}
     kubectl create namespace egress-gateway
+    kubectl label namespace egress-gateway pod-security.kubernetes.io/enforce=restricted
     ```
 
 2. Add the `istio-discovery=enabled` label to the `egress-gateway` namespace:
@@ -64,7 +65,7 @@ This guide demonstrates how to use the Kubernetes Gateway API together with a wa
     kubectl apply -f egress-se.yaml
     ```
 
-6.  *Optional* : If the `egress-gateway` namespace enforces the `Restricted` Pod Security Admission profile, add the `istio-waypoint` gateway class overlay to the `Istio` resource. Without it, the waypoint pod is rejected:
+6.  Add the `istio-waypoint` gateway class overlay to the `Istio` resource so that the waypoint pod is admitted into the `Restricted` `egress-gateway` namespace:
 
     ```bash
     kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio-waypoint":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
@@ -195,7 +196,7 @@ This guide demonstrates how to use the Kubernetes Gateway API together with a wa
 2.  Deploy the `curl` client in the `egress-gateway` namespace:
 
     ```shell {name=ambient-egress:deploy-curl}
-    kubectl apply -n egress-gateway -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/curl/curl.yaml
+    kubectl apply -n egress-gateway -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/curl/curl.yaml
     ```
 
 3.  Store the name of the `curl` pod in a variable:

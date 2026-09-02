@@ -32,6 +32,7 @@ Additional details can be found in the upstream Istio documentation for the [Boo
 
     ```shell {name=bookinfo:create-namespace}
     kubectl create namespace bookinfo
+    kubectl label namespace bookinfo pod-security.kubernetes.io/enforce=restricted
     ```
 
 
@@ -247,7 +248,15 @@ With the Kubernetes Gateway API, a gateway is deployed through the creation of a
 
 #### Procedure
 
-1.  Create and configure a gateway with the `Gateway` and `HTTPRoute` resources by executing the command below:
+1.  Add the `istio` gateway class overlay to the `Istio` resource so that the gateway pod is admitted into the `Restricted` `bookinfo` namespace:
+
+    ```bash
+    kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
+    ```
+
+    For more information, see [Pod Security Admission](../../pod-security-admission.mdx#gateway-api).
+
+2.  Create and configure a gateway with the `Gateway` and `HTTPRoute` resources by executing the command below:
 
     ```shell {name=bookinfo:gw-api-create-gateway}
     kubectl -n bookinfo apply -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/bookinfo/gateway-api/bookinfo-gateway.yaml 

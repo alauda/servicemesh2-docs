@@ -20,15 +20,16 @@ You can use the Kubernetes Gateway API to create `Gateway` and `HTTPRoute` resou
 
     ```shell {name=sidecar-gw-api:create-httpbin-ns}
     kubectl create namespace httpbin
+    kubectl label namespace httpbin pod-security.kubernetes.io/enforce=restricted
     ```
 
 2.  Deploy the `httpbin` sample service with this command:
 
     ```shell {name=sidecar-gw-api:deploy-httpbin}
-    kubectl apply -n httpbin -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/httpbin/httpbin.yaml
+    kubectl apply -n httpbin -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/httpbin/httpbin.yaml
     ```
 
-3.  *Optional* : If the `httpbin` namespace enforces the `Restricted` Pod Security Admission profile, add the `istio` gateway class overlay to the `Istio` resource. Without it, the gateway pod is rejected:
+3.  Add the `istio` gateway class overlay to the `Istio` resource so that the gateway pod is admitted into the `Restricted` `httpbin` namespace:
 
     ```bash
     kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
@@ -192,12 +193,13 @@ You can use the Kubernetes Gateway API to create `Gateway` and `HTTPRoute` resou
 
     ```shell {name=sidecar-gw-api:create-curl-ns}
     kubectl create namespace curl
+    kubectl label namespace curl pod-security.kubernetes.io/enforce=restricted
     ```
 
 2.  Deploy a `curl` client using the command below:
 
     ```shell {name=sidecar-gw-api:deploy-curl}
-    kubectl apply -n curl -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/curl/curl.yaml
+    kubectl apply -n curl -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/curl/curl.yaml
     ```
 
 3.  Set a `CURL_POD` variable with the name of the `curl` pod with this command:
