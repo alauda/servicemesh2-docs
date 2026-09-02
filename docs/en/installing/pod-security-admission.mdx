@@ -1,0 +1,91 @@
+---
+weight: 200
+---
+
+# Pod Security Admission
+
+The [Pod Security Admission (PSA)](https://kubernetes.io/docs/concepts/security/pod-security-admission/) profile that a namespace enforces determines whether the pods of your mesh workloads are admitted.
+
+- **`Baseline`**: All mesh workloads are admitted with the default control plane configuration.
+- **`Restricted`**: A mesh workload is admitted only when its pod carries the `RuntimeDefault` seccomp profile, which the control plane does not add by default. Otherwise the pod is rejected, for example with `seccompProfile ... must be set to "RuntimeDefault" or "Localhost"`.
+
+Each kind of workload is configured separately:
+
+| Workload | Configuration |
+| --- | --- |
+| Application pods with an injected sidecar | `spec.values.global.proxy.seccompProfile` on the `Istio` resource. See [Injected sidecars](#sidecars). |
+| Gateways deployed with the Kubernetes Gateway API (`istio` gateway class) | `spec.values.gatewayClasses.istio` on the `Istio` resource. See [Gateway API gateways and waypoint proxies](#gateway-api). |
+| Waypoint proxies (`istio-waypoint` gateway class) | `spec.values.gatewayClasses.istio-waypoint` on the `Istio` resource. See [Gateway API gateways and waypoint proxies](#gateway-api). |
+| Gateways installed through gateway injection | The `securityContext` of your own gateway `Deployment`. See [Installing a gateway via injection](../gateways/gateway-installation/installing-a-gateway-via-injection.mdx). |
+
+## Injected sidecars \{#sidecars}
+
+Injected sidecars are admitted into a `Restricted` namespace only when both of the following conditions are met:
+
+- The `IstioCNI` resource is deployed, so that the control plane injects the unprivileged `istio-validation` container instead of the privileged `istio-init` container. This is the default installation flow described in [Installing Alauda Service Mesh](./installing-service-mesh/install-mesh.mdx).
+
+- The `Istio` resource sets `spec.values.global.proxy.seccompProfile.type` to `RuntimeDefault`:
+
+    ```yaml
+    apiVersion: sailoperator.io/v1
+    kind: Istio
+    metadata:
+      name: default
+    spec:
+      values:
+        global:
+          proxy:
+            seccompProfile:
+              type: RuntimeDefault
+    ```
+
+    This setting applies to the `istio-validation` and `istio-proxy` containers only.
+
+:::note
+Changing the `spec.values` field of the `Istio` resource updates the injection template, but running pods keep the sidecar that was injected when they were created. Restart the affected workloads so that they pick up the new seccomp profile.
+:::
+
+## Gateway API gateways and waypoint proxies \{#gateway-api}
+
+The control plane renders gateways deployed with the Kubernetes Gateway API and waypoint proxies from its own templates, which do not read `spec.values.global.proxy.seccompProfile`. The `Istio` resource does not expose `spec.values.gateways` either; that field is silently discarded. Configure the seccomp profile with the `spec.values.gatewayClasses` overlay, which the control plane merges into the generated `Deployment`.
+
+Patch the `Istio` resource before you create a `Gateway` resource in a namespace that enforces the `Restricted` profile. Apply only the gateway classes that you use.
+
+- For gateways that use the `istio` gateway class:
+
+    ```bash
+    kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
+    ```
+
+- For waypoint proxies, which use the `istio-waypoint` gateway class:
+
+    ```bash
+    kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio-waypoint":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
+    ```
+
+The patch merges by key, so you can apply both commands and keep both overlays.
+
+**Verification**
+
+Confirm that the control plane generated a ConfigMap for each patched gateway class by running the following command:
+
+```bash
+kubectl get configmap -n istio-system -l gateway.istio.io/defaults-for-class
+```
+
+**Example output**
+
+```text
+NAME                                        DATA   AGE
+istio-default-gatewayclass-istio            1      10s
+istio-default-gatewayclass-istio-waypoint   1      10s
+```
+
+:::note
+The overlay applies to every gateway of that class in the cluster. Existing gateways roll out once to pick up the seccomp profile.
+:::
+
+## Reference
+
+- [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/) (Kubernetes documentation)
+- [Restrict a Container's Syscalls with seccomp](https://kubernetes.io/docs/tutorials/security/seccomp/) (Kubernetes documentation)

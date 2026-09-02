@@ -21,7 +21,15 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
     kubectl create namespace egress-gateway
     ```
 
-2.  Create a YAML file named `egress-gateway-cr.yaml` that defines the egress gateway.
+2.  *Optional* : If the `egress-gateway` namespace enforces the `Restricted` Pod Security Admission profile, add the `istio` gateway class overlay to the `Istio` resource. Without it, the gateway pod is rejected:
+
+    ```bash
+    kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
+    ```
+
+    For more information, see [Pod Security Admission](../../installing/pod-security-admission.mdx#gateway-api).
+
+3.  Create a YAML file named `egress-gateway-cr.yaml` that defines the egress gateway.
 
     <details>
     <summary>**Example egress gateway CR file**</summary>
@@ -103,7 +111,7 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
     kubectl -n egress-gateway apply -f egress-gateway-cr.yaml
     ```
 
-3.  Check the status of the gateway configuration by running this command:
+4.  Check the status of the gateway configuration by running this command:
 
     ```shell {name=sidecar-egress:verify-gateway}
     kubectl -n egress-gateway get gtw httpbin-egress-gateway
@@ -118,7 +126,7 @@ This section describes how to use the Kubernetes Gateway API to route outbound H
     httpbin-egress-gateway   istio   httpbin-egress-gateway-istio.egress-gateway.svc.cluster.local   True         68s
     ```
 
-4.  *Optional* : Deploy the gateway to <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />:
+5.  *Optional* : Deploy the gateway to <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />:
 
     <details>
       <summary>Click to expand</summary>

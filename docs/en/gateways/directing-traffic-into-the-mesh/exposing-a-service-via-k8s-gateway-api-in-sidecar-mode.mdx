@@ -28,7 +28,15 @@ You can use the Kubernetes Gateway API to create `Gateway` and `HTTPRoute` resou
     kubectl apply -n httpbin -f https://raw.githubusercontent.com/istio/istio/refs/heads/release-1.30/samples/httpbin/httpbin.yaml
     ```
 
-3.  Create a file named `httpbin-k8s-gw.yaml` that defines a Kubernetes `Gateway` resource. This will configure gateway proxies to expose port 80 (HTTP) for the `httpbin.example.com` host.
+3.  *Optional* : If the `httpbin` namespace enforces the `Restricted` Pod Security Admission profile, add the `istio` gateway class overlay to the `Istio` resource. Without it, the gateway pod is rejected:
+
+    ```bash
+    kubectl patch istio default --type=merge -p '{"spec":{"values":{"gatewayClasses":{"istio":{"deployment":{"spec":{"template":{"spec":{"securityContext":{"seccompProfile":{"type":"RuntimeDefault"}}}}}}}}}}}'
+    ```
+
+    For more information, see [Pod Security Admission](../../installing/pod-security-admission.mdx#gateway-api).
+
+4.  Create a file named `httpbin-k8s-gw.yaml` that defines a Kubernetes `Gateway` resource. This will configure gateway proxies to expose port 80 (HTTP) for the `httpbin.example.com` host.
     
     <Directive type="info" title="Automated deployment">
     By default, each `Gateway` will automatically provision a `Service` and `Deployment`. These will be named `<Gateway name>-<GatewayClass name>` (with the exception of the `istio-waypoint` `GatewayClass`, which does not append a suffix). These configurations will be updated automatically if the `Gateway` changes (for example, if a new port is added).
@@ -66,13 +74,13 @@ You can use the Kubernetes Gateway API to create `Gateway` and `HTTPRoute` resou
         5.  Specifies the virtual hostname for clients to use when accessing a mesh service on this port.
     </Callouts>
 
-4.  Apply the YAML file with this command:
+5.  Apply the YAML file with this command:
 
     ```shell {name=sidecar-gw-api:apply-gateway}
     kubectl apply -f httpbin-k8s-gw.yaml
     ```
 
-5.  Create a YAML file named `httpbin-hr.yaml` that defines an `HTTPRoute` resource. This resource specifies the rules for routing traffic from the gateway proxy to the `httpbin` service.
+6.  Create a YAML file named `httpbin-hr.yaml` that defines an `HTTPRoute` resource. This resource specifies the rules for routing traffic from the gateway proxy to the `httpbin` service.
 
     **Example HTTPRoute file**
 
@@ -104,19 +112,19 @@ You can use the Kubernetes Gateway API to create `Gateway` and `HTTPRoute` resou
         2.  Directs matching traffic to the `httpbin` service by defining a `backendRefs` entry that includes the name and port of the `httpbin` `Service`.
     </Callouts>
 
-6.  Apply the YAML file by executing this command:
+7.  Apply the YAML file by executing this command:
 
     ```shell {name=sidecar-gw-api:apply-httproute}
     kubectl apply -f httpbin-hr.yaml
     ```
 
-7.  Confirm that the Gateway API service is ready and has an allocated address by running this command:
+8.  Confirm that the Gateway API service is ready and has an allocated address by running this command:
 
     ```shell {name=sidecar-gw-api:wait-programmed}
     kubectl wait --for=condition=programmed gtw httpbin-gateway -n httpbin
     ```
 
-8.  *Optional* : Deploy the gateway to <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />:
+9.  *Optional* : Deploy the gateway to <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />:
 
     <details>
       <summary>Click to expand</summary>

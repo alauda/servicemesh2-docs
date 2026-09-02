@@ -371,7 +371,7 @@ The Alauda Service Mesh v2 Operator leverages this resource's configuration to d
     ```
 
     <Callouts>
-      1. `spec.values.global.proxy.seccompProfile.type` set to `RuntimeDefault` adds the `RuntimeDefault` seccomp profile to the `istio-validation` and `istio-proxy` containers that the control plane injects into application pods. Injected sidecars then satisfy the `Restricted` Pod Security Admission (PSA) profile. Omit this setting only if no application namespace enforces the `Restricted` profile. For more information, see [Namespace Requirements](./application-deployment/namespace-requirements.mdx#pod-security-admission-modes).
+      1. `spec.values.global.proxy.seccompProfile.type` set to `RuntimeDefault` adds the `RuntimeDefault` seccomp profile to the `istio-validation` and `istio-proxy` containers that the control plane injects into application pods. Injected sidecars then satisfy the `Restricted` Pod Security Admission (PSA) profile. Omit this setting only if no application namespace enforces the `Restricted` profile. For more information, see [Pod Security Admission](../pod-security-admission.mdx#sidecars).
     </Callouts>
 11. Click **Create**.
 
@@ -409,7 +409,7 @@ Wait until the `.status.state` field of the `Istio` resource to be `Healthy`.
     ```
 
     <Callouts>
-      1. `spec.values.global.proxy.seccompProfile.type` set to `RuntimeDefault` adds the `RuntimeDefault` seccomp profile to the `istio-validation` and `istio-proxy` containers that the control plane injects into application pods. Injected sidecars then satisfy the `Restricted` Pod Security Admission (PSA) profile. Omit this setting only if no application namespace enforces the `Restricted` profile. For more information, see [Namespace Requirements](./application-deployment/namespace-requirements.mdx#pod-security-admission-modes).
+      1. `spec.values.global.proxy.seccompProfile.type` set to `RuntimeDefault` adds the `RuntimeDefault` seccomp profile to the `istio-validation` and `istio-proxy` containers that the control plane injects into application pods. Injected sidecars then satisfy the `Restricted` Pod Security Admission (PSA) profile. Omit this setting only if no application namespace enforces the `Restricted` profile. For more information, see [Pod Security Admission](../pod-security-admission.mdx#sidecars).
     </Callouts>
 
 2. Wait for the Istio control plane to return the `Ready` status condition by running the following command:
