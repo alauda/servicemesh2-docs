@@ -311,14 +311,17 @@ EOF
 
     # 27. 验证网格内连通性
     log_info "步骤 27: 验证网格内连通性"
-    local conn_output conn_expected
-    conn_output=$(runme run update-ambient:verify-connectivity 2>&1)
+    local conn_expected
     conn_expected=$(runme print update-ambient:verify-connectivity-output)
 
-    if ! __cmp_contains "$conn_output" "$conn_expected"; then
+    # NOTE: 文档块经 bookinfo 的 ratings pod exec 发起请求，取的是 `{.items[0]}`——
+    # 不筛 phase，滚动重启或跨 Case 残留时可能选中正在终止的 Pod，报
+    # `container not found ("ratings")`；数据面配置下发也有短延迟。
+    # 2026-09-05 g1 实测 ARM 与 x86 均失败过，故按块重试（重跑会重新解析 Pod 名）。
+    if ! retry_runme_verify update-ambient:verify-connectivity __cmp_contains "$conn_expected" 12 5; then
         log_error "网格连通性验证失败"
         log_error "期待输出: $conn_expected"
-        log_error "实际输出: $conn_output"
+        log_error "实际输出: $RETRY_RUNME_OUTPUT"
         return 1
     fi
     log_success "网格连通性验证通过"

@@ -220,12 +220,12 @@ Use an L7 authorization policy to explicitly allow the `curl` service to send GE
 
 ```bash {name=ambient-l7-features:cleanup-authorization-policy}
 # Remove the authorization policy
-kubectl delete -n bookinfo authorizationpolicy productpage-waypoint
+kubectl delete -n bookinfo authorizationpolicy productpage-waypoint --ignore-not-found
 # Remove the namespace from the ambient data plane
 kubectl label namespace curl istio.io/dataplane-mode-
 # Remove the Curl deployment and namespace
-kubectl delete -n curl -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/curl/curl.yaml
-kubectl delete namespace curl
+kubectl delete -n curl -f https://raw.githubusercontent.com/alauda-mesh/istio/refs/heads/istio-1.30/samples/curl/curl.yaml --ignore-not-found
+kubectl delete namespace curl --ignore-not-found
 ```
 
 ## Additional resources

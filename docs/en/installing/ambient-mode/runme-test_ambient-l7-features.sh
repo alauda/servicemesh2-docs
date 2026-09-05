@@ -46,20 +46,17 @@ test_ambient_l7_features() {
 
     # 步骤 1.3: 验证流量分发（概率性输出，检查 reviews-v1 和 reviews-v2 都出现）
     log_info "步骤 1.3: 验证流量分发"
-    local split_output
-    split_output=$(runme run ambient-l7-features:verify-traffic-split 2>&1) || {
-        log_error "执行流量分发验证失败"
-        log_error "输出: $split_output"
-        return 1
-    }
-
-    if ! __cmp_lines "$split_output" "$(cat <<'EOF'
+    # NOTE: 文档块经 bookinfo 的 ratings pod exec 发起请求，取的是 `{.items[0]}`——
+    # 不筛 phase，滚动重启或跨 Case 残留时可能选中正在终止的 Pod，报
+    # `container not found ("ratings")`；数据面配置下发也有短延迟。
+    # 2026-09-05 g1 实测 ARM 与 x86 均失败过，故按块重试（重跑会重新解析 Pod 名）。
+    if ! retry_runme_verify ambient-l7-features:verify-traffic-split __cmp_lines "$(cat <<'EOF'
 + reviews-v1
 + reviews-v2
 EOF
-    )"; then
+    )" 12 5; then
         log_error "流量分发验证失败：期望同时出现 reviews-v1 和 reviews-v2"
-        log_error "实际输出: $split_output"
+        log_error "实际输出: $RETRY_RUNME_OUTPUT"
         return 1
     fi
     log_success "流量分发验证通过（reviews-v1 和 reviews-v2 均出现）"
@@ -175,10 +172,21 @@ cleanup_ambient_l7_features() {
     }
 
     # 清理授权策略资源
-    runme_run_with_assets ambient-l7-features:cleanup-authorization-policy || {
-        log_error "清理授权策略资源失败"
-        return 1
-    }
+    # NOTE: 测试可能在创建这些资源之前就失败退出（如步骤 1.3 未通过，curl 命名空间尚未建）。
+    # 文档块里的 `kubectl label namespace curl ...-` 不支持 --ignore-not-found，命名空间不存在
+    # 时会整块报错，把一次早退放大成额外的 cleanup 失败。故先探测，缺失时只做幂等的删除。
+    if kubectl get namespace curl >/dev/null 2>&1; then
+        runme_run_with_assets ambient-l7-features:cleanup-authorization-policy || {
+            log_error "清理授权策略资源失败"
+            return 1
+        }
+    else
+        log_warn "curl 命名空间不存在，跳过文档 cleanup 块（测试可能在创建资源前已退出）"
+        kubectl delete -n bookinfo authorizationpolicy productpage-waypoint --ignore-not-found || {
+            log_error "清理授权策略失败"
+            return 1
+        }
+    fi
 
     log_success "测试资源清理完成"
     return 0

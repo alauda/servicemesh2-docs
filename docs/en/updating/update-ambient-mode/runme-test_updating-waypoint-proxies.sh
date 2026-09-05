@@ -84,19 +84,17 @@ EOF
 
     # 3. 验证流量分发（概率性输出，检查 reviews-v1 和 reviews-v2 都出现）
     log_info "步骤 3: 验证流量分发 (80/20)"
-    output=$(runme run update-waypoint:verify-traffic-split 2>&1) || {
-        log_error "执行流量分发验证失败"
-        log_error "输出: $output"
-        return 1
-    }
-
-    if ! __cmp_lines "$output" "$(cat <<'EOF'
+    # NOTE: 文档块经 bookinfo 的 ratings pod exec 发起请求，取的是 `{.items[0]}`——
+    # 不筛 phase，滚动重启或跨 Case 残留时可能选中正在终止的 Pod，报
+    # `container not found ("ratings")`；数据面配置下发也有短延迟。
+    # 2026-09-05 g1 实测 ARM 与 x86 均失败过，故按块重试（重跑会重新解析 Pod 名）。
+    if ! retry_runme_verify update-waypoint:verify-traffic-split __cmp_lines "$(cat <<'EOF'
 + reviews-v1
 + reviews-v2
 EOF
-    )"; then
+    )" 12 5; then
         log_error "流量分发验证失败：期望同时出现 reviews-v1 和 reviews-v2"
-        log_error "实际输出: $output"
+        log_error "实际输出: $RETRY_RUNME_OUTPUT"
         return 1
     fi
     log_success "流量分发验证通过（reviews-v1 和 reviews-v2 均出现）"

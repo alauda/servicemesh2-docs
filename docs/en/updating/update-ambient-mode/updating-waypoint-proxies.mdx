@@ -161,6 +161,6 @@ Confirm that L7 authorization decisions survive the update. The following exampl
 If you created the routing and authorization resources only for this verification, remove them afterwards:
 
 ```bash {name=update-waypoint:cleanup}
-kubectl delete -n bookinfo httproute reviews
-kubectl delete -n bookinfo authorizationpolicy productpage-waypoint
+kubectl delete -n bookinfo httproute reviews --ignore-not-found
+kubectl delete -n bookinfo authorizationpolicy productpage-waypoint --ignore-not-found
 ```

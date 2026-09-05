@@ -308,14 +308,16 @@ EOF
 
     # 24. 验证旧控制面 Pod 已删除
     log_info "步骤 24: 验证旧控制面 Pod 已删除"
-    output=$(runme run update-revisionbased:verify-pods 2>&1)
-    if ! __cmp_lines "$output" "$(cat <<EOF
+    # NOTE: IstioRevision 消失不代表其 istiod Pod 对象已被回收——Pod 先优雅终止
+    # （kubectl 显示 Completed）再由 GC 删除，两者异步。一次性断言会踩这个窗口，
+    # 2026-09-05 g1 实测 ARM 集群失败、x86 侥幸通过，故按块重试。
+    if ! retry_runme_verify update-revisionbased:verify-pods __cmp_lines "$(cat <<EOF
 + istiod-$NEW_REV
 - istiod-$REV
 EOF
-    )"; then
+    )" 12 5; then
         log_error "旧控制面 Pod 删除验证失败"
-        log_error "实际输出: $output"
+        log_error "实际输出: $RETRY_RUNME_OUTPUT"
         return 1
     fi
     log_success "旧控制面 Pod 已删除，验证通过"
