@@ -311,14 +311,17 @@ EOF
 
     # 27. 验证网格内连通性
     log_info "步骤 27: 验证网格内连通性"
-    local conn_output conn_expected
-    conn_output=$(runme run update-ambient:verify-connectivity 2>&1)
+    local conn_expected
     conn_expected=$(runme print update-ambient:verify-connectivity-output)
 
-    if ! __cmp_contains "$conn_output" "$conn_expected"; then
+    # NOTE: 本块经 bookinfo 的 ratings pod exec 发起请求。命名空间纳入 ambient 后
+    # kubelet 存活探针会间歇超时（样例自带 failureThreshold=1/timeout=5s，超时一次即杀容器），
+    # 容器进入 CrashLoopBackOff，退避期内 exec 报 `container not found ("ratings")`。
+    # 2026-09-05 g1 实测退避涨到 1m20s，故重试窗口取 24×5s=120s。根因在产品侧，详见 project.sh。
+    if ! retry_runme_verify update-ambient:verify-connectivity __cmp_contains "$conn_expected" 24 5; then
         log_error "网格连通性验证失败"
         log_error "期待输出: $conn_expected"
-        log_error "实际输出: $conn_output"
+        log_error "实际输出: $RETRY_RUNME_OUTPUT"
         return 1
     fi
     log_success "网格连通性验证通过"

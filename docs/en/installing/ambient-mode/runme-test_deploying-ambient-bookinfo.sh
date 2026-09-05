@@ -146,14 +146,15 @@ EOF
 
     # 9. 验证应用响应
     log_info "步骤 9: 验证应用响应"
-    local app_output expected_app
-    app_output=$(runme run ambient-bookinfo:verify-application 2>&1)
+    local expected_app
     expected_app=$(runme print ambient-bookinfo:verify-application-output)
 
-    if ! __cmp_contains "$app_output" "$expected_app"; then
+    # NOTE: 同上——ambient 纳管后 kubelet 探针会杀 ratings 容器，退避期内 exec 报
+    # `container not found`，故按块重试 24×5s。
+    if ! retry_runme_verify ambient-bookinfo:verify-application __cmp_contains "$expected_app" 24 5; then
         log_error "应用验证失败"
         log_error "期待输出: $expected_app"
-        log_error "实际输出: $app_output"
+        log_error "实际输出: $RETRY_RUNME_OUTPUT"
         return 1
     fi
     log_success "应用运行验证通过"

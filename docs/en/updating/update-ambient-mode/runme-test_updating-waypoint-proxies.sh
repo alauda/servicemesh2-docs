@@ -84,19 +84,17 @@ EOF
 
     # 3. 验证流量分发（概率性输出，检查 reviews-v1 和 reviews-v2 都出现）
     log_info "步骤 3: 验证流量分发 (80/20)"
-    output=$(runme run update-waypoint:verify-traffic-split 2>&1) || {
-        log_error "执行流量分发验证失败"
-        log_error "输出: $output"
-        return 1
-    }
-
-    if ! __cmp_lines "$output" "$(cat <<'EOF'
+    # NOTE: 本块经 bookinfo 的 ratings pod exec 发起请求。命名空间纳入 ambient 后
+    # kubelet 存活探针会间歇超时（样例自带 failureThreshold=1/timeout=5s，超时一次即杀容器），
+    # 容器进入 CrashLoopBackOff，退避期内 exec 报 `container not found ("ratings")`。
+    # 2026-09-05 g1 实测退避涨到 1m20s，故重试窗口取 24×5s=120s。根因在产品侧，详见 project.sh。
+    if ! retry_runme_verify update-waypoint:verify-traffic-split __cmp_lines "$(cat <<'EOF'
 + reviews-v1
 + reviews-v2
 EOF
-    )"; then
+    )" 24 5; then
         log_error "流量分发验证失败：期望同时出现 reviews-v1 和 reviews-v2"
-        log_error "实际输出: $output"
+        log_error "实际输出: $RETRY_RUNME_OUTPUT"
         return 1
     fi
     log_success "流量分发验证通过（reviews-v1 和 reviews-v2 均出现）"
@@ -124,14 +122,15 @@ EOF
 
     # 6. 验证 allow list 之外的 ratings 服务被 RBAC 拒绝
     log_info "步骤 6: 验证 ratings 服务 GET 请求被 RBAC 拒绝"
-    local rbac_output rbac_expected
-    rbac_output=$(runme run update-waypoint:verify-get-denied 2>&1)
+    local rbac_expected
     rbac_expected=$(runme print update-waypoint:verify-get-denied-output)
 
-    if ! __cmp_contains "$rbac_output" "$rbac_expected"; then
+    # NOTE: 同上——ambient 纳管后 kubelet 探针会杀 ratings 容器，退避期内 exec 报
+    # `container not found`，故按块重试 24×5s。
+    if ! retry_runme_verify update-waypoint:verify-get-denied __cmp_contains "$rbac_expected" 24 5; then
         log_error "RBAC 拒绝验证失败"
         log_error "期待输出: $rbac_expected"
-        log_error "实际输出: $rbac_output"
+        log_error "实际输出: $RETRY_RUNME_OUTPUT"
         return 1
     fi
     log_success "RBAC 拒绝验证通过"
