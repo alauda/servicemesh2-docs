@@ -314,11 +314,11 @@ EOF
     local conn_expected
     conn_expected=$(runme print update-ambient:verify-connectivity-output)
 
-    # NOTE: 文档块经 bookinfo 的 ratings pod exec 发起请求，取的是 `{.items[0]}`——
-    # 不筛 phase，滚动重启或跨 Case 残留时可能选中正在终止的 Pod，报
-    # `container not found ("ratings")`；数据面配置下发也有短延迟。
-    # 2026-09-05 g1 实测 ARM 与 x86 均失败过，故按块重试（重跑会重新解析 Pod 名）。
-    if ! retry_runme_verify update-ambient:verify-connectivity __cmp_contains "$conn_expected" 12 5; then
+    # NOTE: 本块经 bookinfo 的 ratings pod exec 发起请求。命名空间纳入 ambient 后
+    # kubelet 存活探针会间歇超时（样例自带 failureThreshold=1/timeout=5s，超时一次即杀容器），
+    # 容器进入 CrashLoopBackOff，退避期内 exec 报 `container not found ("ratings")`。
+    # 2026-09-05 g1 实测退避涨到 1m20s，故重试窗口取 24×5s=120s。根因在产品侧，详见 project.sh。
+    if ! retry_runme_verify update-ambient:verify-connectivity __cmp_contains "$conn_expected" 24 5; then
         log_error "网格连通性验证失败"
         log_error "期待输出: $conn_expected"
         log_error "实际输出: $RETRY_RUNME_OUTPUT"
