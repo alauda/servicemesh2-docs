@@ -174,7 +174,7 @@ test_exposing_a_service_via_istio_gateway() {
     # 文档示例由本地终端执行，测试改为经 curl pod 在集群内发起，避免本地代理等干扰。
     # 文档对外部访问无 -output 块，使用 __cmp_lines 校验关键行（对响应头顺序免疫）。
     log_info "步骤 15: 外部访问测试"
-    local external_cmd external_output
+    local external_cmd
     if [[ "$INGRESS_HOST" == *:* ]]; then
         log_info "检测到 IPv6 地址，使用 IPv6 测试命令"
         external_cmd=$(runme print istio-gw:test-external-ipv6)
@@ -182,18 +182,17 @@ test_exposing_a_service_via_istio_gateway() {
         log_info "检测到 IPv4 地址，使用 IPv4 测试命令"
         external_cmd=$(runme print istio-gw:test-external)
     fi
-    external_output=$(eval "kubectl exec $CURL_POD -n curl -- $external_cmd" 2>&1) || {
-        log_error "外部访问测试失败"
-        log_error "输出: $external_output"
-        return 1
-    }
-    if ! __cmp_lines "$external_output" "$(cat <<'EOF'
+    # LoadBalancer 的数据面就绪晚于 _wait_for_ingress_lb 等待的控制面回填，
+    # 集群内第一个 LoadBalancer 尤其明显（详见 retry_cmd_verify 的适用边界说明），
+    # 故重试等待收敛；断言本身保持严格，输出不符时照常失败。
+    if ! retry_cmd_verify "kubectl exec $CURL_POD -n curl -- $external_cmd" \
+        __cmp_lines "$(cat <<'EOF'
 + HTTP/1.1 200 OK
 + server: istio-envoy
 EOF
     )"; then
-        log_error "外部访问测试验证失败"
-        log_error "实际输出: $external_output"
+        log_error "外部访问测试失败"
+        log_error "实际输出: $RETRY_CMD_OUTPUT"
         return 1
     fi
     log_success "外部访问测试通过"
