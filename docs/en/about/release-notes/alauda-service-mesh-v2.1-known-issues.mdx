@@ -45,3 +45,11 @@ This limitation stems from a regex pattern in the Helm chart template that valid
 **Fixed in:** The fix has been merged into the upstream Istio master branch and will be included in a future Istio release.
 
 **Reference:** [istio/istio#58646](https://github.com/istio/istio/issues/58646)
+
+## Ambient mode is not supported on kube-ovn underlay networks \{#ambient-mode-requires-kube-ovn-overlay}
+
+Ambient mode supports kube-ovn overlay networking only. On a kube-ovn underlay network, where nodes and pods are on different subnets, every kubelet HTTP or TCP probe against an enrolled pod times out. Pods that keep a liveness or readiness probe running are then killed and enter `CrashLoopBackOff`, while pods without a probe are unaffected.
+
+The `istio-cni` node agent SNATs kubelet probes to a deliberately non-routable address (`169.254.7.127` for IPv4, `fd16:9254:7127:1337:ffff:ffff:ffff:ffff` for IPv6) so that a pod can tell them apart from other host traffic. This assumes the probe never leaves the node, which holds for overlay networking. On an underlay network the probe is routed through the physical gateway, which has no route back to the SNAT address, so the pod response is dropped. The behavior is the same for IPv4 and IPv6 and does not depend on the CPU architecture.
+
+**Workaround:** Use sidecar mode on a kube-ovn underlay network. Sidecar mode rewrites the probes in the pod specification and does not rely on host SNAT, so it is not affected.
