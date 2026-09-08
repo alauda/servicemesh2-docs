@@ -230,7 +230,7 @@ test_exposing_a_service_via_k8s_gateway_api_in_ambient_mode() {
     # 文档示例由测试者本地终端执行，但本地终端可能存在代理等不稳定因素，
     # 因此测试脚本改为通过 curl pod 在集群内部发起请求，避免环境干扰
     log_info "步骤 22: 外部访问测试"
-    local external_cmd external_output external_expected
+    local external_cmd external_expected
     if [[ "$INGRESS_HOST" == *:* ]]; then
         log_info "检测到 IPv6 地址，使用 IPv6 测试命令"
         external_cmd=$(runme print ambient-gw-api:test-external-ipv6)
@@ -238,16 +238,15 @@ test_exposing_a_service_via_k8s_gateway_api_in_ambient_mode() {
         log_info "检测到 IPv4 地址，使用 IPv4 测试命令"
         external_cmd=$(runme print ambient-gw-api:test-external)
     fi
-    external_output=$(eval "kubectl exec $CURL_POD -n curl -- $external_cmd" 2>&1) || {
-        log_error "外部访问测试失败"
-        log_error "输出: $external_output"
-        return 1
-    }
     external_expected=$(runme print ambient-gw-api:test-external-output)
-    if ! __cmp_elided "$external_output" "$external_expected"; then
+    # LoadBalancer 的数据面就绪晚于 _wait_for_ingress_lb 等待的控制面回填，
+    # 集群内第一个 LoadBalancer 尤其明显（详见 retry_cmd_verify 的适用边界说明），
+    # 故重试等待收敛；断言本身保持严格，输出不符时照常失败。
+    if ! retry_cmd_verify "kubectl exec $CURL_POD -n curl -- $external_cmd" \
+        __cmp_elided "$external_expected"; then
         log_error "/headers 端点验证失败"
         log_error "期待输出: $external_expected"
-        log_error "实际输出: $external_output"
+        log_error "实际输出: $RETRY_CMD_OUTPUT"
         return 1
     fi
     log_success "外部访问测试通过"
