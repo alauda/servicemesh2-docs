@@ -8,7 +8,8 @@ You can deploy Istio in ambient mode on Alauda Container Platform with Alauda Se
 
 ## Prerequisites
 
-- The Alauda Container Platform Networking for Multus plugin must be installed, and kube-ovn must be v4.1.5 or later.
+- The Alauda Container Platform Networking for Multus plugin must be installed.
+- kube-ovn must be v4.1.5 or later and must use overlay networking. Ambient mode does not work on a kube-ovn underlay network; see [Ambient mode is not supported on kube-ovn underlay networks](../../about/release-notes/alauda-service-mesh-v2.1-known-issues.mdx#ambient-mode-requires-kube-ovn-overlay).
 - Alauda Service Mesh Operator 2.1.1 or later is installed.
 - An active ACP CLI (`kubectl`) session by a cluster administrator with the `cluster-admin` role.
 - You have `istioctl` installed locally so that you can use to run these instructions.
