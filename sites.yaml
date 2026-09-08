@@ -1,6 +1,6 @@
 - name: acp
   base: /container_platform
-  version: "4.3"
+  version: "4.4"
 - name: distributed-tracing
   base: /distributed-tracing
-  version: "2.0"
+  version: "2.1"
