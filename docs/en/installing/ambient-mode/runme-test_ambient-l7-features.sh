@@ -175,10 +175,21 @@ cleanup_ambient_l7_features() {
     }
 
     # 清理授权策略资源
-    runme_run_with_assets ambient-l7-features:cleanup-authorization-policy || {
-        log_error "清理授权策略资源失败"
-        return 1
-    }
+    # NOTE: 测试可能在创建这些资源之前就失败退出（如步骤 1.3 未通过，curl 命名空间尚未建）。
+    # 文档块里的 `kubectl label namespace curl ...-` 不支持 --ignore-not-found，命名空间不存在
+    # 时会整块报错，把一次早退放大成额外的 cleanup 失败。故先探测，缺失时只做幂等的删除。
+    if kubectl get namespace curl >/dev/null 2>&1; then
+        runme_run_with_assets ambient-l7-features:cleanup-authorization-policy || {
+            log_error "清理授权策略资源失败"
+            return 1
+        }
+    else
+        log_warn "curl 命名空间不存在，跳过文档 cleanup 块（测试可能在创建资源前已退出）"
+        kubectl delete -n bookinfo authorizationpolicy productpage-waypoint --ignore-not-found || {
+            log_error "清理授权策略失败"
+            return 1
+        }
+    fi
 
     log_success "测试资源清理完成"
     return 0

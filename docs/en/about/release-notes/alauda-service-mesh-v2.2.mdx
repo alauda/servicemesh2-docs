@@ -10,14 +10,14 @@ Alauda Service Mesh v2.2 is built on the [Istio](https://istio.io/) project and 
 
 ### Supported component versions
 
-- `Istio` version: v1.28.6 and v1.30.3
+- `Istio` version: v1.28.6 and v1.30.4
     - Istio 1.30 [supports Kubernetes](https://istio.io/latest/docs/releases/supported-releases/#support-status-of-istio-releases) 1.32, 1.33, 1.34, 1.35, 1.36
     - Istio 1.28 [supports Kubernetes](https://istio.io/latest/docs/releases/supported-releases/#support-status-of-istio-releases) 1.30, 1.31, 1.32, 1.33, 1.34
 - `Kiali operator` version: v2.27.1
 
 ### Istio Features
 
-- Updated Istio to version 1.30.3.
+- Updated Istio to version 1.30.4.
     - **Ambient**: CIDR addresses in `ServiceEntry`, optional XFCC synthesis at waypoints, configurable HBONE window sizing, ztunnel runtime metrics, and DNS capture enabled by default.
     - **Gateway API**: `TLSRoute` termination and mixed mode, TLS passthrough listeners on east-west gateways, and attached `ListenerSets` reported in the Gateway status.
     - **Traffic management**: Namespace-level traffic distribution, configurable DNS upstream timeout and failover priority, and the new `TrafficExtension` API as a unified extension mechanism for Wasm and Lua.

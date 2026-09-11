@@ -90,9 +90,9 @@ Verify that the Operator installation status is reported as `Succeeded` in the *
     **Example output**
     
     ```bash {name=install-mesh:check-packagemanifest-versions-output}
-    CHANNEL     NAME                          VERSION
-    stable      servicemesh-operator2.v2.1.0  2.1.0
-    stable-2.1  servicemesh-operator2.v2.1.0  2.1.0
+    CHANNEL     NAME                             VERSION
+    stable      servicemesh-operator2.v2.2.0-r1  2.2.0-r1
+    stable-2.2  servicemesh-operator2.v2.2.0-r1  2.2.0-r1
     ```
 
     **Fields**:
@@ -140,7 +140,7 @@ Verify that the Operator installation status is reported as `Succeeded` in the *
       name: servicemesh-operator2
       source: platform
       sourceNamespace: cpaas-system
-      startingCSV: servicemesh-operator2.v2.1.0
+      startingCSV: servicemesh-operator2.v2.2.0-r1
     EOF
     ```
     
@@ -184,8 +184,8 @@ Verify that the Operator installation status is reported as `Succeeded` in the *
     **Example output**
     
     ```bash {name=install-mesh:get-installplan-output}
-    NAME            CSV                            APPROVAL   APPROVED
-    install-rlgnp   servicemesh-operator2.v2.1.0   Manual     false
+    NAME            CSV                               APPROVAL   APPROVED
+    install-rlgnp   servicemesh-operator2.v2.2.0-r1   Manual     false
     ```
     
     **Approve manually**
@@ -212,8 +212,8 @@ kubectl -n sail-operator get csv
 **Example output**
 
 ```bash {name=install-mesh:check-csv-status-output}
-NAME                           DISPLAY                  VERSION   REPLACES   PHASE
-servicemesh-operator2.v2.1.0   Alauda Service Mesh v2   2.1.0                Succeeded
+NAME                              DISPLAY                  VERSION    REPLACES   PHASE
+servicemesh-operator2.v2.2.0-r1   Alauda Service Mesh v2   2.2.0-r1              Succeeded
 ```
 
 **Fields**
@@ -310,7 +310,7 @@ Wait until the `.status.state` field of the `IstioCNI` resource to be `Healthy`.
     metadata:
       name: default
     spec:
-      version: v1.30.3
+      version: v1.30.4
       namespace: istio-cni
       values:
         cni:
@@ -356,7 +356,24 @@ The Alauda Service Mesh v2 Operator leverages this resource's configuration to d
 6. Click **Create**.
 7. Locate and Select **Istio** and then click **Create**.
 8. Select the `istio-system` from the **Namespace** drop down.
-9. Click **Create**.
+9. Click **YAML** tab.
+10. Add the following YAML snippet to the **YAML** code editor:
+    ```yaml
+    apiVersion: sailoperator.io/v1
+    kind: Istio
+    spec:
+      # Applying the following contents to the yaml code editor:
+      values:
+        global:
+          proxy:
+            seccompProfile:
+              type: RuntimeDefault # [!code callout]
+    ```
+
+    <Callouts>
+      1. `spec.values.global.proxy.seccompProfile.type` set to `RuntimeDefault` adds the `RuntimeDefault` seccomp profile to the `istio-validation` and `istio-proxy` containers that the control plane injects into application pods. Injected sidecars then satisfy the `Restricted` Pod Security Admission (PSA) profile. Omit this setting only if no application namespace enforces the `Restricted` profile. For more information, see [Pod Security Admission](../pod-security-admission.mdx#sidecars).
+    </Callouts>
+11. Click **Create**.
 
 **Verification**
 
@@ -381,10 +398,19 @@ Wait until the `.status.state` field of the `Istio` resource to be `Healthy`.
     metadata:
       name: default
     spec:
-      version: v1.30.3
+      version: v1.30.4
       namespace: istio-system
+      values:
+        global:
+          proxy:
+            seccompProfile:
+              type: RuntimeDefault # [!code callout]
     EOF
     ```
+
+    <Callouts>
+      1. `spec.values.global.proxy.seccompProfile.type` set to `RuntimeDefault` adds the `RuntimeDefault` seccomp profile to the `istio-validation` and `istio-proxy` containers that the control plane injects into application pods. Injected sidecars then satisfy the `Restricted` Pod Security Admission (PSA) profile. Omit this setting only if no application namespace enforces the `Restricted` profile. For more information, see [Pod Security Admission](../pod-security-admission.mdx#sidecars).
+    </Callouts>
 
 2. Wait for the Istio control plane to return the `Ready` status condition by running the following command:
 

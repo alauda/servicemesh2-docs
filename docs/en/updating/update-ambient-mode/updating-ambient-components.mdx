@@ -129,6 +129,7 @@ This section exists so that you can walk through the update process from a known
 
     ```shell {name=update-ambient:create-bookinfo-ns}
     kubectl create namespace bookinfo
+    kubectl label namespace bookinfo pod-security.kubernetes.io/enforce=restricted --overwrite
     kubectl label namespace bookinfo istio-discovery=enabled
     ```
 
@@ -155,7 +156,8 @@ This section exists so that you can walk through the update process from a known
 ### Prerequisites
 
 - You are logged in to the Alauda Container Platform web console as **cluster-admin**.
-- You have installed the Alauda Container Platform Networking for Multus plugin, and kube-ovn must be v4.1.5 or later.
+- You have installed the Alauda Container Platform Networking for Multus plugin.
+- kube-ovn is v4.1.5 or later and uses overlay networking. Ambient mode does not work on a kube-ovn underlay network; see [Ambient mode does not work on a kube-ovn underlay network](../../about/release-notes/alauda-service-mesh-v2.2-known-issues.mdx#ambient-mode-requires-kube-ovn-overlay).
 - You have upgraded the Alauda Service Mesh Operator to version 2.1.2 or later, and the new target version is available in the Operator. For more information, see [Understanding Operator updates and channels](../update-mesh/index.mdx#understanding-operator-updates-and-channels).
 - Istio is deployed in ambient mode. In this example, the `Istio`, `IstioCNI`, and `ZTunnel` resources are all named `default`.
 - The cluster runs a Kubernetes version that the target Istio version supports. Istio 1.30 supports Kubernetes 1.32 to 1.36, and Istio 1.28 supports Kubernetes 1.30 to 1.34, so a cluster on Kubernetes 1.30 or 1.31 must be upgraded before you update Istio to 1.30.
@@ -164,10 +166,10 @@ This section exists so that you can walk through the update process from a known
 
 ### Updating the Istio control plane
 
-1. Change the version in the `Istio` resource. For example, to update to Istio `1.30.3`, set the `spec.version` field to `v1.30.3` by running the following command:
+1. Change the version in the `Istio` resource. For example, to update to Istio `1.30.4`, set the `spec.version` field to `v1.30.4` by running the following command:
 
     ```bash {name=update-ambient:patch-istio-version}
-    kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.30.3"}}'
+    kubectl patch istio default --type='merge' -p '{"spec":{"version":"v1.30.4"}}'
     ```
 
     The Operator replaces the running control plane with the new version. ZTunnel and any waypoint proxies reconnect to the new istiod instance automatically; the application pods keep running and do not need a restart.
@@ -188,7 +190,7 @@ This section exists so that you can walk through the update process from a known
 
     ```text {name=update-ambient:get-istio-update-output}
     NAME      NAMESPACE      PROFILE   REVISIONS   READY   IN USE   ACTIVE REVISION   STATUS    VERSION   AGE
-    default   istio-system   ambient   1           1       0        default           Healthy   v1.30.3   12m
+    default   istio-system   ambient   1           1       0        default           Healthy   v1.30.4   12m
     ```
 
 ### Updating the Istio CNI plugin
@@ -198,7 +200,7 @@ Update the Istio CNI plugin only after the control plane update has completed, b
 1. Set the `spec.version` field of the `IstioCNI` resource to the same version as the control plane:
 
     ```bash {name=update-ambient:patch-istiocni-version}
-    kubectl patch istiocni default --type='merge' -p '{"spec":{"version":"v1.30.3"}}'
+    kubectl patch istiocni default --type='merge' -p '{"spec":{"version":"v1.30.4"}}'
     ```
 
 2. Watch the `istio-cni-node` DaemonSet roll out:
@@ -223,7 +225,7 @@ Update the Istio CNI plugin only after the control plane update has completed, b
 
     ```text {name=update-ambient:get-istiocni-update-output}
     NAME      NAMESPACE   PROFILE   READY   STATUS    VERSION   AGE
-    default   istio-cni   ambient   True    Healthy   v1.30.3   15m
+    default   istio-cni   ambient   True    Healthy   v1.30.4   15m
     ```
 
 :::note
@@ -246,7 +248,7 @@ Replacing a ZTunnel pod can reset long-lived TCP connections on that node. If yo
 1. Set the `spec.version` field of the `ZTunnel` resource to the same version as the control plane:
 
     ```bash {name=update-ambient:patch-ztunnel-version}
-    kubectl patch ztunnel default --type='merge' -p '{"spec":{"version":"v1.30.3"}}'
+    kubectl patch ztunnel default --type='merge' -p '{"spec":{"version":"v1.30.4"}}'
     ```
 
 2. Watch the ZTunnel DaemonSet roll out:
@@ -277,7 +279,7 @@ Replacing a ZTunnel pod can reset long-lived TCP connections on that node. If yo
 
     ```text {name=update-ambient:get-ztunnel-update-output}
     NAME      NAMESPACE   READY   STATUS    VERSION   AGE
-    default   ztunnel     True    Healthy   v1.30.3   18m
+    default   ztunnel     True    Healthy   v1.30.4   18m
     ```
 
 5. Inspect the per-node ZTunnel pods:
