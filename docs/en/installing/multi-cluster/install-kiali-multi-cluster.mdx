@@ -16,7 +16,10 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
 - You have deployed a multi-cluster mesh by following either [Installing a multi-primary multi-network mesh](./install-multi-primary-multi-network.mdx) or [Installing a primary-remote multi-network mesh](./install-primary-remote-multi-network.mdx).
 - You have installed the Alauda Build of Kiali Operator on **every** cluster in the mesh, including the clusters where no Kiali server is deployed. See [Installing Alauda Build of Kiali](../../integration/observability/kiali.mdx).
-- You have configured metrics collection on **every** cluster in the mesh by following [Configuring Monitoring with Service Mesh](../../integration/observability/metrics-and-mesh.mdx), with the `mesh_id` relabeling in the `PodMonitor` object and the `mesh_id` tag override in the `Telemetry` resource both enabled. Kiali distinguishes clusters by the `source_cluster` and `destination_cluster` labels that Istio adds to these metrics.
+- You have configured metrics collection by following [Configuring Monitoring with Service Mesh](../../integration/observability/metrics-and-mesh.mdx). Kiali distinguishes clusters by the `source_cluster` and `destination_cluster` labels that Istio adds to these metrics, and it filters them by the `mesh_id` label, so where each resource goes matters:
+
+  - Create the `ServiceMonitor` and `PodMonitor` objects on **every** cluster in the mesh, because monitoring scrapes each cluster separately. In the `PodMonitor` object, uncomment the `mesh_id` relabeling and set the replacement to the `meshID` of your mesh. This relabeling happens at scrape time, so it is what stamps `mesh_id` onto the metrics of every cluster, including clusters that run no control plane.
+  - Create the `Telemetry` resource only on the clusters that run a control plane, because it is Istio configuration rather than a monitoring object. In a primary-remote mesh, applying it on a remote cluster is rejected by the `validation.istio.io` webhook, since the `istiod` service on that cluster has no endpoints.
 - Kiali requires a single endpoint that returns metrics for all clusters in the mesh. In Alauda Container Platform the monitoring store already spans clusters, so every cluster reports the same address. Read it with the following command:
 
   ```bash
@@ -26,7 +29,12 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
   The address is the value you set in `spec.external_services.prometheus.url` of the `Kiali` resource. You do not need to federate metrics stores yourself.
 
 - The Kiali deployment namespace and instance name are identical on all clusters. If you change either default, apply the same value to `spec.deployment.namespace` and `spec.deployment.instance_name` in the `Kiali` resource on every cluster. This procedure uses the defaults, `istio-system` and `kiali`.
-- You know the `meshID` and the per-cluster `multiCluster.clusterName` values that you set in the `Istio` resource of each cluster. This procedure uses `mesh1`, `cluster1`, and `cluster2`.
+- You know the `meshID` of the mesh and the name that Istio uses for each cluster. Later steps pass the cluster name to the `--remote-cluster-name` option and use it as the key of the remote cluster secret, so it must match exactly. Where to read it depends on the topology:
+
+  - In a multi-primary mesh, every cluster has its own `Istio` resource carrying `spec.values.global.meshID` and `spec.values.global.multiCluster.clusterName`.
+  - In a primary-remote mesh, only the primary cluster's `Istio` resource carries those fields. The name of a remote cluster appears in that cluster's own `Istio` resource as part of `spec.values.istiodRemote.injectionPath`, which has the form `/inject/cluster/<cluster-name>/net/<network>`.
+
+  This procedure uses `mesh1`, `cluster1`, and `cluster2`.
 - You have `kubectl` configured with a context for each cluster. The following environment variables are used throughout:
 
   ```bash
@@ -138,6 +146,18 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
     "<platform-url>/auth/v1/clusters/<west-cluster-name>/kubeconfig"
   ```
 
+  :::warning
+  The platform API returns the `kubeconfig` as JSON, and it carries `certificate-authority-data` as a PEM block instead of base64. Saving the response unchanged and pointing `kubectl` at it fails with `illegal base64 data at input byte 0`. Encode that field before use, or download the `kubeconfig` from the web console instead.
+  :::
+
+  The following command rewrites the field and writes a usable `kubeconfig` file. It is safe to run more than once, because it only touches values that are still PEM:
+
+  ```bash
+  jq '.clusters[].cluster."certificate-authority-data" |=
+    (if startswith("-----BEGIN") then @base64 else . end)' \
+    west-kubeconfig.json > west-kubeconfig.yaml
+  ```
+
   The downloaded `kubeconfig` contains two contexts. Use the `proxy-connect` context, which is the default, and whose server address has the following form:
 
   ```text
@@ -151,6 +171,10 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
   :::
 
   Add the `proxy-connect` context to the `kubeconfig` that also holds your **East** cluster context, so that a single `kubeconfig` can reach both clusters. This procedure refers to it as `${CTX_CLUSTER2_PROXY}`.
+
+  :::note
+  Every cluster's downloaded `kubeconfig` names its contexts `proxy-connect` and `direct-connect`. When you merge the files of several clusters, rename the contexts first so that they do not collide.
+  :::
 
   ### Create a remote cluster secret on the **East** cluster
 
@@ -366,7 +390,7 @@ spec:
 
 Apply the mirror-image configuration on the **West** cluster so that both consoles link to each other.
 
-## Removing a cluster from Kiali
+## Removing a cluster from Kiali \{#removing-a-cluster-from-kiali}
 
 **Procedure**
 
@@ -401,6 +425,30 @@ Apply the mirror-image configuration on the **West** cluster so that both consol
    - With explicit declaration, remove the corresponding entry from `spec.clustering.clusters`.
    - With one combined secret, no action is needed. The Operator notices the change and redeploys the Kiali server.
 
+4. If the removed cluster had a remote cluster secret of its own, recreate the Kiali server deployment so that it stops mounting the deleted secret:
+
+   ```bash
+   kubectl --context "${CTX_CLUSTER1}" -n istio-system delete deployment kiali
+   kubectl --context "${CTX_CLUSTER1}" annotate kiali kiali -n istio-system \
+     --overwrite kiali.io/reconcile="$(date)"
+   kubectl --context "${CTX_CLUSTER1}" wait --for=condition=Successful \
+     kialis/kiali -n istio-system --timeout=3m
+   kubectl --context "${CTX_CLUSTER1}" rollout status deployment/kiali -n istio-system
+   ```
+
+   Confirm that the removed cluster no longer has a volume:
+
+   ```bash
+   kubectl --context "${CTX_CLUSTER1}" get deployment kiali -n istio-system \
+     -o jsonpath='{range .spec.template.spec.volumes[*]}{.name}{"\n"}{end}'
+   ```
+
+   <Directive type="warning">
+
+   Do not skip this step. Reconciliation on its own does not drop the volume of a deleted remote cluster secret from the Kiali server deployment. The running pod keeps serving, but the next restart leaves it stuck in `ContainerCreating`. This step is unnecessary only when all remote clusters share one combined secret, because the volume then refers to a secret that still exists.
+
+   </Directive>
+
 ## Verification
 
 1. Confirm that the Kiali server discovered every cluster by running the following command:
@@ -418,7 +466,10 @@ Apply the mirror-image configuration on the **West** cluster so that both consol
 
 2. In the Kiali console, navigate to **Overview** and confirm that namespaces from every cluster are listed. The cluster name is shown on each namespace card.
 
-3. Navigate to **Mesh** and confirm that every cluster appears with its own control plane and data plane node.
+3. Navigate to **Mesh** and confirm that every cluster in the mesh appears. How the control plane is drawn depends on the topology:
+
+   - In a multi-primary mesh, each cluster shows its own control plane node next to its data plane node.
+   - In a primary-remote mesh, only the primary cluster shows a control plane node. Each remote cluster shows a data plane node that the primary's control plane connects to.
 
 4. Navigate to **Traffic Graph**, select a namespace that exists on more than one cluster, and confirm that the graph draws the clusters separately with edges between them. Enable **Display** > **Cluster Boxes** to group the nodes by cluster.
 
@@ -446,6 +497,16 @@ ERROR: There is no token assigned yet to the remote cluster SA secret [kiali-ser
 ```
 
 The long-lived service account token secret is missing on the remote cluster. Complete step 3 of the [Procedure](#procedure), then run the script again.
+
+**The Kiali server pod stays in `ContainerCreating` after a cluster was removed**
+
+The pod events report a missing secret:
+
+```text
+MountVolume.SetUp failed for volume "cluster2" : secret "kiali-remote-cluster-secret-cluster2" not found
+```
+
+The deployment still mounts the remote cluster secret that was deleted, and reconciliation does not drop that volume. Recreate the deployment as described in step 4 of [Removing a cluster from Kiali](#removing-a-cluster-from-kiali).
 
 **Graphs are empty although the clusters are accessible**
 
