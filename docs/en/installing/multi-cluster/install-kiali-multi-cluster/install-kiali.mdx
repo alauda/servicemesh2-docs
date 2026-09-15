@@ -18,7 +18,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 - You have installed the Alauda Build of Kiali Operator on **every** cluster in the mesh, including the clusters where no Kiali server is deployed. See [Installing Alauda Build of Kiali](../../../integration/observability/kiali.mdx).
 - Every cluster in the mesh collects metrics with **ACP Monitoring with VictoriaMetrics**, and all of them report to the same VictoriaMetrics Center. See <ExternalSiteLink name="acp" href="/observability/monitor/install_monitor.html#acp-monitoring-with-victoriametrics" children="ACP Monitoring with VictoriaMetrics" />.
 
-  Kiali reads the metrics of the whole mesh from a single endpoint. **ACP Monitoring with Prometheus** keeps the metrics of each cluster in a store of its own, so it cannot serve such an endpoint. Read the address of the shared endpoint by running the following command:
+  Kiali reads the metrics of the whole mesh from a single endpoint. Read the address of the shared endpoint by running the following command:
 
   ```bash
   kubectl get feature monitoring -o jsonpath='{.spec.accessInfo.database.address}'
