@@ -1,0 +1,11 @@
+---
+weight: 40
+---
+
+# Observing a multi-cluster mesh with Kiali
+
+A single Alauda Build of Kiali instance can observe an entire multi-cluster mesh. You deploy the Kiali server on one cluster, then grant it read access to every other cluster in the mesh. The remaining clusters only need the resources that the Kiali server authenticates with — no Kiali server runs there.
+
+Where one Kiali server cannot reach every cluster, you can instead run a Kiali server per cluster and let the consoles link to each other.
+
+<Overview overviewHeaders={[]} />
