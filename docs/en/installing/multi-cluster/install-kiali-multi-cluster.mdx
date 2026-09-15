@@ -133,10 +133,6 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
   kubectl --context "${CTX_CLUSTER2}" apply -f kiali-svc-account-token.yaml
   ```
 
-  :::warning
-  Do not skip this step. Without this secret the next steps cannot read a token for the remote cluster, and generating the remote cluster secret fails.
-  :::
-
   ### Obtain a `kubeconfig` for the **West** cluster that uses the platform API endpoint
 
   Download the `kubeconfig` of the **West** cluster from the Alauda Container Platform web console, or retrieve it from the platform API:
@@ -222,67 +218,6 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
   Use the `--help` option to display all the options that the script supports, including `--delete true` for removing what it created.
   :::
 
-  <details>
-    <summary>Creating the remote cluster secret without the script (click to expand)</summary>
-
-    In an environment without access to GitHub, create the secret manually. Read the token and the platform certificate authority first:
-
-    ```bash
-    export REMOTE_TOKEN=$(kubectl --context "${CTX_CLUSTER2}" -n istio-system \
-      get secret kiali-service-account -o jsonpath='{.data.token}' | base64 -d)
-
-    # Base64-encoded certificate authority of the platform. Copy it from the
-    # certificate-authority-data field of the proxy-connect cluster entry in the
-    # kubeconfig that you downloaded in the previous step.
-    export PLATFORM_CA=<platform-ca>
-    ```
-
-    Then create a YAML file named `kiali-remote-secret.yaml` with the following content:
-
-    ```yaml title="kiali-remote-secret.yaml"
-    apiVersion: v1
-    kind: Secret
-    metadata:
-      name: kiali-remote-cluster-secret-cluster2
-      namespace: istio-system
-      labels:
-        kiali.io/multiCluster: "true"  # [!code callout]
-    stringData:
-      cluster2: |  # [!code callout]
-        apiVersion: v1
-        kind: Config
-        preferences: {}
-        current-context: cluster2
-        contexts:
-        - name: cluster2
-          context:
-            cluster: cluster2
-            user: cluster2
-        users:
-        - name: cluster2
-          user:
-            token: ${REMOTE_TOKEN}
-        clusters:
-        - name: cluster2
-          cluster:
-            server: https://<platform-url>/kubernetes/<west-cluster-name>  # [!code callout]
-            certificate-authority-data: ${PLATFORM_CA}  # [!code callout]
-    ```
-
-    <Callouts>
-      1. Makes the Operator detect the secret automatically. See [Registering remote cluster secrets](#registering-remote-cluster-secrets).
-      2. The key must be the name that Istio uses for the remote cluster.
-      3. The platform endpoint of the remote cluster, as described in step 4.
-      4. The base64-encoded certificate authority of the platform, taken from the `certificate-authority-data` field of the downloaded `kubeconfig`.
-    </Callouts>
-
-    Render the manifest and apply it on the **East** cluster by running the following command:
-
-    ```bash
-    envsubst < kiali-remote-secret.yaml | kubectl --context "${CTX_CLUSTER1}" apply -f -
-    ```
-  </details>
-
   ### Trigger reconciliation of the Kiali server
 
   The Operator mounts remote cluster secrets into the Kiali server pod when it reconciles the `Kiali` resource. Annotate the resource to start a reconciliation:
@@ -304,9 +239,6 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
   Open the Kiali console of the **East** cluster at `<platform-url>/clusters/<east-cluster-name>/kiali`.
 
-  :::note
-  A single login covers every cluster in the mesh. Because the remote cluster secrets address the clusters through the platform API endpoint, the platform authorizes your account on all of them, and you do not need to log in to each cluster separately.
-  :::
 </Steps>
 
 ## Registering remote cluster secrets \{#registering-remote-cluster-secrets}
