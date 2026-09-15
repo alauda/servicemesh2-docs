@@ -20,7 +20,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
   Kiali reads the metrics of the whole mesh from a single endpoint. Read the address of the shared endpoint by running the following command:
 
-  ```bash
+  ```bash {name=install-kiali-mc:get-monitoring-address}
   kubectl get feature monitoring -o jsonpath='{.spec.accessInfo.database.address}'
   ```
 
@@ -39,7 +39,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
   This procedure uses `mesh1`, `cluster1`, and `cluster2`.
 - You have `kubectl` configured with a context for each cluster. The following environment variables are used throughout:
 
-  ```bash
+  ```bash {name=install-kiali-mc:set-contexts}
   export CTX_CLUSTER1=<your cluster1 context>
   export CTX_CLUSTER2=<your cluster2 context>
   ```
@@ -53,7 +53,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
   Because the monitoring store also holds metrics produced outside the mesh, restrict Kiali to this mesh by setting a query scope:
 
-  ```yaml title="kiali-query-scope.yaml"
+  ```yaml {name=install-kiali-mc:query-scope-yaml} title="kiali-query-scope.yaml"
   spec:
     external_services:
       prometheus:
@@ -67,7 +67,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
   Apply the setting by running the following command:
 
-  ```bash
+  ```bash {name=install-kiali-mc:apply-query-scope}
   kubectl --context "${CTX_CLUSTER1}" -n istio-system patch kiali kiali \
     --type merge -p "$(cat kiali-query-scope.yaml)"
   ```
@@ -76,7 +76,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
   Create a YAML file named `kiali-remote.yaml` with the following content:
 
-  ```yaml title="kiali-remote.yaml"
+  ```yaml {name=install-kiali-mc:kiali-remote-yaml} title="kiali-remote.yaml"
   apiVersion: kiali.io/v1alpha1
   kind: Kiali
   metadata:
@@ -96,13 +96,13 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
   Apply the YAML file on the **West** cluster by running the following command:
 
-  ```bash
+  ```bash {name=install-kiali-mc:apply-kiali-remote}
   kubectl --context "${CTX_CLUSTER2}" apply -f kiali-remote.yaml
   ```
 
   Wait for the resource to reconcile:
 
-  ```bash
+  ```bash {name=install-kiali-mc:wait-kiali-remote}
   kubectl --context "${CTX_CLUSTER2}" wait --for=condition=Successful \
     kialis/kiali -n istio-system --timeout=3m
   ```
@@ -113,7 +113,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
   Create a YAML file named `kiali-svc-account-token.yaml` with the following content:
 
-  ```yaml title="kiali-svc-account-token.yaml"
+  ```yaml {name=install-kiali-mc:svc-account-token-yaml} title="kiali-svc-account-token.yaml"
   apiVersion: v1
   kind: Secret
   metadata:
@@ -131,7 +131,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
   Apply the YAML file on the **West** cluster by running the following command:
 
-  ```bash
+  ```bash {name=install-kiali-mc:apply-svc-account-token}
   kubectl --context "${CTX_CLUSTER2}" apply -f kiali-svc-account-token.yaml
   ```
 
@@ -139,7 +139,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
   Download the `kubeconfig` of the **West** cluster from the Alauda Container Platform web console, or retrieve it from the platform API:
 
-  ```bash
+  ```bash {name=install-kiali-mc:download-west-kubeconfig}
   curl -sS -k -H "Authorization: Bearer <your-platform-api-token>" \
     "<platform-url>/auth/v1/clusters/<west-cluster-name>/kubeconfig" \
     -o west-kubeconfig.json
@@ -151,7 +151,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
   The following commands encode the field, convert the file to YAML, and inline every credential so that the result is easy to merge later. The first command is safe to run more than once, because it only touches values that are still PEM:
 
-  ```bash
+  ```bash {name=install-kiali-mc:normalize-west-kubeconfig}
   jq '.clusters[].cluster."certificate-authority-data" |=
     (if startswith("-----BEGIN") then @base64 else . end)' \
     west-kubeconfig.json > west-kubeconfig-fixed.json
@@ -162,8 +162,8 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
   The downloaded `kubeconfig` contains two contexts. Use the `proxy-connect` context, which is the default, and whose server address has the following form:
 
-  ```text
-  https://<platform-url>/kubernetes/<west-cluster-name>
+  ```text {name=install-kiali-mc:proxy-server-url}
+  <platform-url>/kubernetes/<west-cluster-name>
   ```
 
   :::danger
@@ -174,7 +174,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
   Add the `proxy-connect` context to the `kubeconfig` that also holds your **East** cluster context, so that a single `kubeconfig` can reach both clusters, then export its name:
 
-  ```bash
+  ```bash {name=install-kiali-mc:set-proxy-context}
   export CTX_CLUSTER2_PROXY=<your cluster2 proxy-connect context>
   ```
 
@@ -188,7 +188,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
   Download the script and make it executable by running the following commands:
 
-  ```bash
+  ```bash {name=install-kiali-mc:download-prepare-script}
   curl -L -o kiali-prepare-remote-cluster.sh \
     https://raw.githubusercontent.com/kiali/kiali/master/hack/istio/multicluster/kiali-prepare-remote-cluster.sh
   chmod +x kiali-prepare-remote-cluster.sh
@@ -196,7 +196,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
   Run the script by using the following command:
 
-  ```bash
+  ```bash {name=install-kiali-mc:run-prepare-script}
   ./kiali-prepare-remote-cluster.sh \
     --kiali-cluster-context "${CTX_CLUSTER1}" \
     --remote-cluster-context "${CTX_CLUSTER2_PROXY}" \
@@ -219,8 +219,8 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
   On success the script reports the server address it read from the context and the name of the secret it created:
 
-  ```text
-  INFO: remote_cluster_server_url=https://<platform-url>/kubernetes/<west-cluster-name>
+  ```text {name=install-kiali-mc:run-prepare-script-output}
+  INFO: remote_cluster_server_url=<platform-url>/kubernetes/<west-cluster-name>
   secret/kiali-remote-cluster-secret-cluster2 created
   ```
 
@@ -234,14 +234,14 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
   The Operator mounts remote cluster secrets into the Kiali server pod when it reconciles the `Kiali` resource. Annotate the resource to start a reconciliation:
 
-  ```bash
+  ```bash {name=install-kiali-mc:trigger-reconcile}
   kubectl --context "${CTX_CLUSTER1}" annotate kiali kiali -n istio-system \
     --overwrite kiali.io/reconcile="$(date)"
   ```
 
   Wait for the resource and the server to become ready by running the following commands:
 
-  ```bash
+  ```bash {name=install-kiali-mc:wait-kiali-server}
   kubectl --context "${CTX_CLUSTER1}" wait --for=condition=Successful \
     kialis/kiali -n istio-system --timeout=3m
   kubectl --context "${CTX_CLUSTER1}" rollout status deployment/kiali -n istio-system
@@ -257,15 +257,15 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
 1. Confirm that the Kiali server discovered every cluster by running the following command:
 
-   ```bash
+   ```bash {name=install-kiali-mc:verify-discovered-clusters}
    kubectl --context "${CTX_CLUSTER1}" logs -n istio-system deployment/kiali | grep "Discovered cluster"
    ```
 
    Each cluster in the mesh appears with `Accessible=true`, and exactly one of them with `IsKialiHome=true`:
 
-   ```text
+   ```text {name=install-kiali-mc:verify-discovered-clusters-output}
    INF Discovered cluster: Name=[cluster1], Accessible=true, IsKialiHome=true, ApiEndpoint=[https://100.4.0.1:443], SecretName=[]
-   INF Discovered cluster: Name=[cluster2], Accessible=true, IsKialiHome=false, ApiEndpoint=[https://<platform-url>/kubernetes/<west-cluster-name>], SecretName=[kiali-remote-cluster-secret-cluster2]
+   INF Discovered cluster: Name=[cluster2], Accessible=true, IsKialiHome=false, ApiEndpoint=[<platform-url>/kubernetes/<west-cluster-name>], SecretName=[kiali-remote-cluster-secret-cluster2]
    ```
 
 2. In the Kiali console, navigate to **Namespaces** and confirm that namespaces from every cluster are listed. The cluster name is shown on each namespace card.
@@ -283,7 +283,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
 1. Delete the remote cluster secret from the Kiali deployment namespace on the cluster that hosts the Kiali server:
 
-   ```bash
+   ```bash {name=install-kiali-mc:delete-remote-secret}
    kubectl --context "${CTX_CLUSTER1}" -n istio-system \
      delete secret kiali-remote-cluster-secret-cluster2
    ```
@@ -296,7 +296,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
 2. Remove the service account and roles from the remote cluster by deleting its `Kiali` resource:
 
-   ```bash
+   ```bash {name=install-kiali-mc:delete-remote-kiali}
    kubectl --context "${CTX_CLUSTER2}" -n istio-system delete kiali kiali
    ```
 
@@ -310,7 +310,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
    - With [label based auto-detection](./registering-remote-cluster-secrets.mdx#label-based-auto-detection), trigger a reconciliation:
 
-     ```bash
+     ```bash {name=install-kiali-mc:reconcile-after-removal}
      kubectl --context "${CTX_CLUSTER1}" annotate kiali kiali -n istio-system \
        --overwrite kiali.io/reconcile="$(date)"
      ```
@@ -320,7 +320,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
 4. If the removed cluster had a remote cluster secret of its own, recreate the Kiali server deployment so that it stops mounting the deleted secret:
 
-   ```bash
+   ```bash {name=install-kiali-mc:recreate-kiali-deployment}
    kubectl --context "${CTX_CLUSTER1}" -n istio-system delete deployment kiali
    kubectl --context "${CTX_CLUSTER1}" annotate kiali kiali -n istio-system \
      --overwrite kiali.io/reconcile="$(date)"
@@ -331,7 +331,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
    Confirm that the removed cluster no longer has a volume:
 
-   ```bash
+   ```bash {name=install-kiali-mc:verify-volumes}
    kubectl --context "${CTX_CLUSTER1}" get deployment kiali -n istio-system \
      -o jsonpath='{range .spec.template.spec.volumes[*]}{.name}{"\n"}{end}'
    ```
@@ -358,19 +358,19 @@ Remove Kiali from the whole mesh by unregistering the remote clusters first and 
 
 2. Delete the `Kiali` resource on the **East** cluster:
 
-   ```bash
+   ```bash {name=install-kiali-mc:delete-kiali-server}
    kubectl --context "${CTX_CLUSTER1}" -n istio-system delete kiali kiali
    ```
 
    Confirm that the Operator removed the server:
 
-   ```bash
+   ```bash {name=install-kiali-mc:verify-kiali-server-removed}
    kubectl --context "${CTX_CLUSTER1}" -n istio-system get deployment kiali
    ```
 
    **Example output**
 
-   ```text
+   ```text {name=install-kiali-mc:verify-kiali-server-removed-output}
    Error from server (NotFound): deployments.apps "kiali" not found
    ```
 

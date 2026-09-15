@@ -35,39 +35,45 @@ test_uninstalling_alauda_build_of_kiali() {
     local kiali_namespace kiali_name
     kiali_namespace=$(echo "$kiali_output" | awk 'NR==2 {print $1}')
     kiali_name=$(echo "$kiali_output" | awk 'NR==2 {print $2}')
+
+    # 集群上没有 Kiali 资源时跳过步骤 1-2，继续卸载 Operator 与 CRDs。
+    # 出现这种情况的正常场景：多集群用例按自己文档的「Cleaning up Kiali」已经删过 CR。
+    # 注: kubectl get 无匹配时把 No resources found 写到 stderr 且返回 0，
+    #     不能靠返回码判断，只能看有没有解析出资源名。
     if [ -z "$kiali_name" ] || [ -z "$kiali_namespace" ]; then
-        log_error "无法解析 Kiali 资源名称或命名空间"
-        return 1
+        log_warn "集群上没有 Kiali 资源，跳过步骤 1-2（删除 Kiali CR）"
+        log_warn "get kiali 输出: $kiali_output"
+    else
+        log_info "Kiali 资源: $kiali_namespace/$kiali_name"
+
+        # 2. 删除 Kiali 资源（使用 runme print 获取命令模板，替换为实际名称后执行）
+        log_info "步骤 2: 删除 Kiali 资源"
+        local delete_kiali_cmd
+        delete_kiali_cmd=$(runme print uninstall-kiali:delete-kiali)
+        # 将模板中的占位符替换为实际资源名称和命名空间
+        delete_kiali_cmd="${delete_kiali_cmd//<name_of_custom_resource>/$kiali_name}"
+        delete_kiali_cmd="${delete_kiali_cmd//<namespace>/$kiali_namespace}"
+        log_info "执行命令: $delete_kiali_cmd"
+
+        local delete_kiali_output
+        delete_kiali_output=$(eval "$delete_kiali_cmd" 2>&1) || {
+            log_error "删除 Kiali 资源失败"
+            log_error "输出: $delete_kiali_output"
+            return 1
+        }
+
+        # 验证删除输出
+        local expected_delete_kiali_output
+        expected_delete_kiali_output=$(runme print uninstall-kiali:delete-kiali-output)
+        expected_delete_kiali_output="${expected_delete_kiali_output//<name_of_custom_resource>/$kiali_name}"
+        if ! __cmp_contains "$delete_kiali_output" "$expected_delete_kiali_output"; then
+            log_error "删除 Kiali 资源验证失败"
+            log_error "期待输出: $expected_delete_kiali_output"
+            log_error "实际输出: $delete_kiali_output"
+            return 1
+        fi
+        log_success "删除 Kiali 资源成功"
     fi
-    log_info "Kiali 资源: $kiali_namespace/$kiali_name"
-
-    # 2. 删除 Kiali 资源（使用 runme print 获取命令模板，替换为实际名称后执行）
-    log_info "步骤 2: 删除 Kiali 资源"
-    local delete_kiali_cmd
-    delete_kiali_cmd=$(runme print uninstall-kiali:delete-kiali)
-    # 将模板中的占位符替换为实际资源名称和命名空间
-    delete_kiali_cmd="${delete_kiali_cmd//<name_of_custom_resource>/$kiali_name}"
-    delete_kiali_cmd="${delete_kiali_cmd//<namespace>/$kiali_namespace}"
-    log_info "执行命令: $delete_kiali_cmd"
-
-    local delete_kiali_output
-    delete_kiali_output=$(eval "$delete_kiali_cmd" 2>&1) || {
-        log_error "删除 Kiali 资源失败"
-        log_error "输出: $delete_kiali_output"
-        return 1
-    }
-
-    # 验证删除输出
-    local expected_delete_kiali_output
-    expected_delete_kiali_output=$(runme print uninstall-kiali:delete-kiali-output)
-    expected_delete_kiali_output="${expected_delete_kiali_output//<name_of_custom_resource>/$kiali_name}"
-    if ! __cmp_contains "$delete_kiali_output" "$expected_delete_kiali_output"; then
-        log_error "删除 Kiali 资源验证失败"
-        log_error "期待输出: $expected_delete_kiali_output"
-        log_error "实际输出: $delete_kiali_output"
-        return 1
-    fi
-    log_success "删除 Kiali 资源成功"
 
     # 3-4. (可选) 删除 kiali-operator subscription 与 Kiali CRDs
     # 受 --skip-operator-and-crds 控制：传入时保留 Operator 与 CRDs 以便后续测试复用。
