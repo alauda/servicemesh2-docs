@@ -140,8 +140,9 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
   Download the `kubeconfig` of the **West** cluster from the Alauda Container Platform web console, or retrieve it from the platform API:
 
   ```bash
-  curl -sS -H "Authorization: Bearer <your-platform-api-token>" \
-    "<platform-url>/auth/v1/clusters/<west-cluster-name>/kubeconfig"
+  curl -sS -k -H "Authorization: Bearer <your-platform-api-token>" \
+    "<platform-url>/auth/v1/clusters/<west-cluster-name>/kubeconfig" \
+    -o west-kubeconfig.json
   ```
 
   :::warning

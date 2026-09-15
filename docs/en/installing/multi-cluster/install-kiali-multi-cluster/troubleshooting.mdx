@@ -4,7 +4,7 @@ weight: 40
 
 # Troubleshooting
 
-The following problems can occur while a Kiali server observes a multi-cluster mesh. The cluster names and environment variables are the ones used in [Installing Kiali in a multi-cluster mesh](./install-kiali.mdx).
+The following problems can occur while a Kiali server observes a multi-cluster mesh. The cluster names and environment variables are the ones used in [Installing Kiali in a multi-cluster mesh](./install-kiali-in-multi-cluster-mesh.mdx).
 
 ## The remote cluster is reported as accessible, but its namespaces are missing from the console \{#namespaces-missing}
 
@@ -16,7 +16,7 @@ INF Error fetching Namespaces for cluster [cluster2]: Unauthorized
 WRN Error checking Istio API configuration: the server has asked for the client to provide credentials
 ```
 
-The remote cluster secret addresses the cluster API server directly, so the service account token of Kiali works but the platform token of the logged-in user is rejected. Change the `server` field of the `kubeconfig` in the secret to the platform endpoint, `https://<platform-url>/kubernetes/<cluster-name>`, together with the matching certificate authority, and trigger a reconciliation. See [step 4](./install-kiali.mdx#obtain-remote-credentials) of the installation procedure.
+The remote cluster secret addresses the cluster API server directly, so the service account token of Kiali works but the platform token of the logged-in user is rejected. Change the `server` field of the `kubeconfig` in the secret to the platform endpoint, `https://<platform-url>/kubernetes/<cluster-name>`, together with the matching certificate authority, and trigger a reconciliation. See [step 4](./install-kiali-in-multi-cluster-mesh.mdx#obtain-remote-credentials) of the installation procedure.
 
 ## Generating the remote cluster secret never completes \{#secret-generation-hangs}
 
@@ -27,7 +27,7 @@ INFO: Waiting for the remote cluster SA secret token to be created...
 ERROR: There is no token assigned yet to the remote cluster SA secret [kiali-service-account] found in remote cluster namespace [istio-system].
 ```
 
-The long-lived service account token secret is missing on the remote cluster. Complete [step 3](./install-kiali.mdx#create-the-service-account-token) of the installation procedure, then run the script again.
+The long-lived service account token secret is missing on the remote cluster. Complete [step 3](./install-kiali-in-multi-cluster-mesh.mdx#create-the-service-account-token) of the installation procedure, then run the script again.
 
 ## The Kiali server pod stays in `ContainerCreating` after a cluster was removed \{#pod-stuck-after-removal}
 
@@ -37,7 +37,7 @@ The pod events report a missing secret:
 MountVolume.SetUp failed for volume "cluster2" : secret "kiali-remote-cluster-secret-cluster2" not found
 ```
 
-The deployment still mounts the remote cluster secret that was deleted, and reconciliation does not drop that volume. Recreate the deployment as described in [step 4 of Removing a cluster from Kiali](./install-kiali.mdx#removing-a-cluster-from-kiali).
+The deployment still mounts the remote cluster secret that was deleted, and reconciliation does not drop that volume. Recreate the deployment as described in [step 4 of Removing a cluster from Kiali](./install-kiali-in-multi-cluster-mesh.mdx#removing-a-cluster-from-kiali).
 
 ## Graphs are empty although the clusters are accessible \{#empty-graphs}
 
