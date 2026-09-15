@@ -149,12 +149,15 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
   The platform API returns the `kubeconfig` as JSON, and it carries `certificate-authority-data` as a PEM block instead of base64. Saving the response unchanged and pointing `kubectl` at it fails with `illegal base64 data at input byte 0`. Encode that field before use, or download the `kubeconfig` from the web console instead.
   :::
 
-  The following command rewrites the field and writes a usable `kubeconfig` file. It is safe to run more than once, because it only touches values that are still PEM:
+  The following commands encode the field, convert the file to YAML, and inline every credential so that the result is easy to merge later. The first command is safe to run more than once, because it only touches values that are still PEM:
 
   ```bash
   jq '.clusters[].cluster."certificate-authority-data" |=
     (if startswith("-----BEGIN") then @base64 else . end)' \
-    west-kubeconfig.json > west-kubeconfig.yaml
+    west-kubeconfig.json > west-kubeconfig-fixed.json
+
+  KUBECONFIG=west-kubeconfig-fixed.json \
+    kubectl config view --flatten --raw > west-kubeconfig.yaml
   ```
 
   The downloaded `kubeconfig` contains two contexts. Use the `proxy-connect` context, which is the default, and whose server address has the following form:
