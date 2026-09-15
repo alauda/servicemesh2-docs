@@ -49,4 +49,4 @@ curl -sS -u "<monitoring-user>:<monitoring-password>" \
   "<monitoring-address>/api/v1/query"
 ```
 
-The result must contain one series per cluster pair that exchanges traffic. If it is empty, either the `mesh_id` relabeling is missing from the `PodMonitor` object of a cluster, or the value does not match the `meshID` of the `Istio` resource. See [Configuring Monitoring with Service Mesh](../../../integration/observability/metrics-and-mesh.mdx).
+The result must contain one series per cluster pair that exchanges traffic. If a cluster is missing, its metrics either never reach the store or carry no matching `mesh_id` label: check that the cluster has the `ServiceMonitor` and `PodMonitor` objects, and that the control plane which configures it has the `Telemetry` resource whose `mesh_id` tag override matches the `meshID` of the `Istio` resource. See [Configuring Monitoring with Service Mesh](../../../integration/observability/metrics-and-mesh.mdx).
