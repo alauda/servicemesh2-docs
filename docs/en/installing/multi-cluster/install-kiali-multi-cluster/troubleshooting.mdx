@@ -1,0 +1,52 @@
+---
+weight: 40
+---
+
+# Troubleshooting
+
+The following problems can occur while a Kiali server observes a multi-cluster mesh. The cluster names and environment variables are the ones used in [Installing Kiali in a multi-cluster mesh](./index.mdx).
+
+## The remote cluster is reported as accessible, but its namespaces are missing from the console \{#namespaces-missing}
+
+The Kiali server log shows the following entries:
+
+```text
+INF Discovered cluster: Name=[cluster2], Accessible=true, IsKialiHome=false, ...
+INF Error fetching Namespaces for cluster [cluster2]: Unauthorized
+WRN Error checking Istio API configuration: the server has asked for the client to provide credentials
+```
+
+The remote cluster secret addresses the cluster API server directly, so the service account token of Kiali works but the platform token of the logged-in user is rejected. Change the `server` field of the `kubeconfig` in the secret to the platform endpoint, `https://<platform-url>/kubernetes/<cluster-name>`, together with the matching certificate authority, and trigger a reconciliation. See [step 4](./index.mdx#obtain-remote-credentials) of the installation procedure.
+
+## Generating the remote cluster secret never completes \{#secret-generation-hangs}
+
+The script repeats the following message and then fails:
+
+```text
+INFO: Waiting for the remote cluster SA secret token to be created...
+ERROR: There is no token assigned yet to the remote cluster SA secret [kiali-service-account] found in remote cluster namespace [istio-system].
+```
+
+The long-lived service account token secret is missing on the remote cluster. Complete [step 3](./index.mdx#create-the-service-account-token) of the installation procedure, then run the script again.
+
+## The Kiali server pod stays in `ContainerCreating` after a cluster was removed \{#pod-stuck-after-removal}
+
+The pod events report a missing secret:
+
+```text
+MountVolume.SetUp failed for volume "cluster2" : secret "kiali-remote-cluster-secret-cluster2" not found
+```
+
+The deployment still mounts the remote cluster secret that was deleted, and reconciliation does not drop that volume. Recreate the deployment as described in [step 4 of Removing a cluster from Kiali](./index.mdx#removing-a-cluster-from-kiali).
+
+## Graphs are empty although the clusters are accessible \{#empty-graphs}
+
+Confirm that the metrics of all clusters carry the `mesh_id` label that `spec.external_services.prometheus.query_scope` filters on:
+
+```bash
+curl -sS -u "<monitoring-user>:<monitoring-password>" \
+  --data-urlencode 'query=count(istio_requests_total{mesh_id="mesh1"}) by (source_cluster, destination_cluster)' \
+  "<monitoring-address>/api/v1/query"
+```
+
+The result must contain one series per cluster pair that exchanges traffic. If it is empty, either the `mesh_id` relabeling is missing from the `PodMonitor` object of a cluster, or the value does not match the `meshID` of the `Istio` resource. See [Configuring Monitoring with Service Mesh](../../../integration/observability/metrics-and-mesh.mdx).

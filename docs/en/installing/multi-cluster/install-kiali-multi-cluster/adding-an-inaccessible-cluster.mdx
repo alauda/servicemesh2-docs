@@ -1,0 +1,33 @@
+---
+weight: 20
+---
+
+# Adding an inaccessible cluster
+
+If you prefer a separate Kiali server per cluster, or you cannot grant one Kiali server access to the other clusters, declare the other clusters without a secret. Each Kiali console then renders links to the console that observes the remote cluster, instead of the remote data itself.
+
+The **East** and **West** clusters below are the ones described in [Installing Kiali in a multi-cluster mesh](./index.mdx).
+
+**Procedure**
+
+1. On the **East** cluster, describe the **West** cluster as follows:
+
+   ```yaml
+   spec:
+     clustering:
+       clusters:
+       - name: cluster2  # [!code callout]
+       kiali_urls:
+       - cluster_name: cluster2
+         instance_name: kiali  # [!code callout]
+         namespace: istio-system
+         url: https://<platform-url>/clusters/<west-cluster-name>/kiali  # [!code callout]
+   ```
+
+   <Callouts>
+     1. Omitting `secret_name` marks the cluster as inaccessible.
+     2. The instance name and namespace of the Kiali server that observes that cluster.
+     3. The address that the Kiali console links to. It must be reachable from the browser.
+   </Callouts>
+
+2. Apply the mirror-image configuration on the **West** cluster so that both consoles link to each other.
