@@ -220,6 +220,10 @@ test_install_primary_remote_multi_network() {
     log_info "步骤 2.14: West 等待 sleep 就绪"
     runme run primary-remote-multi-network:wait-sleep-west || return 1
 
+    # 启动两个集群的 sleep 后台流量（AUTO_GEN_SAMPLE_TRAFFIC / AUTO_GEN_BOOKINFO_TRAFFIC=true 时生效）
+    # 供后续 Kiali 多集群用例验证跨集群流量图，与 bookinfo 场景的自动打流量对应
+    maybe_gen_sample_traffic sample "$CTX_CLUSTER1" "$CTX_CLUSTER2"
+
     # ============================================================
     # Phase 3: 验证跨集群流量
     # ============================================================

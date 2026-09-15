@@ -16,7 +16,7 @@ INF Error fetching Namespaces for cluster [cluster2]: Unauthorized
 WRN Error checking Istio API configuration: the server has asked for the client to provide credentials
 ```
 
-The remote cluster secret addresses the cluster API server directly, so the service account token of Kiali works but the platform token of the logged-in user is rejected. Change the `server` field of the `kubeconfig` in the secret to the platform endpoint, `https://<platform-url>/kubernetes/<cluster-name>`, together with the matching certificate authority, and trigger a reconciliation. See [step 4](./install-kiali-in-multi-cluster-mesh.mdx#obtain-remote-credentials) of the installation procedure.
+The remote cluster secret addresses the cluster API server directly, so the service account token of Kiali works but the platform token of the logged-in user is rejected. Change the `server` field of the `kubeconfig` in the secret to the platform endpoint, `<platform-url>/kubernetes/<cluster-name>`, together with the matching certificate authority, and trigger a reconciliation. See [step 4](./install-kiali-in-multi-cluster-mesh.mdx#obtain-remote-credentials) of the installation procedure.
 
 ## Generating the remote cluster secret never completes \{#secret-generation-hangs}
 
