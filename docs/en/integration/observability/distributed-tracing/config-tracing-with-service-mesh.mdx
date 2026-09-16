@@ -34,10 +34,6 @@ The Jaeger v2 instance and the OpenTelemetry Collector are not service-mesh-spec
 
 **Procedure**
 
-:::note
-In a [multi-cluster mesh](../../../installing/multi-cluster/index.mdx), apply the mesh-side configuration (the `Istio` and `Telemetry` resources) on every cluster that runs a control plane: both clusters in a multi-primary mesh, and only the primary cluster in a primary-remote mesh, because the proxies in the remote cluster receive their tracing configuration from the control plane of the primary cluster. The optional `jaeger-system` label in the first step applies to every cluster that hosts an OpenTelemetry Collector, including the remote cluster.
-:::
-
 <Steps>
   ### (Optional) Label the `jaeger-system` namespace when the mesh uses discovery selectors
 
