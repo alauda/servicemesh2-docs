@@ -48,7 +48,7 @@ For background on why the v1 Operator must be removed before the v2 Operator is 
 
 ### Deploy the new distributed tracing stack
 
-Complete the **Prerequisites** section of [Configuring distributed tracing platform with Service Mesh](./config-with-service-mesh.mdx) to bring up the v2 stack:
+Complete the **Prerequisites** section of [Configuring distributed tracing platform with Service Mesh](./config-tracing-with-service-mesh.mdx) to bring up the v2 stack:
 
 - Install the `Alauda Build of OpenTelemetry v2` Operator.
 - Deploy a new `Jaeger v2` instance (defaulted to the `jaeger-system` namespace).
@@ -57,7 +57,7 @@ Complete the **Prerequisites** section of [Configuring distributed tracing platf
 The v2 stack is namespace-isolated from the legacy `jaeger-prod` Jaeger in `istio-system`, so the two can coexist for the duration of the observation window.
 
 :::note
-Stop after the **Prerequisites** of [Configuring distributed tracing platform with Service Mesh](./config-with-service-mesh.mdx) are satisfied. The mesh-side configuration (the `Istio` and `Telemetry` resources) is already in place from the legacy installation and is updated by the patch in the next step — do not follow the **Procedure** section of that document during the migration.
+Stop after the **Prerequisites** of [Configuring distributed tracing platform with Service Mesh](./config-tracing-with-service-mesh.mdx) are satisfied. The mesh-side configuration (the `Istio` and `Telemetry` resources) is already in place from the legacy installation and is updated by the patch in the next step — do not follow the **Procedure** section of that document during the migration.
 :::
 
 ### Repoint the Istio extension provider at the new OpenTelemetry Collector
