@@ -4,14 +4,15 @@ weight: 30
 
 # Migrating to Jaeger v2
 
-This document describes how to migrate an existing Service Mesh distributed tracing stack — the legacy `Alauda Build of Jaeger` (Jaeger 1.60.0) plus `Alauda Build of OpenTelemetry` integration described in [Configuring distributed tracing platform with Service Mesh (Deprecated)](./config-with-service-mesh-deprecated.mdx) — to the current <ExternalSiteLink name="distributed-tracing" href="/" children="Alauda Distributed Tracing" /> integration based on `Jaeger v2` (2.16.0) plus `Alauda Build of OpenTelemetry v2`.
+This document describes how to migrate an existing Service Mesh distributed tracing stack — the legacy `Alauda Build of Jaeger` (Jaeger 1.60.0) plus `Alauda Build of OpenTelemetry` integration described in [Configuring distributed tracing platform with Service Mesh (Deprecated)](./config-with-service-mesh-deprecated.mdx) — to the current <ExternalSiteLink name="distributed-tracing" href="/" children="Alauda Distributed Tracing" /> integration based on `Jaeger v2` (2.20.0) plus `Alauda Build of OpenTelemetry v2`.
 
 After the migration:
 
 - New traces are ingested by the v2 OpenTelemetry Collector and stored in the new Jaeger v2 backend.
-- The legacy Jaeger instance is kept running for an observation window (default 7 days) so that previously stored traces remain queryable through the legacy Jaeger UI, then it is removed.
+- Traces produced before the cutover stay in the legacy Elasticsearch indices, which are attached to the read aliases of the new backend. The new Jaeger UI serves them alongside new traces, so nothing is copied or reindexed and no trace history is lost.
+- The legacy Jaeger instance is kept only as a rollback target and is removed once the new pipeline has been validated — it no longer has to outlive a full retention window.
 
-For background, comparison tables, dual-export options, and rollback paths, refer to the underlying <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html" children="Migrating from Alauda Container Platform Tracing" /> guide; this Service Mesh document focuses on the steps that differ for a Service Mesh deployment.
+For background, comparison tables, and rollback paths, refer to the underlying <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html" children="Migrating from Alauda Container Platform Tracing" /> guide; this Service Mesh document focuses on the steps that differ for a Service Mesh deployment.
 
 :::warning Tracing outage during migration
 Trace ingestion is interrupted between the time the legacy `OpenTelemetryCollector` is deleted and the time the `Istio` resource is patched to point at the new OpenTelemetry Collector. Application traffic is not affected, but spans generated during that window are dropped. Plan the migration during a low-traffic window and notify telemetry consumers in advance.
@@ -60,6 +61,33 @@ The v2 stack is namespace-isolated from the legacy `jaeger-prod` Jaeger in `isti
 Stop after the **Prerequisites** of [Configuring distributed tracing platform with Service Mesh](./config-tracing-with-service-mesh.mdx) are satisfied. The mesh-side configuration (the `Istio` and `Telemetry` resources) is already in place from the legacy installation and is updated by the patch in the next step — do not follow the **Procedure** section of that document during the migration.
 :::
 
+### Attach the legacy Elasticsearch indices to the new read aliases
+
+Traces produced before the cutover live in the index family that the legacy `Jaeger` instance wrote. Attaching those indices to the read aliases of the new index family makes them queryable in the new Jaeger UI, so the legacy Jaeger no longer has to be kept alive to answer historical queries. Nothing is copied, renamed, or reindexed, and the legacy indices stay read-only.
+
+Perform this step before repointing the mesh, so that the new Jaeger UI is already complete when it starts receiving spans.
+
+Follow <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#attach-the-legacy-indices" children="Attach the legacy indices to the new read aliases" /> in the Alauda Distributed Tracing migration guide, with these two values:
+
+- `LEGACY_ES_INDEX_PREFIX` — the `--jaeger-es-index-prefix` value used when the legacy Jaeger was installed (for example `istio-tracing-<cluster>`). Read it back from the legacy instance rather than relying on memory:
+
+    ```bash
+    kubectl -n istio-system get jaeger jaeger-prod \
+      -o jsonpath='{.spec.storage.options.es\.index-prefix}{"\n"}'
+    ```
+
+- `JAEGER_ES_INDEX_PREFIX` — the prefix chosen for the new Jaeger v2 instance in [Configuring distributed tracing platform with Service Mesh](./config-tracing-with-service-mesh.mdx).
+
+Both Jaeger instances must use the same Elasticsearch cluster, which is the case when the new instance was installed against the endpoint of the legacy one.
+
+:::note Multi-cluster meshes
+In a multi-cluster mesh both the legacy and the new prefix are shared by every cluster, so there is one legacy index family and one set of read aliases for the whole mesh. Attach the indices once, not once per cluster.
+:::
+
+:::danger Do not write to both Jaeger backends at the same time
+Once the legacy indices are attached, exporting the same span to both the legacy and the new Jaeger makes every span appear twice in the new Jaeger UI: each backend indexes its own copy into its own index family, one read alias resolves both, and Jaeger does not deduplicate spans. The `Istio` patch in the next step moves the mesh to the new Collector as a whole, which keeps a single write path.
+:::
+
 ### Repoint the Istio extension provider at the new OpenTelemetry Collector
 
 Patch the `Istio` resource so that the `otel` extension provider targets the new v2 OpenTelemetry Collector in the `jaeger-system` namespace instead of the deleted legacy Collector in `istio-system`:
@@ -84,12 +112,14 @@ This command uses a JSON merge patch, which replaces the entire `meshConfig.exte
 
 Once the patch is applied and the Istio control plane reconciles, sidecars send spans to the new OpenTelemetry Collector and new traces appear in the Jaeger v2 UI. The `Telemetry` resource does not need to be changed because it already references the provider by name (`otel`).
 
-### (After ≥ 7 days) Uninstall the legacy Jaeger instance and Operator
+### Uninstall the legacy Jaeger instance and Operator
 
-:::tip Wait for the legacy retention window to elapse
-The legacy Jaeger keeps serving traces produced *before* the cutover for as long as the legacy `jaeger-es-index-cleaner` retains them — by default 7 days from each index's creation date. Keep the legacy Jaeger running for at least 7 days after the cutover so that users can still search recent historical traces in the legacy UI at `<platform-url>/clusters/<cluster>/istio/jaeger`. Once the legacy retention has aged out, proceed with the cleanup below.
+The legacy Jaeger no longer has to outlive the retention window: with the indices attached to the read aliases, pre-cutover traces are served by the new Jaeger UI. Keep the legacy instance only for as long as you want a rollback target, then remove it. See <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#trace-data-continuity-strategy" children="Trace data continuity strategy" /> for the data-continuity model.
 
-Pre-cutover traces are not migrated into the new Jaeger v2 backend; once the legacy Jaeger is deleted, those traces are no longer recoverable. See <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#trace-data-continuity-strategy" children="Trace data continuity strategy" /> for the data-continuity model.
+:::warning Hand retention over before deleting the `Jaeger` resource
+The `jaeger-es-index-cleaner` CronJob is owned by the `Jaeger` resource and is garbage-collected together with it, after which nothing would expire the legacy indices. Complete <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#take-over-retention-of-the-legacy-indices" children="Take over retention of the legacy indices" /> first.
+
+Deleting the `Jaeger` resource does not delete its Elasticsearch indices, so pre-cutover traces stay queryable in the new Jaeger UI afterwards.
 :::
 
 1. Delete the legacy `Jaeger` instance and its supporting resources in the `istio-system` namespace. The resource names below match the defaults produced by `install-jaeger.sh` with `--target-namespace='istio-system'`; adjust them if you used a different `--jaeger-instance-name` during the original installation.
@@ -113,6 +143,6 @@ Pre-cutover traces are not migrated into the new Jaeger v2 backend; once the leg
     - On the **Alauda build of Jaeger** details page, click the **Uninstall** button in the upper right corner.
     - In the **Uninstall "jaeger-operator"?** window, click **Uninstall**.
 
-For optional follow-up tasks — cleaning up leftover legacy Elasticsearch indices that the deleted `jaeger-es-index-cleaner` no longer rotates — see <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#disable-the-legacy-feature-switch-and-clean-up-legacy-indices" children="Disable the legacy feature switch and clean up legacy indices" /> in the Alauda Distributed Tracing migration guide.
+Once the legacy indices have expired under the policy applied above, remove the leftover index templates and the delete-only policy as described in <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#disable-the-legacy-feature-switch-and-clean-up-legacy-indices" children="Disable the legacy feature switch and retire the legacy index family" /> in the Alauda Distributed Tracing migration guide. The `acp-tracing-ui` feature switch mentioned there belongs to the platform tracing stack and does not apply to a Service Mesh deployment; for the mesh, retire the legacy UI at `<platform-url>/clusters/<cluster>/istio/jaeger` by updating internal runbooks to point at `<platform-url>/clusters/<cluster>/jaeger` instead.
 
 </Steps>
