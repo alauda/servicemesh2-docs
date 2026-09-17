@@ -84,10 +84,6 @@ Both Jaeger instances must use the same Elasticsearch cluster, which is the case
 In a multi-cluster mesh both the legacy and the new prefix are shared by every cluster, so there is one legacy index family and one set of read aliases for the whole mesh. Attach the indices once, not once per cluster.
 :::
 
-:::danger Do not write to both Jaeger backends at the same time
-Once the legacy indices are attached, exporting the same span to both the legacy and the new Jaeger makes every span appear twice in the new Jaeger UI: each backend indexes its own copy into its own index family, one read alias resolves both, and Jaeger does not deduplicate spans. The `Istio` patch in the next step moves the mesh to the new Collector as a whole, which keeps a single write path.
-:::
-
 ### Repoint the Istio extension provider at the new OpenTelemetry Collector
 
 Patch the `Istio` resource so that the `otel` extension provider targets the new v2 OpenTelemetry Collector in the `jaeger-system` namespace instead of the deleted legacy Collector in `istio-system`:
@@ -116,7 +112,7 @@ Once the patch is applied and the Istio control plane reconciles, sidecars send 
 
 The legacy Jaeger no longer has to outlive the retention window: with the indices attached to the read aliases, pre-cutover traces are served by the new Jaeger UI. Keep the legacy instance only for as long as you want a rollback target, then remove it. See <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#trace-data-continuity-strategy" children="Trace data continuity strategy" /> for the data-continuity model.
 
-:::warning Hand retention over before deleting the `Jaeger` resource
+:::warning Hand retention over before deleting the Jaeger resource
 The `jaeger-es-index-cleaner` CronJob is owned by the `Jaeger` resource and is garbage-collected together with it, after which nothing would expire the legacy indices. Complete <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#take-over-retention-of-the-legacy-indices" children="Take over retention of the legacy indices" /> first.
 
 Deleting the `Jaeger` resource does not delete its Elasticsearch indices, so pre-cutover traces stay queryable in the new Jaeger UI afterwards.
@@ -143,6 +139,6 @@ Deleting the `Jaeger` resource does not delete its Elasticsearch indices, so pre
     - On the **Alauda build of Jaeger** details page, click the **Uninstall** button in the upper right corner.
     - In the **Uninstall "jaeger-operator"?** window, click **Uninstall**.
 
-Once the legacy indices have expired under the policy applied above, remove the leftover index templates and the delete-only policy as described in <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#disable-the-legacy-feature-switch-and-clean-up-legacy-indices" children="Disable the legacy feature switch and retire the legacy index family" /> in the Alauda Distributed Tracing migration guide. The `acp-tracing-ui` feature switch mentioned there belongs to the platform tracing stack and does not apply to a Service Mesh deployment; for the mesh, retire the legacy UI at `<platform-url>/clusters/<cluster>/istio/jaeger` by updating internal runbooks to point at `<platform-url>/clusters/<cluster>/jaeger` instead.
+Once the legacy indices have expired under the policy applied above, remove the leftover index templates and the delete-only policy as described in <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#disable-the-legacy-feature-switch-and-clean-up-legacy-indices" children="Disable the legacy feature switch and retire the legacy index family" /> in the Alauda Distributed Tracing migration guide. The `acp-tracing-ui` feature switch mentioned there belongs to the platform tracing stack and does not apply to a Service Mesh deployment.
 
 </Steps>
