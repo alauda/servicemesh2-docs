@@ -1,0 +1,210 @@
+---
+weight: 20
+---
+
+# Migrating workloads
+
+Phase 3 of the migration. Workloads move from the Mesh v1 revision to the Mesh v2 revision one namespace — or one workload — at a time. Each move is a rolling restart, and each one can be reversed until Mesh v1 is decommissioned in Phase 5.
+
+Before you start, complete [Installing the Mesh v2 control plane](./installing-the-v2-control-plane.mdx) and keep the shell variables set by that page and by [Preparing for the migration](../preparing-for-migration.mdx).
+
+## How injection is decided
+
+A namespace carries the label `istio.io/rev`, and the value selects the control plane that injects its pods. Mesh v1 is itself a revisioned deployment (`1-22`), so changing the label from `${V1_REVISION}` to `${V2_REVISION}` moves the namespace to Mesh v2. Running pods are not affected; the change applies to pods created after it.
+
+Two Mesh v1 behaviors matter here:
+
+- The Mesh v1 controllers do not change a revision label that already has a value, but they do add the label back when it is missing. Never remove the label from a namespace while Mesh v1 is running.
+- A pod-level `istio.io/rev` label does not override the namespace label. While the namespace carries a revision label, that revision injects every pod in it.
+
+With `autoInject: disabled` — the Mesh v1 default, recorded in Phase 0 — a pod is injected only when it carries `sidecar.istio.io/inject: "true"`. Mesh v1 adds that annotation to the pods of every microservice that has a sidecar, together with the sidecar settings of that microservice. Mesh v2 has no component that does this, which is what the next section is about.
+
+:::warning Keep the Mesh v1 controllers running until Phase 5
+Do not scale down `asm-controller` before Phase 5. Its pod mutating webhook uses `failurePolicy: Fail`, so while the controller is down the API server rejects every new pod in namespaces labeled `cpaas.io/serviceMesh=enabled`, including the pods created by the rollouts on this page.
+:::
+
+## Persist the Mesh v1 pod settings
+
+Mesh v1 adds the settings of each `MicroService` to its pods when the pods are created: whether to inject a sidecar, the proxy resources, the proxy log level, and the ports or address ranges excluded from capture. They are not in the workload template, so they disappear as soon as the Mesh v1 webhook is removed in Phase 5 — a pod restarted after that point runs without them, and with `autoInject: disabled` without a sidecar at all.
+
+Write them into the workload template while you migrate the workload. The same rollout applies both changes.
+
+<Steps>
+
+### Generate the patches
+
+```bash {name=migrate-workloads:build-metadata-patches}
+export MESH_NAMESPACE=<namespace>
+PATCH_DIR="${BACKUP_DIR}/metadata-patches/${MESH_NAMESPACE}"
+mkdir -p "${PATCH_DIR}"
+kubectl -n "${MESH_NAMESPACE}" get deploy -o json | jq -c '.items[]' | while read -r deploy; do
+  name=$(jq -r '.metadata.name' <<<"${deploy}")
+  selector=$(jq -r '.spec.selector.matchLabels // {} | to_entries | map("\(.key)=\(.value)") | join(",")' <<<"${deploy}")
+  [ -z "${selector}" ] && continue
+  pod=$(kubectl -n "${MESH_NAMESPACE}" get pod -l "${selector}" -o json \
+    | jq -c '[.items[] | select(.metadata.annotations["sidecar.istio.io/status"] != null)][0] // empty')
+  [ -z "${pod}" ] && continue
+  jq -n --argjson d "${deploy}" --argjson p "${pod}" '
+    ($d.spec.template.metadata.labels // {}) as $tl
+    | ($d.spec.template.metadata.annotations // {}) as $ta
+    | ($p.metadata.labels // {}) as $pl
+    | {spec: {template: {metadata: {
+        labels: (if ($tl.app == null and $pl.app != null) then {app: $pl.app} else {} end),
+        annotations: (($p.metadata.annotations // {}) | with_entries(select(
+          (.key | test("^(sidecar\\.istio\\.io/(inject|proxyCPU|proxyMemory|proxyCPULimit|proxyMemoryLimit|logLevel)|traffic\\.sidecar\\.istio\\.io/(excludeInboundPorts|excludeOutboundPorts|excludeOutboundIPRanges))$"))
+          and ($ta[.key] == null) and ($tl[.key] == null))))
+      }}}}' > "${PATCH_DIR}/${name}.json"
+  echo "${name}: $(jq -c '.spec.template.metadata' "${PATCH_DIR}/${name}.json")"
+done
+```
+
+**Example output**
+
+```text
+frontend: {"labels":{},"annotations":{"sidecar.istio.io/inject":"true","sidecar.istio.io/logLevel":"warning","sidecar.istio.io/proxyCPU":"100m","sidecar.istio.io/proxyCPULimit":"500m","sidecar.istio.io/proxyMemory":"128Mi","sidecar.istio.io/proxyMemoryLimit":"512Mi"}}
+backend: {"labels":{},"annotations":{"sidecar.istio.io/inject":"true","sidecar.istio.io/proxyCPU":"50m","traffic.sidecar.istio.io/excludeOutboundPorts":"12345"}}
+```
+
+The command compares a running pod with its template and writes only what is missing. Workloads without a sidecar produce no patch and are left alone. Review each patch before applying it.
+
+<Callouts>
+1. `sidecar.istio.io/inject` is written as an annotation, the same form Mesh v1 uses. Writing it as a label instead changes the pod template hash that the Mesh v1 controller tracks, and the controller then restarts the workload a second time.
+2. Do not add the `msname` and `asm.cpaas.io/msname` labels to the template. A template that carries `app`, `msname` and `asm.cpaas.io/msname` together is treated as a legacy workload by the Mesh v1 controller, which then removes the annotations you just wrote.
+</Callouts>
+
+For `StatefulSet` and `DaemonSet` workloads, run the same command with `sts` or `ds` in place of `deploy`.
+
+### Check the access logging configuration
+
+Mesh v1 enables access logging with a `Telemetry` resource per microservice, and those resources select pods by the `msname` label that the Mesh v1 webhook adds. After Phase 5 the label is gone and the resources no longer match anything.
+
+```bash {name=migrate-workloads:list-access-log-telemetry}
+kubectl -n "${MESH_NAMESPACE}" get telemetries.telemetry.istio.io -o json | jq -r '.items[]
+  | "\(.metadata.name) owner=\(.metadata.ownerReferences[0].kind // "-") selector=\(.spec.selector.matchLabels // {} | tojson)"'
+```
+
+Recreate the configuration with a resource that matches labels which exist in the workload template. If every workload in the namespace has access logging, one namespace-wide resource is enough:
+
+```bash {name=migrate-workloads:create-access-log-telemetry}
+cat <<EOF | kubectl apply -f -
+apiVersion: telemetry.istio.io/v1
+kind: Telemetry
+metadata:
+  name: access-logging
+  namespace: ${MESH_NAMESPACE}
+spec:
+  accessLogging:
+    - providers:
+        - name: envoy
+EOF
+```
+
+For a namespace where only some workloads have access logging, add a `selector` that matches a label of those workloads, for example `app`.
+
+</Steps>
+
+## Migrate a namespace
+
+<Steps>
+
+### Switch the namespace to the Mesh v2 revision
+
+```bash {name=migrate-workloads:switch-namespace}
+kubectl label ns "${MESH_NAMESPACE}" istio.io/rev="${V2_REVISION}" --overwrite
+```
+
+Running pods keep their Mesh v1 proxy. Only pods created from now on are injected by Mesh v2.
+
+### Migrate the workloads
+
+Apply the patch of each workload. The patch also sets the restart annotation, so one rollout both persists the settings and moves the workload to Mesh v2.
+
+```bash {name=migrate-workloads:migrate-workload}
+export WORKLOAD=<workload>
+jq -c --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  '.spec.template.metadata.annotations["kubectl.kubernetes.io/restartedAt"] = $now' \
+  "${BACKUP_DIR}/metadata-patches/${MESH_NAMESPACE}/${WORKLOAD}.json" > /tmp/workload-patch.json
+kubectl -n "${MESH_NAMESPACE}" patch deploy "${WORKLOAD}" --type=merge -p "$(cat /tmp/workload-patch.json)"
+kubectl -n "${MESH_NAMESPACE}" rollout status deploy "${WORKLOAD}" --timeout=300s
+```
+
+To migrate every workload of the namespace, loop over the patches:
+
+```bash {name=migrate-workloads:migrate-all-workloads}
+for f in "${BACKUP_DIR}/metadata-patches/${MESH_NAMESPACE}"/*.json; do
+  workload=$(basename "${f}" .json)
+  jq -c --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '.spec.template.metadata.annotations["kubectl.kubernetes.io/restartedAt"] = $now' "${f}" > /tmp/workload-patch.json
+  kubectl -n "${MESH_NAMESPACE}" patch deploy "${workload}" --type=merge -p "$(cat /tmp/workload-patch.json)"
+  kubectl -n "${MESH_NAMESPACE}" rollout status deploy "${workload}" --timeout=300s
+done
+```
+
+### Check which control plane injected the pods
+
+```bash {name=migrate-workloads:check-injection-revision}
+kubectl -n "${MESH_NAMESPACE}" get pod -o json | jq -r '.items[]
+  | select(.metadata.annotations["sidecar.istio.io/status"] != null)
+  | "\(.metadata.name) \(.metadata.annotations["sidecar.istio.io/status"] | fromjson | .revision)"'
+istioctl proxy-status --revision "${V2_REVISION}"
+```
+
+Every migrated pod reports `${V2_REVISION}`, and `istioctl` lists it as `SYNCED` against `istiod-${V2_REVISION}`.
+
+:::note
+`istioctl` needs `--revision` because Mesh v2 uses the `RevisionBased` strategy and has no unsuffixed control plane. Without it, `istioctl` reports that no Istio pods are running.
+:::
+
+</Steps>
+
+## Migrate individual workloads \{#migrate-individual-workloads}
+
+A namespace can hold both mesh workloads and workloads that are deliberately not in the mesh. With the injection policy of Mesh v1 preserved, migrating one workload at a time is safe:
+
+1. Switch the namespace label once, as above. Nothing restarts.
+2. Apply the patch of the first workload and verify it. Repeat for the next one.
+
+Workloads you have not migrated yet keep running with their Mesh v1 proxy, and workloads without a sidecar stay without one, because the injection policy requires the `sidecar.istio.io/inject` annotation.
+
+:::note
+If a workload that has not been migrated yet is restarted for another reason — a scale-up, an eviction, a node drain — its new pods are injected by Mesh v2 rather than Mesh v1. That is the target state, and both generations interoperate, but it means the order of the migration is only guaranteed for restarts you control.
+:::
+
+## Verify traffic between the two control planes
+
+While the migration runs, some namespaces are on Mesh v1 and others on Mesh v2. Verify after each namespace that calls still work in both directions:
+
+```bash {name=migrate-workloads:verify-cross-control-plane}
+kubectl -n "${MESH_NAMESPACE}" exec "deploy/${WORKLOAD}" -c "${APP_CONTAINER}" -- \
+  curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 "http://${PEER_SERVICE}.${PEER_NAMESPACE}:${PEER_PORT}/"
+```
+
+Both directions return the status code the application normally returns. Mutual TLS keeps working because both control planes issue certificates from the same root:
+
+```bash {name=migrate-workloads:verify-root-ca}
+POD=$(kubectl -n "${MESH_NAMESPACE}" get pod -l "app=${WORKLOAD}" -o jsonpath='{.items[0].metadata.name}')
+istioctl proxy-config secret "${POD}" -n "${MESH_NAMESPACE}" -o json \
+  | jq -r '.dynamicActiveSecrets[] | select(.name=="ROOTCA") | .secret.validationContext.trustedCa.inlineBytes' \
+  | base64 -d | openssl x509 -noout -subject
+```
+
+The subject is the root certificate authority of the Mesh v1 mesh, unchanged.
+
+## What to expect during the rollout
+
+- A workload with at least two replicas and a `PodDisruptionBudget` is migrated without dropped requests.
+- A workload with a single replica is unavailable for the few seconds of its rolling restart. This is the restart itself, not the migration.
+- The proxy is injected as a native sidecar: an init container with `restartPolicy: Always`. The container count reported by `kubectl get pod` changes accordingly, and the application container starts only after the proxy is ready.
+
+## Namespaces without mesh workloads
+
+A namespace that carries the revision label but has no injected pods — for example a namespace that only uses OpenTelemetry auto-instrumentation — needs nothing here. Do not switch its label. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx) removes the leftover label, and [Migrating the observability stack](../migrating-observability.mdx) migrates its instrumentation.
+
+## Verification
+
+- Every migrated pod reports `${V2_REVISION}` in its `sidecar.istio.io/status` annotation.
+- The probes report no failures beyond the restart window of single-replica workloads.
+- The traffic graph in Kiali shows the same services and the same edges as before the migration.
+- Access logs are still produced for the migrated workloads.
+
+Continue with [Migrating gateways](./migrating-gateways.mdx).
