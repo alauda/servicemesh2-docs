@@ -75,6 +75,10 @@ Run this command only when the gateway namespace already carries a revision labe
 
 ## Deploy the Mesh v2 gateway \{#deploy-the-mesh-v2-gateway}
 
+:::warning The new gateway receives traffic as soon as it is ready
+The Mesh v2 gateway carries the selector labels of the Mesh v1 gateway, so the existing `Service` starts load-balancing across both of them the moment the new pod becomes ready. Complete the certificate and permission steps below **before** you create the deployment, and run the verification immediately after. To send all traffic back to the Mesh v1 gateway at any point, scale the Mesh v2 deployment to zero.
+:::
+
 <Steps>
 
 ### Copy the TLS certificates into the gateway namespace
@@ -166,6 +170,16 @@ spec:
       containers:
         - name: istio-proxy
           image: auto
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
 EOF
 kubectl -n "${GATEWAY_NAMESPACE}" rollout status "deploy/${GATEWAY_NAME}-v2" --timeout=300s
 ```
@@ -175,6 +189,7 @@ kubectl -n "${GATEWAY_NAMESPACE}" rollout status "deploy/${GATEWAY_NAME}-v2" --t
 2. `sidecar.istio.io/inject: "true"` is required because the mesh keeps the injection policy of Mesh v1, where a pod is injected only when it opts in.
 3. `istio.io/rev` selects the Mesh v2 control plane. Remove this label when the namespace already carries the revision label.
 4. Replace the last two labels with the union of the selectors you collected: every label used by the gateway `Service` and by the `Gateway` resources. The values in this example follow the Mesh v1 naming, `app: <gateway>` and `istio: <namespace>-<gateway>`.
+5. The `securityContext` satisfies the `Restricted` Pod Security Admission profile. Gateways installed through injection are your own deployments, so this is set here rather than on the `Istio` resource. See [Pod Security Admission](../../installing/pod-security-admission.mdx).
 </Callouts>
 
 ### Recreate the access logging configuration
@@ -198,7 +213,7 @@ spec:
 EOF
 ```
 
-### Verify the Mesh v2 gateway before shifting traffic
+### Verify the Mesh v2 gateway
 
 ```bash {name=migrate-gateways:verify-v2-gateway}
 POD=$(kubectl -n "${GATEWAY_NAMESPACE}" get pod -l "gateway.migration=${GATEWAY_NAME}-v2" -o jsonpath='{.items[0].metadata.name}')
@@ -206,8 +221,14 @@ istioctl proxy-config listener "${POD}" -n "${GATEWAY_NAMESPACE}"
 istioctl proxy-config secret "${POD}" -n "${GATEWAY_NAMESPACE}"
 ```
 
-- The listeners match the ports of the `Gateway` resources.
-- Every `kubernetes://<credential>` secret is `ACTIVE`. A secret in `WARMING` state means the certificate is missing in this namespace, or the service account may not read it.
+- The listeners match the ports of the `Gateway` resources. No listeners means the pod labels do not match the `Gateway` selectors.
+- Every `kubernetes://<credential>` secret is `ACTIVE`. A secret in `WARMING` state means the certificate is missing in this namespace, or the service account may not read it — half of the HTTPS requests fail while this is the case.
+
+If either check fails, scale the deployment to zero, fix the cause, and scale it back up:
+
+```bash {name=migrate-gateways:pause-v2-gateway}
+kubectl -n "${GATEWAY_NAMESPACE}" scale deploy "${GATEWAY_NAME}-v2" --replicas=0
+```
 
 </Steps>
 

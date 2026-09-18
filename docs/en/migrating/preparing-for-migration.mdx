@@ -145,11 +145,16 @@ Also record how applications are instrumented today, so that the telemetry of yo
 kubectl get instrumentations.opentelemetry.io -A -o yaml > "${BACKUP_DIR}/instrumentations.yaml"
 kubectl get pod -A -o json | jq -r '.items[]
   | select(.metadata.annotations["instrumentation.opentelemetry.io/inject-java"] != null)
-  | "\(.metadata.namespace)/\(.metadata.name) service_name=\([.spec.containers[].env[]? | select(.name=="OTEL_SERVICE_NAME") | .value] | join(","))"' \
+  | . as $p
+  | ([$p.spec.containers[].env[]? | select(.name == "OTEL_SERVICE_NAME") | .value] | first // "") as $raw
+  | ($raw
+      | gsub("\\$\\(ASM_MS_NAME\\)"; ($p.metadata.labels["asm.cpaas.io/msname"] // ""))
+      | gsub("\\$\\(ASM_POD_NAMESPACE\\)"; $p.metadata.namespace)) as $name
+  | "\($p.metadata.namespace) \($p.metadata.name) \($name)"' \
   | tee "${BACKUP_DIR}/v1-instrumented-pods.txt"
 ```
 
-The service name of a Mesh v1 application is built from environment variables that a Mesh v1 webhook adds to the pod. [Migrating the observability stack](./migrating-observability.mdx) restores the same values without that webhook.
+The service name of a Mesh v1 application is built from variables that a Mesh v1 webhook adds to the pod, so the environment of the pod shows `$(ASM_MS_NAME).$(ASM_POD_NAMESPACE)` rather than a value. The command resolves it to the name the application actually reports, `<microservice>.<namespace>`. [Migrating the observability stack](./migrating-observability.mdx) restores the same names without that webhook.
 
 </Steps>
 
@@ -219,6 +224,8 @@ kubectl get node -o json | jq -r '.items[] | "\(.metadata.name) allocatable cpu=
 ```
 
 Plan for the Mesh v2 control plane (`istiod`, `istio-cni`, Kiali) in addition to the running Mesh v1 control plane, and for one extra sidecar per workload during its rolling update.
+
+As a reference point, a three-node cluster running a small mesh — three namespaces, seven injected workloads, two gateways — used about 400 mCPU and 800 MiB more while both control planes were running than it did with Mesh v1 alone. Your own numbers scale with the number of proxies, since each migrating workload runs a second pod for the duration of its rolling update.
 
 ## Back up the mesh \{#back-up-the-mesh}
 

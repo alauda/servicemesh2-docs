@@ -45,12 +45,13 @@ The mesh keeps the root certificate authority it has always used. What changes i
 ### Export the root certificate authority
 
 ```bash {name=migrate-finalize:export-root-ca}
-mkdir -p /tmp/ca-handover && cd /tmp/ca-handover
+export CA_DIR=${CA_DIR:-/tmp/ca-handover}
+mkdir -p "${CA_DIR}"
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get secret asm-istio-rootca \
-  -o jsonpath='{.data.tls\.crt}' | base64 -d > root-cert.pem
+  -o jsonpath='{.data.tls\.crt}' | base64 -d > "${CA_DIR}/root-cert.pem"
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get secret asm-istio-rootca \
-  -o jsonpath='{.data.tls\.key}' | base64 -d > root-key.pem
-openssl x509 -in root-cert.pem -noout -subject -enddate
+  -o jsonpath='{.data.tls\.key}' | base64 -d > "${CA_DIR}/root-key.pem"
+openssl x509 -in "${CA_DIR}/root-cert.pem" -noout -subject -enddate
 ```
 
 If the secret no longer exists on the `global` cluster, take both files from `${BACKUP_DIR}/global-asm-istio-rootca.yaml`, which holds the same two keys.
@@ -58,6 +59,7 @@ If the secret no longer exists on the `global` cluster, take both files from `${
 ### Issue the new intermediate certificate
 
 ```bash {name=migrate-finalize:issue-intermediate-ca}
+cd "${CA_DIR}"
 openssl genrsa -out ca-key.pem 4096
 openssl req -new -key ca-key.pem -subj "/O=Istio/CN=Intermediate CA/L=${CLUSTER_NAME}" -out ca.csr
 cat > ca-ext.cnf <<EOF
@@ -78,7 +80,8 @@ Choose the lifetime (`-days`) according to your certificate policy, and plan the
 
 ```bash {name=migrate-finalize:replace-cacerts}
 kubectl -n istio-system create secret generic cacerts \
-  --from-file=ca-cert.pem --from-file=ca-key.pem --from-file=root-cert.pem --from-file=cert-chain.pem \
+  --from-file="${CA_DIR}/ca-cert.pem" --from-file="${CA_DIR}/ca-key.pem" \
+  --from-file="${CA_DIR}/root-cert.pem" --from-file="${CA_DIR}/cert-chain.pem" \
   --dry-run=client -o yaml | kubectl replace -f -
 ```
 
@@ -89,8 +92,7 @@ kubectl -n istio-system create secret generic cacerts \
 ### Remove the private keys from your workstation
 
 ```bash {name=migrate-finalize:clean-up-ca-workspace}
-shred -u root-key.pem 2>/dev/null || rm -f root-key.pem
-cd - >/dev/null
+shred -u "${CA_DIR}/root-key.pem" 2>/dev/null || rm -f "${CA_DIR}/root-key.pem"
 ```
 
 Keep the root key where you keep private keys. It is needed again when the intermediate certificate is rotated.

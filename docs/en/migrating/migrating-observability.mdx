@@ -48,6 +48,10 @@ Attaching the Mesh v1 indices to the read aliases of the new index family makes 
 
 Follow <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#attach-the-legacy-indices" children="Attach the legacy indices to the new read aliases" />, with `LEGACY_ES_INDEX_PREFIX` set to the Mesh v1 prefix and `JAEGER_ES_INDEX_PREFIX` to the prefix of the new instance. In a multi-cluster mesh, attach them once for the whole mesh.
 
+:::note
+The Mesh v1 backend writes only span and service indices. The attach step also covers dependency and sampling indices, and reports `index_not_found_exception` for those two. That is expected and does not affect the result.
+:::
+
 :::warning Do not write to both backends
 With the indices attached, a span exported to both the old and the new backend is stored twice and rendered twice in the UI. Export to one backend only.
 :::
@@ -120,6 +124,8 @@ spec:
       value: otlp
     - name: OTEL_METRICS_EXPORTER
       value: otlp
+    - name: OTEL_LOGS_EXPORTER
+      value: none
   java:
     image: ${JAVA_AGENT_IMAGE}
 EOF
@@ -129,6 +135,7 @@ EOF
 1. The Java agent 2.x exports with `http/protobuf` by default, where 1.x used gRPC. Either point the endpoint at the HTTP port `4318`, as above, or keep port `4317` and add `OTEL_EXPORTER_OTLP_PROTOCOL: grpc` to `spec.env`.
 2. Mesh v1 used a sampler of its own that sampled every root span and followed the decision of the caller for the rest. `parentbased_traceidratio` with `argument: "1.0"` is the equivalent built into the agent. Lower the argument if you sampled less than 100 percent.
 3. Mesh v1 also exported metrics in the Prometheus format from the agent. The v2 agent reports them through OTLP; scrape them from the collector instead of from the application pods.
+4. The 2.x agent exports logs by default, which Mesh v1 did not. A collector without a logs pipeline answers those requests with `404` and the agent logs a warning on every export. `OTEL_LOGS_EXPORTER: none` keeps the behavior your applications had. Set it to `otlp` only after you add a logs pipeline to the collector.
 </Callouts>
 
 ### Keep the service names of your applications \{#keep-the-service-names-of-your-applications}
