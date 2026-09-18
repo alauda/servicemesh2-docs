@@ -1,0 +1,228 @@
+---
+weight: 10
+---
+
+# Installing the Mesh v2 control plane
+
+Phase 1 installs the observability components that let you watch the mesh during the migration. Phase 2 creates the Mesh v2 control plane next to Mesh v1. No workload changes in either phase: the mesh keeps running on Mesh v1 until [Migrating workloads](./migrating-workloads.mdx).
+
+Both phases are reversible — deleting the `Istio` and `IstioCNI` resources removes everything Phase 2 created.
+
+Before you start, complete [Preparing for the migration](../preparing-for-migration.mdx) and keep the shell variables it sets.
+
+## Phase 1: Prepare observability \{#phase-1-prepare-observability}
+
+Kiali reads the metrics of the mesh, so it shows the Mesh v1 traffic before the migration starts and the Mesh v2 traffic afterwards. Installing it first gives you a view that spans the whole migration.
+
+<Steps>
+
+### Install Kiali
+
+Follow [Alauda Build of Kiali](../../integration/observability/kiali.mdx) to install the Kiali Operator and create the `Kiali` resource, and [Configuring Monitoring with Kiali](../../integration/observability/kiali.mdx#configuring-monitoring-with-kiali) to connect it to the monitoring store of the platform.
+
+Leave the tracing configuration of Kiali pointing at the Mesh v1 Jaeger instance for now. [Migrating the observability stack](../migrating-observability.mdx) repoints it at Jaeger v2 in Phase 6.
+
+### Create the metrics resources
+
+Follow [Metrics and Service Mesh](../../integration/observability/metrics-and-mesh.mdx) to create the `ServiceMonitor` and `PodMonitor` resources that scrape the Mesh v2 control plane and the Mesh v2 proxies. Create the `PodMonitor` resource in every namespace that takes part in the mesh.
+
+:::note
+Do not create the mesh-wide `Telemetry` resource described in that document yet. Mesh v1 already owns a mesh-wide `Telemetry` resource in `istio-system`, and both control planes read it. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx) replaces it in Phase 5.
+:::
+
+### Verification
+
+Open Kiali and confirm that the traffic graph shows the current Mesh v1 traffic.
+
+</Steps>
+
+## Phase 2: Install the Mesh v2 control plane \{#phase-2-install-the-mesh-v2-control-plane}
+
+<Steps>
+
+### Install the Alauda Service Mesh v2 Operator
+
+Follow [Installing Alauda Service Mesh](../../installing/installing-service-mesh/install-mesh.mdx#installing-the-alauda-service-mesh-v2-operator) to install the Operator. Stop before creating the `IstioCNI` and `Istio` resources: this document creates them with the values of your Mesh v1 mesh.
+
+### Relax the anti-affinity rule of the Mesh v1 control plane
+
+The Mesh v1 `istiod` pod has a required anti-affinity rule against other `istiod` pods. On a cluster where the Mesh v2 `istiod` would have to be scheduled on a node that already runs the Mesh v1 `istiod` — a single-node cluster, or a cluster with only one schedulable node left — the Mesh v2 pod stays `Pending` forever.
+
+Check how many nodes can run the control plane:
+
+```bash {name=migrate-cp:check-istiod-scheduling}
+kubectl get node -o json | jq -r '[.items[] | select((.spec.unschedulable // false) | not)] | length'
+kubectl -n istio-system get pod -l app=istiod -o wide --no-headers
+```
+
+If more than one node can run the control plane, skip this step. Relax the rule when the cluster has a single schedulable node, or when the Mesh v2 `istiod` pod created in the next steps stays `Pending` with an event about pod anti-affinity:
+
+```bash {name=migrate-cp:relax-v1-istiod-affinity}
+kubectl -n istio-system patch istiooperators.install.istio.io "${V1_CONTROL_PLANE_IOP}" --type=json -p='[
+  {"op":"replace","path":"/spec/components/pilot/k8s/affinity","value":{"podAntiAffinity":{"preferredDuringSchedulingIgnoredDuringExecution":[{"weight":100,"podAffinityTerm":{"labelSelector":{"matchExpressions":[{"key":"istio","operator":"In","values":["istiod"]}]},"topologyKey":"kubernetes.io/hostname"}}]}}},
+  {"op":"add","path":"/spec/components/pilot/k8s/strategy","value":{"rollingUpdate":{"maxSurge":0,"maxUnavailable":1}}}
+]'
+```
+
+<Callouts>
+1. The patch must `replace` the affinity, not merge into it: a merge keeps the original required rule.
+2. `maxSurge: 0` makes the Mesh v1 `istiod` roll one pod at a time, which is what a cluster without spare capacity can do. The proxies keep their configuration while `istiod` restarts, so the data plane is not affected.
+</Callouts>
+
+### Create the `IstioCNI` resource
+
+Mesh v2 captures traffic with a CNI plugin instead of the `istio-init` container that Mesh v1 adds to each pod. The plugin skips pods that already carry `istio-init`, so Mesh v1 pods are not affected.
+
+```bash {name=migrate-cp:create-istiocni}
+kubectl create namespace istio-cni --dry-run=client -o yaml | kubectl apply -f -
+cat <<EOF | kubectl apply -f -
+apiVersion: sailoperator.io/v1
+kind: IstioCNI
+metadata:
+  name: default
+spec:
+  version: v1.30.4
+  namespace: istio-cni
+  values:
+    cni:
+      cniConfDir: /etc/cni/multus/net.d
+      excludeNamespaces:
+        - istio-cni
+        - kube-system
+EOF
+kubectl wait --for condition=Ready istiocni/default --timeout=3m
+```
+
+### Build the mesh configuration of Mesh v2
+
+Mesh v2 must run with the mesh-wide settings of Mesh v1. The following command reads them from the Mesh v1 control plane and drops the two fields that belong to the Mesh v1 deployment itself.
+
+```bash {name=migrate-cp:build-mesh-config}
+export V2_MESH_CONFIG=$(kubectl -n istio-system get istiooperators.install.istio.io "${V1_CONTROL_PLANE_IOP}" -o json \
+  | jq -c '(.spec.meshConfig // {})
+      | del(.defaultConfig.discoveryAddress, .rootNamespace)')
+jq . <<<"${V2_MESH_CONFIG}"
+```
+
+**Example output**
+
+```text
+{
+  "defaultConfig": {
+    "gatewayTopology": { "numTrustedProxies": 1 },
+    "holdApplicationUntilProxyStarts": true,
+    "proxyMetadata": {
+      "EXIT_ON_ZERO_ACTIVE_CONNECTIONS": "true",
+      "ISTIO_META_DNS_AUTO_ALLOCATE": "true",
+      "ISTIO_META_DNS_CAPTURE": "true"
+    }
+  },
+  "defaultHttpRetryPolicy": { "attempts": 2 },
+  "extensionProviders": [
+    { "name": "zipkin", "zipkin": { "port": 9411, "service": "zipkin.istio-system.svc.cluster.local" } }
+  ]
+}
+```
+
+<Callouts>
+1. `proxyMetadata` carries settings that change how every proxy behaves. `ISTIO_META_DNS_CAPTURE`, for example, is what makes a `ServiceEntry` host resolvable inside the mesh. A Mesh v2 proxy without it cannot reach hosts that only exist as `ServiceEntry` resources.
+2. The tracing provider is kept as it is, so that proxies of both generations report to the Mesh v1 tracing backend during the migration. Phase 6 repoints it.
+</Callouts>
+
+### Create the `Istio` resource
+
+```bash {name=migrate-cp:create-istio}
+cat <<EOF | kubectl apply -f -
+apiVersion: sailoperator.io/v1
+kind: Istio
+metadata:
+  name: default
+spec:
+  version: v1.30.4
+  namespace: istio-system
+  updateStrategy:
+    type: RevisionBased
+    inactiveRevisionDeletionGracePeriodSeconds: 2592000
+  values:
+    global:
+      meshID: ${MESH_ID}
+      network: ${NETWORK}
+      multiCluster:
+        clusterName: ${MESH_CLUSTER_NAME}
+      proxy:
+        autoInject: ${V1_AUTO_INJECT}
+        seccompProfile:
+          type: RuntimeDefault
+    meshConfig: ${V2_MESH_CONFIG}
+EOF
+kubectl wait --for condition=Ready istio/default --timeout=5m
+```
+
+<Callouts>
+1. `meshID`, `network` and `multiCluster.clusterName` must match Mesh v1 exactly. `network` decides whether a proxy treats an endpoint as local or as reachable through a gateway only. If the two control planes disagree, calls between Mesh v1 and Mesh v2 workloads are routed to a gateway that does not exist.
+2. `autoInject` keeps the injection policy of Mesh v1. With `disabled`, a pod is injected only when it carries `sidecar.istio.io/inject: "true"`, so workloads that are not in the mesh today stay out of it.
+3. `RevisionBased` keeps Mesh v1 and Mesh v2 apart: the Mesh v2 webhooks carry their own revision suffix and never claim the `default` slot that Mesh v1 owns.
+4. `inactiveRevisionDeletionGracePeriodSeconds` keeps a revision that no longer has workloads for 30 days instead of 30 seconds, so a revision is not removed while the migration is still running. [Finalizing the migration](./finalizing-the-migration.mdx#restore-the-revision-deletion-grace-period) restores the default.
+5. `seccompProfile` is required when any mesh namespace enforces the `Restricted` Pod Security Admission profile. See [Pod Security Admission](../../installing/pod-security-admission.mdx#sidecars).
+</Callouts>
+
+Copy any other Mesh v1 proxy setting that differs from the Istio defaults — `includeIPRanges`, `excludeIPRanges` and the default sidecar resources are in `${BACKUP_DIR}/v1-mesh-settings.json` — into `spec.values.global.proxy`.
+
+:::warning Do not create an `IstioRevisionTag` named `default`
+Mesh v1 owns the `default` injection webhook. An `IstioRevisionTag` named `default` collides with it and changes which control plane injects pods that have no revision label. [Finalizing the migration](./finalizing-the-migration.mdx) creates it after Mesh v1 is gone.
+:::
+
+### Prepare the Istio reader service account
+
+Mesh v1 created the `istio-reader-service-account` service account in `istio-system` without Helm metadata. The `IstioRevisionTag` that Phase 6 creates claims that account through Helm and fails while the metadata is missing. Adding it now costs nothing and has no effect on Mesh v1.
+
+```bash {name=migrate-cp:prepare-reader-service-account}
+kubectl -n istio-system label sa istio-reader-service-account app.kubernetes.io/managed-by=Helm --overwrite
+kubectl -n istio-system annotate sa istio-reader-service-account \
+  meta.helm.sh/release-name=default-base meta.helm.sh/release-namespace=sail-operator --overwrite
+```
+
+### Get the Mesh v2 revision \{#get-the-mesh-v2-revision}
+
+With the `RevisionBased` strategy the control plane runs under a revision name derived from the Istio version. Every later phase refers to it.
+
+```bash {name=migrate-cp:get-v2-revision}
+export V2_REVISION=$(kubectl get istio default -o jsonpath='{.status.activeRevisionName}')
+echo "${V2_REVISION}"
+```
+
+**Example output**
+
+```text
+default-v1-30-4
+```
+
+See [Identifying the revision name](../../installing/sidecar-injection/identifying-the-revision-name.mdx) for the naming rules.
+
+</Steps>
+
+## Verification
+
+```bash {name=migrate-cp:verify-control-plane}
+kubectl get istio,istiocni,istiorevision
+kubectl -n istio-system get deploy | grep istiod
+kubectl -n istio-system logs "deploy/istiod-${V2_REVISION}" | grep -i "root cert" | head -3
+```
+
+- The `Istio` and `IstioCNI` resources report `Healthy`, and the `IstioRevision` for `${V2_REVISION}` is `Healthy`.
+- Both `istiod` deployments are running: the Mesh v1 one and `istiod-${V2_REVISION}`.
+- The Mesh v2 `istiod` log contains `Use root cert from etc/cacerts`, which means it loaded the same certificate authority as Mesh v1. Workload certificates issued by either control plane are then trusted by both.
+- The Mesh v1 proxies are unchanged, and the probes report no failures.
+
+```bash {name=migrate-cp:verify-v1-untouched}
+kubectl get pod -A -o json | jq -r --arg rev "${V1_REVISION}" '[.items[]
+  | select((.metadata.annotations["sidecar.istio.io/status"] // "") | test("\"revision\":\"" + $rev + "\""))] | length'
+```
+
+The count matches the number of injected pods recorded in Phase 0: creating the Mesh v2 control plane does not restart or re-inject anything.
+
+:::danger Never delete the Mesh v1 service mesh from the platform UI
+**After you create the Mesh v2 `Istio` resource, never delete the Mesh v1 service mesh from the platform UI, and never delete a `ServiceMesh` resource and leave the cleanup to the Mesh v1 controllers.** The Mesh v1 deletion flow deletes the whole `istio-system` namespace, including the Mesh v2 control plane that runs in it. Remove Mesh v1 only by following [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx).
+:::
+
+Continue with [Migrating workloads](./migrating-workloads.mdx).

@@ -1,0 +1,351 @@
+---
+weight: 20
+---
+
+# Preparing for the migration
+
+Phase 0 of the migration. Nothing changes in the mesh: you check that the cluster is ready, record how Mesh v1 is configured, back up every resource the later phases touch, and start the probes that tell you whether application traffic keeps flowing.
+
+Complete every section before you install the Mesh v2 control plane.
+
+## Prerequisites
+
+- Alauda Container Platform 4.2 or 4.3, with Kubernetes 1.32 or later on every node that runs mesh workloads. Istio 1.30 requires Kubernetes 1.32.
+- Mesh v1 runs Istio 1.22. The **Record the Mesh v1 configuration** section below checks this.
+- The Alauda Service Mesh v2 Operator, the Alauda Build of Kiali Operator and the Alauda Build of OpenTelemetry v2 Operator are available in the cluster catalog. Do not install them yet.
+- The **ACP Networking for Multus** plugin is installed. `IstioCNI` writes its configuration to the Multus configuration directory.
+- `cluster-admin` on the cluster that runs the mesh and on the `global` cluster.
+- The following tools on the machine you run the migration from:
+
+  | Tool | Version | Purpose |
+  |---|---|---|
+  | `kubectl` | Matching the cluster | All steps |
+  | `istioctl` | 1.30.x, see [Istioctl tool](../installing/istioctl.mdx) | Checking Mesh v2 proxies |
+  | `jq` | 1.6 or later | Reading and rewriting resources |
+  | `openssl` | 1.1.1 or later | Certificate authority handover in Phase 6 |
+
+- A maintenance window agreed with the application owners. Application traffic keeps flowing, but workloads and gateways are restarted, and tracing is interrupted between Phase 5 and the end of Phase 6.
+
+:::note istioctl and Mesh v1
+`istioctl` 1.30 talks to the Mesh v2 control plane. Do not point it at the Mesh v1 control plane, which runs Istio 1.22: the versions are too far apart. Checks against Mesh v1 in this section read the `sidecar.istio.io/status` annotation of the pods instead.
+:::
+
+## Set the variables
+
+Every page in this section uses these variables. Set them once per shell.
+
+```bash {name=migrate-prep:set-variables}
+export GLOBAL_CONTEXT=<global-cluster-context>
+export CLUSTER_NAME=<cluster-name>
+export BACKUP_DIR=${HOME}/mesh-v1-migration-backup
+mkdir -p "${BACKUP_DIR}"
+```
+
+`CLUSTER_NAME` is the name of the cluster in the platform. It is also the name of the `ServiceMesh` resource that represents this cluster on the `global` cluster.
+
+## Record the Mesh v1 configuration
+
+Mesh v2 must be created with the same mesh identity and the same mesh-wide settings as Mesh v1. Record them now: the resources that hold them are deleted in Phase 5.
+
+<Steps>
+
+### Find the control plane
+
+The Mesh v1 gateways are `IstioOperator` resources too. The control plane is the one without the gateway label.
+
+```bash {name=migrate-prep:discover-v1-control-plane}
+export V1_CONTROL_PLANE_IOP=$(kubectl -n istio-system get istiooperators.install.istio.io \
+  -l '!asm.cpaas.io/component' -o jsonpath='{.items[0].metadata.name}')
+export V1_REVISION=$(kubectl -n istio-system get istiooperators.install.istio.io "${V1_CONTROL_PLANE_IOP}" \
+  -o jsonpath='{.spec.revision}')
+echo "${V1_CONTROL_PLANE_IOP} ${V1_REVISION}"
+```
+
+**Example output**
+
+```text
+istio-122 1-22
+```
+
+The revision must be `1-22`. If it is lower, update Mesh v1 to Istio 1.22 before you migrate.
+
+### Record the mesh identity and the injection policy
+
+```bash {name=migrate-prep:record-mesh-identity}
+IOP_JSON=$(kubectl -n istio-system get istiooperators.install.istio.io "${V1_CONTROL_PLANE_IOP}" -o json)
+export MESH_ID=$(jq -r '.spec.values.global.meshID // ""' <<<"${IOP_JSON}")
+export NETWORK=$(jq -r '.spec.values.global.network // ""' <<<"${IOP_JSON}")
+export MESH_CLUSTER_NAME=$(jq -r '.spec.values.global.multiCluster.clusterName // ""' <<<"${IOP_JSON}")
+export V1_AUTO_INJECT=$(jq -r '.spec.values.global.proxy.autoInject // "enabled"' <<<"${IOP_JSON}")
+export TRUST_DOMAIN=$(kubectl -n istio-system get configmap "istio-${V1_REVISION}" \
+  -o jsonpath='{.data.mesh}' | awk '/^trustDomain:/{print $2}')
+echo "meshID=${MESH_ID} network=${NETWORK} clusterName=${MESH_CLUSTER_NAME} trustDomain=${TRUST_DOMAIN} autoInject=${V1_AUTO_INJECT}"
+```
+
+**Example output**
+
+```text
+meshID=mesh-1 network=mesh-1 clusterName=cluster-1 trustDomain=cluster.local autoInject=disabled
+```
+
+<Callouts>
+1. `network` is set even for a single-cluster mesh, and every injected pod carries a matching `topology.istio.io/network` label. Mesh v2 must use the same value, otherwise the two control planes disagree about which network the endpoints belong to and traffic between Mesh v1 and Mesh v2 pods fails.
+2. `autoInject` is the injection policy of the mesh. With `disabled`, only pods that carry `sidecar.istio.io/inject: "true"` are injected, which is how Mesh v1 keeps uninjected workloads in a mesh namespace uninjected. Mesh v2 must use the same policy.
+</Callouts>
+
+### Record the mesh-wide settings
+
+```bash {name=migrate-prep:record-mesh-settings}
+kubectl -n istio-system get istiooperators.install.istio.io "${V1_CONTROL_PLANE_IOP}" -o json \
+  | jq '{meshConfig: (.spec.meshConfig // {}),
+         proxy: ((.spec.values.global.proxy // {}) | {includeIPRanges, excludeIPRanges, resources}),
+         traceSampling: .spec.values.pilot.traceSampling}' \
+  | tee "${BACKUP_DIR}/v1-mesh-settings.json"
+```
+
+These settings change how every proxy in the mesh behaves — DNS capture for `ServiceEntry` hosts, the number of trusted proxies at the gateways, connection draining, the trace sampling rate. Phase 2 copies them into the Mesh v2 `Istio` resource.
+
+### List the mesh namespaces and the injected workloads
+
+```bash {name=migrate-prep:list-mesh-namespaces}
+for ns in $(kubectl get ns -l "istio.io/rev=${V1_REVISION}" -o jsonpath='{.items[*].metadata.name}'); do
+  kubectl -n "${ns}" get pod -o json | jq -r --arg ns "${ns}" '
+    ([.items[] | select(.metadata.annotations["sidecar.istio.io/status"] != null)] | length) as $injected
+    | "\($ns) injected=\($injected) pods=\(.items | length)"'
+done
+```
+
+**Example output**
+
+```text
+app-all      injected=6 pods=6
+app-partial  injected=4 pods=6
+java-apps    injected=0 pods=4
+```
+
+- `injected` equals `pods`: every workload in the namespace is in the mesh.
+- `injected` is lower but not zero: a mixed namespace. Migrate these workloads one at a time, see [Migrating workloads](./migrating-a-single-cluster-mesh/migrating-workloads.mdx#migrate-individual-workloads).
+- `injected` is zero: the namespace carries the revision label but has no mesh workloads, typically a namespace that only uses OpenTelemetry auto-instrumentation. Do not switch its label; Phase 5 removes it.
+
+Gateways run in their own namespace, which may not carry the revision label. [Migrating gateways](./migrating-a-single-cluster-mesh/migrating-gateways.mdx) lists them.
+
+### Record the tracing backend
+
+The Mesh v1 `Jaeger` resource is deleted in Phase 5. Record the index prefix and the retention of its Elasticsearch indices now; Phase 6 needs both to keep the existing traces queryable.
+
+```bash {name=migrate-prep:record-jaeger}
+kubectl -n istio-system get jaegers.jaegertracing.io -o json | jq -r '.items[]
+  | "name=\(.metadata.name) prefix=\(.spec.storage.options["es.index-prefix"] // "") days=\(.spec.storage.esIndexCleaner.numberOfDays // "") url=\(.spec.storage.options["es.server-urls"] // "")"' \
+  | tee "${BACKUP_DIR}/v1-jaeger.txt"
+```
+
+Also record how applications are instrumented today, so that the telemetry of your applications does not change when Mesh v1 is gone:
+
+```bash {name=migrate-prep:record-instrumentation}
+kubectl get instrumentations.opentelemetry.io -A -o yaml > "${BACKUP_DIR}/instrumentations.yaml"
+kubectl get pod -A -o json | jq -r '.items[]
+  | select(.metadata.annotations["instrumentation.opentelemetry.io/inject-java"] != null)
+  | "\(.metadata.namespace)/\(.metadata.name) service_name=\([.spec.containers[].env[]? | select(.name=="OTEL_SERVICE_NAME") | .value] | join(","))"' \
+  | tee "${BACKUP_DIR}/v1-instrumented-pods.txt"
+```
+
+The service name of a Mesh v1 application is built from environment variables that a Mesh v1 webhook adds to the pod. [Migrating the observability stack](./migrating-observability.mdx) restores the same values without that webhook.
+
+</Steps>
+
+## Check compatibility
+
+<Steps>
+
+### Audit `ServiceEntry` resources
+
+Istio 1.30 rejects a `ServiceEntry` without ports and one with more than 256 hosts.
+
+```bash {name=migrate-prep:audit-serviceentries}
+kubectl get serviceentries.networking.istio.io -A -o json | jq -r '.items[]
+  | select((.spec.ports == null) or ((.spec.ports | length) == 0) or ((.spec.hosts | length) > 256))
+  | "\(.metadata.namespace)/\(.metadata.name)"'
+```
+
+Expected output: none. Fix every resource that is listed before you continue.
+
+### Audit `EnvoyFilter` resources
+
+An `EnvoyFilter` that pins a proxy version stops applying once the workload runs on Mesh v2, because the data plane is then Istio 1.30.
+
+```bash {name=migrate-prep:audit-envoyfilters}
+kubectl get envoyfilters.networking.istio.io -A -o json | jq -r '.items[]
+  | select([.. | objects | .proxyVersion? // empty] | length > 0)
+  | "\(.metadata.namespace)/\(.metadata.name)"'
+```
+
+Resources generated by Mesh v1 features that Mesh v2 does not provide — API metrics and allow lists among them — appear here. They disappear with Mesh v1 in Phase 5. For every other resource, check whether the filter is still needed and rebuild it for Istio 1.30.
+
+### Find features that Mesh v2 does not provide
+
+```bash {name=migrate-prep:audit-v1-only-features}
+for kind in canarydeliveries globalratelimiters apiattributes isolatepods; do
+  printf '%s: ' "${kind}"
+  kubectl get "${kind}.asm.alauda.io" -A --no-headers 2>/dev/null | wc -l
+done
+```
+
+Every resource counted here stops working when Mesh v1 is removed. Finish running canary releases, release isolated pods, and agree with the application owners on what replaces global rate limiting and API metrics before you start Phase 2.
+
+### Check the lifetime of the intermediate certificate
+
+Mesh v1 renews the intermediate certificate of the mesh automatically, and stops doing so when its controllers are removed in Phase 5. Phase 6 replaces the certificate with a long-lived one.
+
+```bash {name=migrate-prep:check-ca-expiry}
+kubectl -n istio-system get secret cacerts -o jsonpath='{.data.ca-cert\.pem}' \
+  | base64 -d | openssl x509 -noout -subject -enddate
+```
+
+The expiry date must be later than the end of the planned migration, including Phase 6.
+
+### Review the Istio behavior changes
+
+The data plane moves from Istio 1.22 to Istio 1.30. Review the upgrade notes of [Alauda Service Mesh v2.2](../about/release-notes/alauda-service-mesh-v2.2.mdx#upgrade-considerations) and the upstream release announcements between 1.23 and 1.30 for changes that affect your traffic policies.
+
+</Steps>
+
+## Check cluster capacity
+
+Between Phase 2 and Phase 5 both control planes run at the same time, and every workload that is being migrated runs a second pod during its rolling update. Check that the cluster has room:
+
+```bash {name=migrate-prep:check-capacity}
+kubectl top node
+kubectl get node -o json | jq -r '.items[] | "\(.metadata.name) allocatable cpu=\(.status.allocatable.cpu) memory=\(.status.allocatable.memory)"'
+```
+
+Plan for the Mesh v2 control plane (`istiod`, `istio-cni`, Kiali) in addition to the running Mesh v1 control plane, and for one extra sidecar per workload during its rolling update.
+
+## Back up the mesh \{#back-up-the-mesh}
+
+Phase 5 deletes the Mesh v1 resources. Some of them — gateway services, gateway certificates and the telemetry resources of the mesh — are owned by Mesh v1 resources and are garbage collected with them. The backup is what you restore from if a phase has to be rolled back.
+
+<Steps>
+
+### Back up the Istio and Mesh v1 resources
+
+```bash {name=migrate-prep:back-up-resources}
+kubectl get ns -o yaml > "${BACKUP_DIR}/namespaces.yaml"
+for crd in $(kubectl get crd -o name | sed 's|.*/||' | grep -E '\.istio\.io$'); do
+  kubectl get "${crd}" -A -o yaml > "${BACKUP_DIR}/istio-${crd}.yaml"
+done
+for crd in $(kubectl get crd -o name | sed 's|.*/||' | grep -E '\.asm\.alauda\.io$'); do
+  kubectl get "${crd}" -A -o yaml > "${BACKUP_DIR}/asm-${crd}.yaml"
+done
+kubectl get asms.operator.alauda.io,flaggers.operator.alauda.io -A -o yaml > "${BACKUP_DIR}/asm-operator-crs.yaml"
+kubectl get opentelemetrycollectors.opentelemetry.io,instrumentations.opentelemetry.io -A -o yaml > "${BACKUP_DIR}/otel.yaml"
+kubectl get jaegers.jaegertracing.io -A -o yaml > "${BACKUP_DIR}/jaeger.yaml"
+kubectl get subscriptions.operators.coreos.com,clusterserviceversions.operators.coreos.com -A -o yaml > "${BACKUP_DIR}/olm.yaml"
+kubectl -n istio-system get secret cacerts -o yaml > "${BACKUP_DIR}/cacerts.yaml"
+kubectl -n istio-system get secret -l istio/multiCluster=true -o yaml > "${BACKUP_DIR}/remote-secrets.yaml"
+```
+
+The loop over the custom resource definitions covers every Istio API group, including `telemetry.istio.io`. Listing resource types by hand misses the telemetry resources that Phase 5 garbage collects.
+
+### Back up the gateway services and certificates
+
+```bash {name=migrate-prep:back-up-gateway-resources}
+kubectl get gatewaydeploys.asm.alauda.io -A -o json | jq -r '.items[] | "\(.metadata.namespace) \(.metadata.name)"' \
+  | while read -r ns name; do
+      kubectl -n "${ns}" get svc "${name}" -o yaml > "${BACKUP_DIR}/gateway-svc-${ns}-${name}.yaml"
+    done
+kubectl get gateways.networking.istio.io -A -o json \
+  | jq -r '.items[].spec.servers[]? | .tls.credentialName // empty' | sort -u \
+  | while read -r secret; do
+      kubectl get secret -A --field-selector "metadata.name=${secret}" -o yaml > "${BACKUP_DIR}/gateway-tls-${secret}.yaml"
+    done
+```
+
+:::warning Gateway certificates cannot be recreated
+The private key of a gateway certificate exists only in its secret. If the secret is lost, the certificate has to be reissued. Keep this backup until the migration is finished and verified.
+:::
+
+### Record which resources Mesh v1 owns
+
+```bash {name=migrate-prep:audit-owner-references}
+for kind in $(kubectl get crd -o name | sed 's|.*/||' | grep -E '\.istio\.io$') secrets services; do
+  kubectl get "${kind}" -A -o json 2>/dev/null | jq -r --arg k "${kind}" '.items[]
+    | select(any(.metadata.ownerReferences[]?; .apiVersion | test("asm\\.alauda\\.io")))
+    | "\($k) \(.metadata.namespace) \(.metadata.name) \(.metadata.ownerReferences[0].kind)/\(.metadata.ownerReferences[0].name)"'
+done | tee "${BACKUP_DIR}/asm-owned-resources.txt"
+while read -r kind ns name owner; do
+  kubectl -n "${ns}" get "${kind}" "${name}" -o yaml > "${BACKUP_DIR}/owned-${kind}-${ns}-${name}.yaml"
+done < "${BACKUP_DIR}/asm-owned-resources.txt"
+```
+
+Every resource in this list is deleted by Kubernetes when its owner is deleted in Phase 5. [Decommissioning Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) removes the owner reference from the resources you keep.
+
+### Back up the `global` cluster resources
+
+```bash {name=migrate-prep:back-up-global}
+kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshs.asm.alauda.io -o yaml > "${BACKUP_DIR}/global-servicemeshes.yaml"
+kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshgroups.asm.alauda.io -o yaml > "${BACKUP_DIR}/global-servicemeshgroups.yaml"
+kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get secret asm-istio-rootca -o yaml > "${BACKUP_DIR}/global-asm-istio-rootca.yaml"
+```
+
+:::warning The root certificate authority is in this backup
+`asm-istio-rootca` contains the private key of the root certificate authority of the mesh. Phase 6 signs a new intermediate certificate with it. Store the backup where you keep private keys, not on the cluster.
+:::
+
+</Steps>
+
+## Freeze changes
+
+For the duration of the migration:
+
+- Do not change the mesh from the web console: no new microservices, no new gateways, no policy changes.
+- Do not approve updates for the Mesh v1 operators.
+- Tell the application owners that workloads are restarted phase by phase.
+
+## Set up traffic probes
+
+Every phase is verified against continuous traffic. Run probes that cover each path the mesh serves, and keep their output with timestamps:
+
+- a call between two workloads inside the mesh,
+- one request per ingress gateway route, including every TLS host,
+- one request per egress route,
+- for a multi-cluster mesh, one call per cluster pair.
+
+```bash {name=migrate-prep:run-probe}
+while true; do
+  ts=$(date -u +%FT%TZ)
+  for target in "${PROBE_TARGETS[@]}"; do
+    code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "${target}" || echo "000")
+    case "${code}" in
+      2*|3*) echo "${ts} ${target} ${code} OK" ;;
+      *)     echo "${ts} ${target} ${code} FAIL" ;;
+    esac
+  done
+  sleep 1
+done
+```
+
+Set `PROBE_TARGETS` to your own URLs, for example:
+
+```bash {name=migrate-prep:set-probe-targets}
+export PROBE_TARGETS=(
+  "http://<ingress-gateway-host>/<path>"
+  "https://<ingress-gateway-tls-host>/<path>"
+  "http://<external-service-host>/<path>"
+)
+```
+
+:::note Where to run the probes from
+Run the probes from outside the mesh, or from the namespace you migrate last. A probe that runs inside a workload being restarted reports its own restart as an outage.
+
+HTTPS routes must be probed as HTTPS. A gateway whose certificate is missing still serves plain HTTP, so an HTTP-only probe does not detect a broken TLS listener.
+:::
+
+## Verification
+
+- `echo "${MESH_ID} ${NETWORK} ${MESH_CLUSTER_NAME} ${TRUST_DOMAIN} ${V1_AUTO_INJECT}"` prints the mesh identity and the injection policy.
+- `ls "${BACKUP_DIR}"` lists the backup of the Istio resources, the Mesh v1 resources, the gateway services and certificates, the `cacerts` secret and the `global` cluster resources.
+- `cat "${BACKUP_DIR}/v1-jaeger.txt"` shows the index prefix and the retention of the tracing backend.
+- The probes report `OK` for every target.
+- The compatibility audits return no unexpected resources.
+
+Continue with [Migrating a single-cluster mesh](./migrating-a-single-cluster-mesh/index.mdx), or with [Migrating a multi-cluster mesh](./migrating-a-multi-cluster-mesh/index.mdx) if the mesh spans several clusters.
