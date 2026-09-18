@@ -73,7 +73,7 @@ kubectl label ns "${GATEWAY_NAMESPACE}" istio.io/rev="${V2_REVISION}" --overwrit
 Run this command only when the gateway namespace already carries a revision label. Mesh v1 injects its gateways with a template (`asm-gateway`) that does not exist in Mesh v2, so once the namespace points at the Mesh v2 revision, a Mesh v1 gateway pod can no longer be created. Existing pods keep running, but a rollback then means switching the label back, not scaling the old gateway up. Deploy and verify the Mesh v2 gateway immediately after switching the label.
 :::
 
-## Deploy the Mesh v2 gateway
+## Deploy the Mesh v2 gateway \{#deploy-the-mesh-v2-gateway}
 
 <Steps>
 

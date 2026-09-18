@@ -106,7 +106,9 @@ kubectl -n "${MESH_NAMESPACE}" get pod -o jsonpath='{range .items[*]}{.metadata.
 
 - The `istiod` log reports that it picked up the new `cacerts`.
 - No pod was restarted: the start times are unchanged.
-- Existing workload certificates keep working. They are reissued from the new intermediate certificate within their normal 24-hour lifetime; restart one workload to see the new chain immediately:
+- Existing workload certificates keep working. They are reissued from the new intermediate certificate within their normal 24-hour lifetime.
+
+Restart one workload to see the new chain immediately:
 
 ```bash {name=migrate-finalize:verify-new-chain}
 kubectl -n "${MESH_NAMESPACE}" rollout restart "deploy/${WORKLOAD}"

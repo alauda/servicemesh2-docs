@@ -169,7 +169,7 @@ kubectl get serviceentries.networking.istio.io -A -o json | jq -r '.items[]
 
 Expected output: none. Fix every resource that is listed before you continue.
 
-### Audit `EnvoyFilter` resources
+### Audit `EnvoyFilter` resources \{#audit-envoyfilter-resources}
 
 An `EnvoyFilter` that pins a proxy version stops applying once the workload runs on Mesh v2, because the data plane is then Istio 1.30.
 
@@ -205,7 +205,7 @@ The expiry date must be later than the end of the planned migration, including P
 
 ### Review the Istio behavior changes
 
-The data plane moves from Istio 1.22 to Istio 1.30. Review the upgrade notes of [Alauda Service Mesh v2.2](../about/release-notes/alauda-service-mesh-v2.2.mdx#upgrade-considerations) and the upstream release announcements between 1.23 and 1.30 for changes that affect your traffic policies.
+The data plane moves from Istio 1.22 to Istio 1.30. Review the upgrade notes of [Alauda Service Mesh v2.2](../about/release-notes/alauda-service-mesh-v2.2.mdx) and the upstream release announcements between 1.23 and 1.30 for changes that affect your traffic policies.
 
 </Steps>
 
@@ -310,6 +310,8 @@ Every phase is verified against continuous traffic. Run probes that cover each p
 - one request per egress route,
 - for a multi-cluster mesh, one call per cluster pair.
 
+A probe loop can be as simple as this:
+
 ```bash {name=migrate-prep:run-probe}
 while true; do
   ts=$(date -u +%FT%TZ)
@@ -348,4 +350,4 @@ HTTPS routes must be probed as HTTPS. A gateway whose certificate is missing sti
 - The probes report `OK` for every target.
 - The compatibility audits return no unexpected resources.
 
-Continue with [Migrating a single-cluster mesh](./migrating-a-single-cluster-mesh/index.mdx), or with [Migrating a multi-cluster mesh](./migrating-a-multi-cluster-mesh/index.mdx) if the mesh spans several clusters.
+Continue with [Migrating a single-cluster mesh](./migrating-a-single-cluster-mesh/index.mdx). A mesh that spans several clusters follows the same phases with additional steps per cluster.

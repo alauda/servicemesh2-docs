@@ -42,20 +42,20 @@ Open Kiali and confirm that the traffic graph shows the current Mesh v1 traffic.
 
 ### Install the Alauda Service Mesh v2 Operator
 
-Follow [Installing Alauda Service Mesh](../../installing/installing-service-mesh/install-mesh.mdx#installing-the-alauda-service-mesh-v2-operator) to install the Operator. Stop before creating the `IstioCNI` and `Istio` resources: this document creates them with the values of your Mesh v1 mesh.
+Follow [Installing Alauda Service Mesh](../../installing/installing-service-mesh/install-mesh.mdx) to install the Operator. Stop before creating the `IstioCNI` and `Istio` resources: this document creates them with the values of your Mesh v1 mesh.
 
-### Relax the anti-affinity rule of the Mesh v1 control plane
+### Relax the anti-affinity rule of the Mesh v1 control plane \{#relax-the-anti-affinity-rule-of-the-mesh-v1-control-plane}
 
-The Mesh v1 `istiod` pod has a required anti-affinity rule against other `istiod` pods. On a cluster where the Mesh v2 `istiod` would have to be scheduled on a node that already runs the Mesh v1 `istiod` — a single-node cluster, or a cluster with only one schedulable node left — the Mesh v2 pod stays `Pending` forever.
+The Mesh v1 `istiod` pod has a required anti-affinity rule against other `istiod` pods. On a cluster where the Mesh v2 `istiod` would have to be scheduled on a node that already runs the Mesh v1 `istiod` — a single-node cluster, or a cluster where only one node is available for it — the Mesh v2 pod stays `Pending` forever.
 
-Check how many nodes can run the control plane:
+Check how many nodes can take the control plane:
 
 ```bash {name=migrate-cp:check-istiod-scheduling}
-kubectl get node -o json | jq -r '[.items[] | select((.spec.unschedulable // false) | not)] | length'
+kubectl get node -o json | jq -r '[.items[] | select(.spec.unschedulable != true)] | length'
 kubectl -n istio-system get pod -l app=istiod -o wide --no-headers
 ```
 
-If more than one node can run the control plane, skip this step. Relax the rule when the cluster has a single schedulable node, or when the Mesh v2 `istiod` pod created in the next steps stays `Pending` with an event about pod anti-affinity:
+If more than one node can take the control plane, skip this step. Relax the rule when the cluster has a single node available for it, or when the Mesh v2 `istiod` pod created in the next steps stays `Pending` with an event about pod anti-affinity:
 
 ```bash {name=migrate-cp:relax-v1-istiod-affinity}
 kubectl -n istio-system patch istiooperators.install.istio.io "${V1_CONTROL_PLANE_IOP}" --type=json -p='[
@@ -93,7 +93,7 @@ EOF
 kubectl wait --for condition=Ready istiocni/default --timeout=3m
 ```
 
-### Build the mesh configuration of Mesh v2
+### Build the mesh configuration of Mesh v2 \{#build-the-mesh-configuration-of-mesh-v2}
 
 Mesh v2 must run with the mesh-wide settings of Mesh v1. The following command reads them from the Mesh v1 control plane and drops the two fields that belong to the Mesh v1 deployment itself.
 
@@ -129,7 +129,7 @@ jq . <<<"${V2_MESH_CONFIG}"
 2. The tracing provider is kept as it is, so that proxies of both generations report to the Mesh v1 tracing backend during the migration. Phase 6 repoints it.
 </Callouts>
 
-### Create the `Istio` resource
+### Create the `Istio` resource \{#create-the-istio-resource}
 
 ```bash {name=migrate-cp:create-istio}
 cat <<EOF | kubectl apply -f -
@@ -172,7 +172,7 @@ Copy any other Mesh v1 proxy setting that differs from the Istio defaults — `i
 Mesh v1 owns the `default` injection webhook. An `IstioRevisionTag` named `default` collides with it and changes which control plane injects pods that have no revision label. [Finalizing the migration](./finalizing-the-migration.mdx) creates it after Mesh v1 is gone.
 :::
 
-### Prepare the Istio reader service account
+### Prepare the Istio reader service account \{#prepare-the-istio-reader-service-account}
 
 Mesh v1 created the `istio-reader-service-account` service account in `istio-system` without Helm metadata. The `IstioRevisionTag` that Phase 6 creates claims that account through Helm and fails while the metadata is missing. Adding it now costs nothing and has no effect on Mesh v1.
 
@@ -213,6 +213,8 @@ kubectl -n istio-system logs "deploy/istiod-${V2_REVISION}" | grep -i "root cert
 - Both `istiod` deployments are running: the Mesh v1 one and `istiod-${V2_REVISION}`.
 - The Mesh v2 `istiod` log contains `Use root cert from etc/cacerts`, which means it loaded the same certificate authority as Mesh v1. Workload certificates issued by either control plane are then trusted by both.
 - The Mesh v1 proxies are unchanged, and the probes report no failures.
+
+Count the pods that are still served by Mesh v1:
 
 ```bash {name=migrate-cp:verify-v1-untouched}
 kubectl get pod -A -o json | jq -r --arg rev "${V1_REVISION}" '[.items[]

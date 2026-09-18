@@ -1,0 +1,74 @@
+---
+weight: 60
+---
+
+# Rolling back the migration
+
+Every phase before Mesh v1 is decommissioned can be undone. This document lists what to do per phase, and what recovery looks like after the point of no return.
+
+## When to roll back
+
+Roll back when one of these is true and you cannot explain it within your change window:
+
+- The probes report failures that do not stop by themselves.
+- Calls between workloads fail with TLS errors.
+- A verification step of the current phase does not pass.
+
+## Roll back by phase
+
+| Phase | How to roll back | Conditions |
+|---|---|---|
+| Phase 1 — observability | Delete the `Kiali` resource and the monitoring resources you created | None |
+| Phase 2 — control plane | Delete the `Istio` and `IstioCNI` resources | No namespace points at the Mesh v2 revision yet |
+| Phase 3 — workloads | Move the namespace label back and restart the workloads | Mesh v1 still runs |
+| Phase 4 — gateways | Scale the Mesh v1 gateway back up and the Mesh v2 gateway down | The Mesh v1 gateway deployment still exists, see the note below |
+| Phase 5 — decommissioning | Reinstall Mesh v1 from the backups | Disaster recovery, see below |
+| Phase 6 — finalization | Re-create the previous `cacerts` from the backup; delete the `default` revision tag | Mesh v2 keeps running |
+
+### Phase 2
+
+```bash {name=migrate-rollback:remove-control-plane}
+kubectl delete istio default
+kubectl delete istiocni default
+```
+
+The Mesh v1 control plane is untouched by this, and no workload restarts. Keep Kiali if you want to go on watching the mesh.
+
+### Phase 3
+
+```bash {name=migrate-rollback:roll-back-workload}
+kubectl label ns "${MESH_NAMESPACE}" istio.io/rev="${V1_REVISION}" --overwrite
+kubectl -n "${MESH_NAMESPACE}" rollout restart "deploy/${WORKLOAD}"
+kubectl -n "${MESH_NAMESPACE}" rollout status "deploy/${WORKLOAD}" --timeout=300s
+```
+
+The pod settings written into the workload template during the migration are also valid for Mesh v1 — they are the values Mesh v1 itself used — so nothing else has to be reverted.
+
+A namespace label applies to the whole namespace. Rolling back one workload also means that every other workload of that namespace returns to Mesh v1 the next time it restarts.
+
+### Phase 4
+
+```bash {name=migrate-rollback:roll-back-gateway}
+kubectl -n "${GATEWAY_NAMESPACE}" scale deploy "${GATEWAY_NAME}" --replicas="${REPLICAS}"
+kubectl -n "${GATEWAY_NAMESPACE}" scale deploy "${GATEWAY_NAME}-v2" --replicas=0
+```
+
+:::warning Gateways in a namespace that carries a revision label
+If the gateway namespace had an `istio.io/rev` label and you switched it to the Mesh v2 revision, a Mesh v1 gateway pod can no longer be created: its injection template does not exist in Mesh v2. Scaling the old deployment up then produces pods that are rejected. Roll back by switching the namespace label back first, and only then scaling. Gateways in a namespace without a revision label are not affected.
+:::
+
+### Phase 5 and later
+
+Mesh v1 is gone. Recovery means installing it again:
+
+1. Install the Service Mesh Essentials plugin on the `global` cluster, and the Mesh v1 operators on the mesh cluster, at the versions recorded in `${BACKUP_DIR}/olm.yaml`.
+2. Restore the `ServiceMesh` and `ServiceMeshGroup` resources from `${BACKUP_DIR}/global-servicemeshes.yaml` and `${BACKUP_DIR}/global-servicemeshgroups.yaml`, and wait for the Mesh v1 control plane to be running.
+3. Restore the platform resources — microservices, gateways, policies — from the `${BACKUP_DIR}/asm-*.yaml` files.
+4. Restore the namespace labels from `${BACKUP_DIR}/namespaces.yaml` and restart the workloads.
+5. Remove the Mesh v2 resources — `Istio`, `IstioCNI`, `IstioRevisionTag` — and, if Mesh v2 is not to be reinstalled later, its operator.
+6. Restore `cacerts` from `${BACKUP_DIR}/cacerts.yaml` if Phase 6 already replaced it.
+7. Verify with the probes, and check that every pod reports the Mesh v1 revision in its `sidecar.istio.io/status` annotation.
+
+Traces and metrics collected by Mesh v2 stay in their own indices and are not restored by this procedure.
+
+Because this path is long, and because it depends on backups that were taken before the migration, rehearse the whole migration in a test environment first, as [Migration overview](./migration-overview.mdx) requires.

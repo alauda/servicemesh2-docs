@@ -131,7 +131,7 @@ EOF
 3. Mesh v1 also exported metrics in the Prometheus format from the agent. The v2 agent reports them through OTLP; scrape them from the collector instead of from the application pods.
 </Callouts>
 
-### Keep the service names of your applications
+### Keep the service names of your applications \{#keep-the-service-names-of-your-applications}
 
 Mesh v1 built the reported service name from the microservice name and the namespace, `<microservice>.<namespace>`, using variables that a Mesh v1 webhook injected. Without that webhook, the OpenTelemetry Operator falls back to the name of the workload, which changes how your applications appear in Jaeger, in dashboards and in alerts.
 

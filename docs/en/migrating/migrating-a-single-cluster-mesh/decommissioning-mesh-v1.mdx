@@ -138,7 +138,7 @@ This removes, among others, the webhook that adds the sidecar settings to pods a
 kubectl -n cpaas-system scale deploy asm-controller --replicas=0
 ```
 
-### Keep the resources that Mesh v1 owns
+### Keep the resources that Mesh v1 owns \{#keep-the-resources-that-mesh-v1-owns}
 
 The gateway services, the gateway certificates and the telemetry resources are owned by Mesh v1 resources. Kubernetes deletes them together with their owner unless the owner reference is removed first.
 
@@ -181,7 +181,7 @@ done < "${BACKUP_DIR}/asm-owned-resources.txt"
 
 A missing gateway service interrupts traffic immediately. Recreate it from `${BACKUP_DIR}/gateway-svc-<namespace>-<name>.yaml` if that happens.
 
-### Delete the Mesh v1 installation resource
+### Delete the Mesh v1 installation resource \{#delete-the-mesh-v1-installation-resource}
 
 ```bash {name=migrate-decommission:delete-asm-cr}
 kubectl delete asms.operator.alauda.io asm --wait=false
@@ -301,6 +301,8 @@ kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get deploy | grep -E 'asm|
 - The `global` cluster has no Mesh v1 components.
 - The gateway services, the gateway certificates and the telemetry resources you kept are still there.
 - The probes report no failures. Tracing is interrupted from here until the end of Phase 6.
+
+List the resources that were kept:
 
 ```bash {name=migrate-decommission:verify-retained-resources}
 kubectl -n "${GATEWAY_NAMESPACE}" get svc,secret,telemetry

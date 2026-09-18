@@ -23,7 +23,7 @@ With `autoInject: disabled` — the Mesh v1 default, recorded in Phase 0 — a p
 Do not scale down `asm-controller` before Phase 5. Its pod mutating webhook uses `failurePolicy: Fail`, so while the controller is down the API server rejects every new pod in namespaces labeled `cpaas.io/serviceMesh=enabled`, including the pods created by the rollouts on this page.
 :::
 
-## Persist the Mesh v1 pod settings
+## Persist the Mesh v1 pod settings \{#persist-the-mesh-v1-pod-settings}
 
 Mesh v1 adds the settings of each `MicroService` to its pods when the pods are created: whether to inject a sidecar, the proxy resources, the proxy log level, and the ports or address ranges excluded from capture. They are not in the workload template, so they disappear as soon as the Mesh v1 webhook is removed in Phase 5 — a pod restarted after that point runs without them, and with `autoInject: disabled` without a sidecar at all.
 
@@ -74,7 +74,7 @@ The command compares a running pod with its template and writes only what is mis
 
 For `StatefulSet` and `DaemonSet` workloads, run the same command with `sts` or `ds` in place of `deploy`.
 
-### Check the access logging configuration
+### Check the access logging configuration \{#check-the-access-logging-configuration}
 
 Mesh v1 enables access logging with a `Telemetry` resource per microservice, and those resources select pods by the `msname` label that the Mesh v1 webhook adds. After Phase 5 the label is gone and the resources no longer match anything.
 
