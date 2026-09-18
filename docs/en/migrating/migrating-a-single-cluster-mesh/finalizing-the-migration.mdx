@@ -59,19 +59,19 @@ If the secret no longer exists on the `global` cluster, take both files from `${
 ### Issue the new intermediate certificate
 
 ```bash {name=migrate-finalize:issue-intermediate-ca}
-cd "${CA_DIR}"
-openssl genrsa -out ca-key.pem 4096
-openssl req -new -key ca-key.pem -subj "/O=Istio/CN=Intermediate CA/L=${CLUSTER_NAME}" -out ca.csr
-cat > ca-ext.cnf <<EOF
+openssl genrsa -out "${CA_DIR}/ca-key.pem" 4096
+openssl req -new -key "${CA_DIR}/ca-key.pem" -subj "/O=Istio/CN=Intermediate CA/L=${CLUSTER_NAME}" \
+  -out "${CA_DIR}/ca.csr"
+cat > "${CA_DIR}/ca-ext.cnf" <<EOF
 [ v3_ca ]
 basicConstraints = critical, CA:TRUE, pathlen:0
 keyUsage = critical, digitalSignature, keyEncipherment, keyCertSign
 subjectKeyIdentifier = hash
 EOF
-openssl x509 -req -in ca.csr -CA root-cert.pem -CAkey root-key.pem -CAcreateserial \
-  -days 730 -extensions v3_ca -extfile ca-ext.cnf -out ca-cert.pem
-cat ca-cert.pem root-cert.pem > cert-chain.pem
-openssl x509 -in ca-cert.pem -noout -subject -issuer -enddate
+openssl x509 -req -in "${CA_DIR}/ca.csr" -CA "${CA_DIR}/root-cert.pem" -CAkey "${CA_DIR}/root-key.pem" \
+  -CAcreateserial -days 730 -extensions v3_ca -extfile "${CA_DIR}/ca-ext.cnf" -out "${CA_DIR}/ca-cert.pem"
+cat "${CA_DIR}/ca-cert.pem" "${CA_DIR}/root-cert.pem" > "${CA_DIR}/cert-chain.pem"
+openssl x509 -in "${CA_DIR}/ca-cert.pem" -noout -subject -issuer -enddate
 ```
 
 Choose the lifetime (`-days`) according to your certificate policy, and plan the rotation before it expires. A mesh that spans several clusters gets one intermediate certificate per cluster, all signed by the same root.
@@ -95,7 +95,7 @@ kubectl -n istio-system create secret generic cacerts \
 shred -u "${CA_DIR}/root-key.pem" 2>/dev/null || rm -f "${CA_DIR}/root-key.pem"
 ```
 
-Keep the root key where you keep private keys. It is needed again when the intermediate certificate is rotated.
+Keep the root key where you keep private keys. It is needed again when the intermediate certificate is rotated. Remove the rest of `${CA_DIR}` as well once the secret is in place: it still holds the private key of the new intermediate certificate.
 
 </Steps>
 
