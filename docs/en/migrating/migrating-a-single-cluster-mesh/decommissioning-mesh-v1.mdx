@@ -86,16 +86,18 @@ The controller is what deletes the `istio-system` namespace when a `ServiceMesh`
 ### Delete the mesh resources
 
 ```bash {name=migrate-decommission:delete-servicemesh}
-kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system delete servicemeshs.asm.alauda.io "${CLUSTER_NAME}" --wait=false
-kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system patch servicemeshs.asm.alauda.io "${CLUSTER_NAME}" \
-  --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]'
-
-for smg in $(kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshgroups.asm.alauda.io -o jsonpath='{.items[*].metadata.name}'); do
-  kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system delete servicemeshgroups.asm.alauda.io "${smg}" --wait=false
-  kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system patch servicemeshgroups.asm.alauda.io "${smg}" \
+for cn in ${CLUSTER_NAMES}; do
+  kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system delete servicemeshs.asm.alauda.io "${cn}" --wait=false
+  kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system patch servicemeshs.asm.alauda.io "${cn}" \
     --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]' 2>/dev/null || true
 done
+
+kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system delete servicemeshgroups.asm.alauda.io "${MESH_GROUP}" --wait=false
+kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system patch servicemeshgroups.asm.alauda.io "${MESH_GROUP}" \
+  --type=json -p='[{"op":"remove","path":"/metadata/finalizers"}]' 2>/dev/null || true
 ```
+
+`CLUSTER_NAMES` holds every cluster of this mesh — one name for a single-cluster mesh — and `MESH_GROUP` the group that ties them together. A platform can host several meshes: deleting a `ServiceMesh` or a `ServiceMeshGroup` that belongs to another mesh destroys that mesh.
 
 Verify that the resources are gone and that the mesh namespace of the cluster still exists:
 
@@ -106,7 +108,13 @@ kubectl get ns istio-system -o jsonpath='{.metadata.name} {.status.phase}{"\n"}'
 
 Expected: no resources on the `global` cluster, and `istio-system Active` on the mesh cluster.
 
-### Uninstall the Service Mesh Essentials plugin
+### Uninstall the Service Mesh Essentials plugin \{#uninstall-the-service-mesh-essentials-plugin}
+
+The plugin serves every Mesh v1 mesh of the platform. Uninstall it only when the mesh you migrated was the last one:
+
+```bash {name=migrate-decommission:check-remaining-meshes}
+kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshs.asm.alauda.io
+```
 
 Remove the plugin from the web console: **Marketplace** → **Cluster Plugins** on the `global` cluster → **Service Mesh Essentials** → **Uninstall**.
 
@@ -121,6 +129,15 @@ The components of the plugin are removed asynchronously. Check that they are gon
 ```bash {name=migrate-decommission:verify-essentials-removed}
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get deploy | grep -E 'asm|hermes' || echo "no Mesh v1 components left"
 ```
+
+If the previous command still lists other meshes, keep the plugin and put the `global` cluster back the way it was instead:
+
+```bash {name=migrate-decommission:restore-global-controller}
+kubectl --context "${GLOBAL_CONTEXT}" apply -f "${BACKUP_DIR}/global-webhooks.yaml"
+kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system scale deploy global-asm-controller --replicas=1
+```
+
+The controller has nothing left to reconcile for the clusters you migrated — their `ServiceMesh` resources are gone — and the other meshes keep being managed. The plugin records of the migrated clusters stay in the plugin list of the platform until the plugin itself is uninstalled.
 
 </Steps>
 
@@ -220,7 +237,7 @@ spec:
       overrides:
         - tagOverrides:
             mesh_id:
-              value: node.metadata['MESH_ID']
+              value: xds.node.metadata['MESH_ID']
   tracing:
     - providers:
         - name: zipkin
@@ -231,6 +248,7 @@ EOF
 <Callouts>
 1. Keep the provider name of the Mesh v1 configuration until Phase 6 repoints it at the new collector. [Migrating the observability stack](../migrating-observability.mdx) replaces both the provider and this value.
 2. Set the sampling percentage to the value recorded in Phase 0, `traceSampling` in `${BACKUP_DIR}/v1-mesh-settings.json`.
+3. The `mesh_id` tag is what Kiali filters the metrics of a mesh by. Check it on a proxy after the resource is applied: `kubectl -n "${MESH_NAMESPACE}" exec "deploy/${WORKLOAD}" -c istio-proxy -- pilot-agent request GET stats/prometheus | grep istio_requests_total | head -1`. A tag that reads `mesh_id="unknown"` means the expression did not resolve.
 </Callouts>
 
 ### Uninstall the Mesh v1 operators
@@ -329,4 +347,4 @@ Continue with [Finalizing the migration](./finalizing-the-migration.mdx).
 
 ## Multi-cluster meshes
 
-In a mesh that spans several clusters, the steps on the `global` cluster are run once and cover every cluster of the mesh, and the steps on the mesh cluster are run per cluster. There is one extra step before the control plane is deleted on each cluster, see the multi-cluster documentation.
+In a mesh that spans several clusters, the steps on the `global` cluster are run once and cover every cluster of the mesh, and the steps on the mesh cluster are run per cluster. There is one extra step before the control plane is deleted on each cluster, see [Migrating a multi-cluster mesh](../migrating-a-multi-cluster-mesh/index.mdx).

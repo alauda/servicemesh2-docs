@@ -102,11 +102,13 @@ Keep the root key where you keep private keys. It is needed again when the inter
 ### Verify the handover
 
 ```bash {name=migrate-finalize:verify-cacerts}
-kubectl -n istio-system logs "deploy/istiod-${V2_REVISION}" --since=10m | grep -i "cacerts"
+until kubectl -n istio-system logs "deploy/istiod-${V2_REVISION}" --since=10m \
+  | grep -q "newly added intermediate CA"; do sleep 10; done
+kubectl -n istio-system logs "deploy/istiod-${V2_REVISION}" --since=10m | grep -A2 "newly added intermediate CA"
 kubectl -n "${MESH_NAMESPACE}" get pod -o jsonpath='{range .items[*]}{.metadata.name} {.status.startTime}{"\n"}{end}'
 ```
 
-- The `istiod` log reports that it picked up the new `cacerts`.
+- The `istiod` log reports the new intermediate certificate and prints its subject. The secret is mounted as a file, so this takes up to a minute after the secret is replaced; wait for it before you verify anything else.
 - No pod was restarted: the start times are unchanged.
 - Existing workload certificates keep working. They are reissued from the new intermediate certificate within their normal 24-hour lifetime.
 

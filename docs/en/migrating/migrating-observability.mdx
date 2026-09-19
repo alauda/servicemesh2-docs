@@ -38,7 +38,8 @@ Follow the **Prerequisites** of [Configuring distributed tracing platform with S
 Two choices matter for a migrated mesh:
 
 - **Use the same Elasticsearch cluster** as the Mesh v1 backend, otherwise the existing traces cannot be served by the new one.
-- **Choose the index prefix per mesh, not per cluster.** A mesh that spans several clusters writes into one index family so that a trace which crosses clusters is assembled from one place.
+- **Choose the index prefix per mesh, not per cluster.** A mesh that spans several clusters writes into one index family so that a trace which crosses clusters is assembled from one place. The steps that act on Elasticsearch — the lifecycle policy and the index initialization — then belong to the mesh, not to a cluster: run them once, with the prefix of the mesh, and skip them on every other cluster. The Jaeger instance of any cluster serves the traces of the whole mesh afterwards.
+- **In a multi-cluster mesh, keep each proxy reporting to the collector of its own cluster.** The collectors of all clusters share one service name, and without the setting described in [Migrating a multi-network mesh](./migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx#keep-trace-reporting-inside-each-cluster) about half of the spans are sent across clusters and dropped.
 
 Stop after the prerequisites. The mesh-side configuration already exists from the migration, and the next step updates it.
 
@@ -184,6 +185,8 @@ Without `java-container-names`, the agent is injected into the first container o
 ## Repoint Kiali
 
 Update the tracing configuration of the `Kiali` resource to the new Jaeger query service, as described in [Integrating distributed tracing platform with Alauda Build of Kiali](../integration/observability/kiali.mdx#integrating-distributed-tracing-platform-with-alauda-build-of-kiali).
+
+In a multi-cluster mesh, point Kiali at the Jaeger instance of its own cluster and set the query scope of the tracing section to the mesh, `istio.mesh_id: <mesh-id>`, as the monitoring query scope already is. One index family holds the whole mesh, so that instance answers for every cluster.
 
 ## Verification
 
