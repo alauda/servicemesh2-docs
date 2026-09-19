@@ -37,11 +37,19 @@ Every page in this section uses these variables. Set them once per shell.
 ```bash {name=migrate-prep:set-variables}
 export GLOBAL_CONTEXT=<global-cluster-context>
 export CLUSTER_NAME=<cluster-name>
-export BACKUP_DIR=${HOME}/mesh-v1-migration-backup
+export BACKUP_DIR=${HOME}/mesh-v1-migration-backup-${CLUSTER_NAME}
 mkdir -p "${BACKUP_DIR}"
+
+export MESH_GROUP=$(kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshs.asm.alauda.io \
+  "${CLUSTER_NAME}" -o jsonpath='{.metadata.labels.asm\.cpaas\.io/meshgroup}')
+export CLUSTER_NAMES=$(kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshgroups.asm.alauda.io \
+  "${MESH_GROUP}" -o jsonpath='{.spec.clusters[*]}')
+echo "mesh ${MESH_GROUP} spans: ${CLUSTER_NAMES}"
 ```
 
-`CLUSTER_NAME` is the name of the cluster in the platform. It is also the name of the `ServiceMesh` resource that represents this cluster on the `global` cluster.
+`CLUSTER_NAME` is the name of the cluster in the platform. It is also the name of the `ServiceMesh` resource that represents this cluster on the `global` cluster. `MESH_GROUP` is the mesh this cluster belongs to, and `CLUSTER_NAMES` every cluster of that mesh — one name for a single-cluster mesh. Phase 5 uses them to delete only the resources of this mesh: a platform can host several.
+
+In a multi-cluster mesh, set `CLUSTER_NAME` and `BACKUP_DIR` again for each cluster. Everything recorded below differs per cluster.
 
 ## Record the Mesh v1 configuration
 
@@ -208,7 +216,7 @@ kubectl -n istio-system get secret cacerts -o jsonpath='{.data.ca-cert\.pem}' \
 
 The expiry date must be later than the end of the planned migration, including Phase 6.
 
-### Collect the custom Istio configuration
+### Collect the custom Istio configuration \{#collect-the-custom-istio-configuration}
 
 Mesh v1 lets you change the mesh through the web console and through platform resources, and some of those settings end up in places that Mesh v2 does not read: the `IstioOperator` resources, the Mesh v1 `ServiceMesh` resource, and the injection templates of the Mesh v1 control plane.
 
@@ -316,7 +324,14 @@ Every resource in this list is deleted by Kubernetes when its owner is deleted i
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshs.asm.alauda.io -o yaml > "${BACKUP_DIR}/global-servicemeshes.yaml"
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshgroups.asm.alauda.io -o yaml > "${BACKUP_DIR}/global-servicemeshgroups.yaml"
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get secret asm-istio-rootca -o yaml > "${BACKUP_DIR}/global-asm-istio-rootca.yaml"
+kubectl --context "${GLOBAL_CONTEXT}" get \
+  mutatingwebhookconfiguration/servicemesh-v1alpha1-mutation \
+  mutatingwebhookconfiguration/servicemeshgroup-v1alpha1-mutation \
+  validatingwebhookconfiguration/global-asm-controller-validating-webhook-configuration \
+  -o yaml > "${BACKUP_DIR}/global-webhooks.yaml"
 ```
+
+The webhook configurations are needed again only if the `global` cluster keeps serving another Mesh v1 mesh, see [Decommissioning Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx#uninstall-the-service-mesh-essentials-plugin).
 
 :::warning The root certificate authority is in this backup
 `asm-istio-rootca` contains the private key of the root certificate authority of the mesh. Phase 6 signs a new intermediate certificate with it. Store the backup where you keep private keys, not on the cluster.

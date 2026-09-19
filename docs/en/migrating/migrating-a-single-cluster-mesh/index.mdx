@@ -15,6 +15,8 @@ Run the phases in order. Each one ends with checks that must pass before the nex
 5. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx) — Phase 5. Remove Mesh v1 by hand. **This phase cannot be rolled back**: afterwards, recovery means reinstalling Mesh v1 from the backups.
 6. [Finalizing the migration](./finalizing-the-migration.mdx) and [Migrating the observability stack](../migrating-observability.mdx) — Phase 6. Adopt the default revision tag, hand over the certificate authority, and move tracing to OpenTelemetry v2 and Jaeger v2.
 
+Mesh v2 reads the Istio resources of your mesh as they are, but not the Mesh v1 resources that configure the mesh itself. Whatever you changed in the Mesh v1 control plane has to be expressed the Mesh v2 way before the workloads move, see [Collect the custom Istio configuration](../preparing-for-migration.mdx#collect-the-custom-istio-configuration).
+
 See [Rolling back the migration](../rollback.mdx) for what each phase can be rolled back to, and [Troubleshooting the migration](../troubleshooting.mdx) for the problems reported most often.
 
 <Overview overviewHeaders={[]} />

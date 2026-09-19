@@ -142,6 +142,27 @@ Symptoms reported during a Mesh v1 to Mesh v2 migration, with the cause and what
 
 **Resolution.** Set `OTEL_SERVICE_NAME` explicitly on the application container, see [Migrating the observability stack](./migrating-observability.mdx#keep-the-service-names-of-your-applications).
 
+## `IstioCNI` reports that `NetworkAttachmentDefinition` is not a known kind
+
+**Symptom.** The `IstioCNI` resource stays not ready and its status reports `no matches for kind "NetworkAttachmentDefinition" in version "k8s.cni.cncf.io/v1"`, although Multus is installed on the cluster.
+
+**Cause.** The Mesh v2 operator caches the API types of the cluster when it starts. A cluster where Multus was installed after the operator does not have that type in the cache.
+
+**Resolution.** Restart the operator and reconcile again:
+
+```bash
+kubectl -n sail-operator delete pod -l control-plane=servicemesh-operator2
+kubectl wait --for condition=Ready istiocni/default --timeout=5m
+```
+
+## Traces of a multi-cluster mesh are incomplete
+
+**Symptom.** After the observability stack is migrated, traces contain the spans of one cluster only, or spans are missing at random. Each cluster runs its own collector and both are healthy.
+
+**Cause.** The collectors of all clusters share one service name, and the control planes merge them into one set of endpoints. Spans sent to the collector of another network never arrive.
+
+**Resolution.** Declare the collector service cluster-local on every cluster, see [Migrating a multi-network mesh](./migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx#keep-trace-reporting-inside-each-cluster).
+
 ## Kiali shows no data
 
 **Symptom.** The Kiali graph is empty although traffic is flowing.

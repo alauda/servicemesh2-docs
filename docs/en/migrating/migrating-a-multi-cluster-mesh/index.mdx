@@ -14,6 +14,7 @@ Read [Migrating a single-cluster mesh](../migrating-a-single-cluster-mesh/index.
 - Every other step runs per cluster. Complete a phase on all clusters before you start the next one, so that the mesh never has a control plane generation missing on one side.
 - The certificate authority is shared: each cluster has its own intermediate certificate signed by one root. Mesh v2 reuses the `cacerts` secret of each cluster, so workload certificates stay mutually trusted across clusters during the whole migration.
 - The remote secrets that let each control plane read the other clusters are reused as they are. Mesh v2 discovers them by label, exactly as Mesh v1 did.
+- The custom configuration of the mesh is collected per cluster and expressed the Mesh v2 way per cluster, see [Collect the custom Istio configuration](../preparing-for-migration.mdx#collect-the-custom-istio-configuration). Clusters of one mesh rarely have identical control plane settings.
 
 ## Determine the network topology \{#determine-the-network-topology}
 

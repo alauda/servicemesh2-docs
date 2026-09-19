@@ -163,11 +163,21 @@ for i in $(seq 1 10); do
 done | sort | uniq -c
 ```
 
-The replies come from workloads in both clusters, in both directions, whichever generation of proxy is in use. A call that only ever reaches the local cluster means the cross-network path is broken — check the network value of the control plane and the endpoints of the east-west gateway service.
+The replies come from workloads in both clusters, in both directions, whichever generation of proxy is in use.
+
+Compare the result with the one recorded in Phase 0, not with an even split: a mesh that uses locality load balancing sends most calls to the local cluster by design, and a `DestinationRule` that distributes traffic from one locality only makes the two directions look different. When a direction that reached the other cluster before the migration no longer does, check the remote endpoint instead of the sample:
+
+```bash {name=migrate-multi-network:check-remote-endpoint}
+istioctl --context "${CTX}" proxy-config endpoint "deploy/${CLIENT}.${MESH_NAMESPACE}" \
+  --cluster "outbound|${APP_PORT}||${TARGET_SERVICE}" -o json \
+  | jq -r '.[0].hostStatuses[] | "\(.address.socketAddress.address):\(.address.socketAddress.portValue) \(.healthStatus.edsHealthStatus) rq_success=\(.stats[]? | select(.name=="rq_success") | .value // 0)"'
+```
+
+The endpoint of the other cluster is the address of its east-west gateway on port 15443, and it is healthy. An endpoint that is a raw pod address of the other cluster means the `network` value of that control plane is wrong.
 
 ## Phase 5: decommission cluster by cluster
 
-The steps on the `global` cluster are run once: they delete the `ServiceMesh` resource of every cluster of the mesh and the `ServiceMeshGroup` that ties them together, and uninstall the plugin.
+The steps on the `global` cluster are run once: they delete the `ServiceMesh` resource of every cluster of the mesh and the `ServiceMeshGroup` that ties them together. `CLUSTER_NAMES` and `MESH_GROUP`, set in [Preparing for the migration](../preparing-for-migration.mdx), keep that deletion inside this mesh. The plugin is only uninstalled if no other Mesh v1 mesh is left on the platform.
 
 The steps on each mesh cluster are the same as for a single-cluster mesh, with one addition. The east-west gateway service belongs to the Mesh v1 control plane resource — not through an owner reference but through operator labels — and is deleted with it. Detach it first, on every cluster:
 
@@ -189,7 +199,25 @@ The remaining labels must still contain `app`, `istio` and `topology.istio.io/ne
 
 ### Keep trace reporting inside each cluster \{#keep-trace-reporting-inside-each-cluster}
 
-Each cluster runs its own collector, and both are published under the same service name, `otel-collector.jaeger-system.svc.cluster.local`. The control planes merge them into one set of endpoints, so half of the spans of each proxy are sent to the collector of the other cluster. The collector has no sidecar and therefore no network identity, so those endpoints are not rewritten to the east-west gateway address and the traffic is dropped — silently, because a proxy does not retry span export. Roughly half of the spans are lost, and traces appear broken.
+Each cluster runs its own collector, and both are published under the same service name, `otel-collector.jaeger-system.svc.cluster.local`. The control planes merge them into one set of endpoints, and every proxy load-balances its span exports over both. The collector has no sidecar and therefore no network identity, so its endpoint is not rewritten to the east-west gateway address: every proxy receives the raw pod address of the remote collector, which belongs to the other network.
+
+```bash {name=migrate-multi-network:read-collector-endpoints}
+istioctl --context "${CTX}" proxy-config endpoint "deploy/${WORKLOAD}.${MESH_NAMESPACE}" \
+  --cluster "outbound|4317||otel-collector.jaeger-system.svc.cluster.local"
+kubectl --context "${CTX_CLUSTER2}" -n jaeger-system get pod -l app.kubernetes.io/component=opentelemetry-collector -o wide
+```
+
+Two endpoints, one of them the pod address of the collector in the other cluster. Both are reported `HEALTHY`: nothing checks them, so the failure is silent. When the clusters use the same pod address range, that address may even belong to a local pod of another workload, and the spans are sent there.
+
+Every export that goes to the remote endpoint is lost. The endpoint statistics of any proxy show it, with one endpoint failing every request it is given:
+
+```bash {name=migrate-multi-network:read-collector-endpoint-stats}
+kubectl --context "${CTX}" -n "${MESH_NAMESPACE}" exec "deploy/${WORKLOAD}" -c "${APP_CONTAINER}" -- \
+  curl -s localhost:15000/clusters \
+  | grep 'outbound|4317||otel-collector' | grep -E 'rq_total|rq_error'
+```
+
+How much of a trace disappears depends on how the exports are spread over the two endpoints — both spans of a cross-cluster call, the client one, or the server one. Traces appear broken, and some are missing entirely.
 
 Declare the collector service cluster-local on **every cluster that runs a control plane**:
 
