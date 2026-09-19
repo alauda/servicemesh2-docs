@@ -225,7 +225,7 @@ Declare the collector service cluster-local on **every cluster that runs a contr
 kubectl --context "${CTX}" patch istio default --type=merge -p '{"spec":{"values":{"meshConfig":{"serviceSettings":[{"settings":{"clusterLocal":true},"hosts":["otel-collector.jaeger-system.svc.cluster.local"]}]}}}}'
 ```
 
-This affects only that host. Cross-cluster load balancing of application services, and the east-west gateway path they use, are unchanged.
+This affects only that host. Cross-cluster load balancing of application services, and the east-west gateway path they use, are unchanged. It does change the mesh configuration, and the control plane pushes the change to every proxy of its cluster, so make it in the same window as the other Phase 6 changes.
 
 Verify from any sidecar that only the local collector endpoint is left:
 
