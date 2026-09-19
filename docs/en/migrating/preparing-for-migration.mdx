@@ -208,6 +208,30 @@ kubectl -n istio-system get secret cacerts -o jsonpath='{.data.ca-cert\.pem}' \
 
 The expiry date must be later than the end of the planned migration, including Phase 6.
 
+### Collect the custom Istio configuration
+
+Mesh v1 lets you change the mesh through the web console and through platform resources, and some of those settings end up in places that Mesh v2 does not read: the `IstioOperator` resources, the Mesh v1 `ServiceMesh` resource, and the injection templates of the Mesh v1 control plane.
+
+```bash {name=migrate-prep:collect-custom-config}
+kubectl -n istio-system get istiooperators.install.istio.io "${V1_CONTROL_PLANE_IOP}" -o yaml \
+  > "${BACKUP_DIR}/v1-control-plane-iop.yaml"
+kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshs.asm.alauda.io "${CLUSTER_NAME}" -o yaml \
+  > "${BACKUP_DIR}/v1-servicemesh.yaml"
+```
+
+Go through both files and decide, for every setting that differs from the defaults, how it is expressed in Mesh v2:
+
+| Setting in Mesh v1 | Where it goes in Mesh v2 |
+|---|---|
+| `spec.meshConfig` of the control plane resource | `spec.values.meshConfig` of the `Istio` resource, see [Installing the Mesh v2 control plane](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#build-the-mesh-configuration-of-mesh-v2) |
+| `spec.values.global.proxy` — resources, traffic capture, injection policy | `spec.values.global.proxy` of the `Istio` resource |
+| Per-microservice sidecar settings | Annotations in the workload template, see [Migrating workloads](./migrating-a-single-cluster-mesh/migrating-workloads.mdx#persist-the-mesh-v1-pod-settings) |
+| `spec.components` — replica counts, resources, scheduling of the control plane and the gateways | `spec.values.pilot` for the control plane, and your own gateway deployments |
+| Injection templates defined by Mesh v1 | Not available. Reproduce what your workloads need with pod annotations |
+| Istio resources — `Gateway`, `VirtualService`, `DestinationRule`, `Telemetry` and the rest | Unchanged, Mesh v2 reads them as they are |
+
+Anything you do not carry over silently reverts to the Istio default when the workload restarts on Mesh v2.
+
 ### Review the Istio behavior changes
 
 The data plane moves from Istio 1.22 to Istio 1.30. Review the upgrade notes of [Alauda Service Mesh v2.2](../about/release-notes/alauda-service-mesh-v2.2.mdx) and the upstream release announcements between 1.23 and 1.30 for changes that affect your traffic policies.
@@ -357,4 +381,4 @@ HTTPS routes must be probed as HTTPS. A gateway whose certificate is missing sti
 - The probes report `OK` for every target.
 - The compatibility audits return no unexpected resources.
 
-Continue with [Migrating a single-cluster mesh](./migrating-a-single-cluster-mesh/index.mdx). A mesh that spans several clusters follows the same phases with additional steps per cluster.
+Continue with [Migrating a single-cluster mesh](./migrating-a-single-cluster-mesh/index.mdx), or with [Migrating a multi-cluster mesh](./migrating-a-multi-cluster-mesh/index.mdx) if the mesh spans several clusters.

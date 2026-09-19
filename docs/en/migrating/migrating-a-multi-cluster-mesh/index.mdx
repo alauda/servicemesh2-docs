@@ -1,0 +1,63 @@
+---
+weight: 40
+---
+
+# Migrating a multi-cluster mesh
+
+A mesh that spans several clusters follows the same phases as a single-cluster mesh. This section describes what is added per phase, and the order in which the clusters are migrated.
+
+Read [Migrating a single-cluster mesh](../migrating-a-single-cluster-mesh/index.mdx) first: every step there applies to each cluster of the mesh, and the pages in this section only describe the differences.
+
+## How the clusters are migrated
+
+- The `global` cluster orchestrates the mesh. Its steps — freezing the Mesh v1 controllers, deleting the mesh resources, uninstalling the plugin — are run once and cover every cluster.
+- Every other step runs per cluster. Complete a phase on all clusters before you start the next one, so that the mesh never has a control plane generation missing on one side.
+- The certificate authority is shared: each cluster has its own intermediate certificate signed by one root. Mesh v2 reuses the `cacerts` secret of each cluster, so workload certificates stay mutually trusted across clusters during the whole migration.
+- The remote secrets that let each control plane read the other clusters are reused as they are. Mesh v2 discovers them by label, exactly as Mesh v1 did.
+
+## Determine the network topology \{#determine-the-network-topology}
+
+The migration steps differ depending on whether the clusters share one network or use one network each. Determine this before you start.
+
+```bash {name=migrate-mc:collect-network}
+export CTX_CLUSTER1=<context-of-the-first-cluster>
+export CTX_CLUSTER2=<context-of-the-second-cluster>
+export V1_REVISION=1-22
+
+for ctx in "${CTX_CLUSTER1}" "${CTX_CLUSTER2}"; do
+  echo "== ${ctx}"
+  kubectl --context "${ctx}" -n istio-system get istiooperators.install.istio.io -l '!asm.cpaas.io/component' -o json \
+    | jq -r '.items[0] | "   meshID=\(.spec.values.global.meshID // "") network=\(.spec.values.global.network // "") clusterName=\(.spec.values.global.multiCluster.clusterName // "")"'
+  echo "   east-west gateways:"
+  kubectl --context "${ctx}" -n istio-system get svc -l topology.istio.io/network --no-headers 2>/dev/null \
+    | awk '{print "     " $1, $2, $4}'
+done
+```
+
+**Example output**
+
+```text
+== cluster-1
+   meshID=mesh-1 network=mesh-1-a1b2c clusterName=cluster-1
+   east-west gateways:
+     istio-eastwestgateway LoadBalancer 10.0.0.10
+== cluster-2
+   meshID=mesh-1 network=mesh-1-d3e4f clusterName=cluster-2
+   east-west gateways:
+     istio-eastwestgateway LoadBalancer 10.0.0.20
+```
+
+| What you see | Topology | Follow |
+|---|---|---|
+| A different `network` per cluster, and an east-west gateway in each | Multi-network | [Migrating a multi-network mesh](./migrating-a-multi-network-mesh.mdx) |
+| The same `network` on every cluster, or no `network` at all, and no east-west gateway | Single network | Migrating a single-network mesh |
+
+If pods of one cluster can reach pods of the other directly, the mesh is single network even when the `network` values differ by accident. Check before you decide:
+
+```bash {name=migrate-mc:check-pod-ip-reachability}
+PEER_POD_IP=$(kubectl --context "${CTX_CLUSTER2}" -n "${MESH_NAMESPACE}" get pod -o jsonpath='{.items[0].status.podIP}')
+kubectl --context "${CTX_CLUSTER1}" -n "${MESH_NAMESPACE}" exec "deploy/${WORKLOAD}" -c "${APP_CONTAINER}" -- \
+  curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 "http://${PEER_POD_IP}:${APP_PORT}/"
+```
+
+<Overview overviewHeaders={[]} />

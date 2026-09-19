@@ -39,6 +39,7 @@ Two choices matter for a migrated mesh:
 
 - **Use the same Elasticsearch cluster** as the Mesh v1 backend, otherwise the existing traces cannot be served by the new one.
 - **Choose the index prefix per mesh, not per cluster.** A mesh that spans several clusters writes into one index family so that a trace which crosses clusters is assembled from one place.
+- **In a multi-cluster mesh, keep each proxy reporting to the collector of its own cluster.** The collectors of all clusters share one service name, and without the setting described in [Migrating a multi-network mesh](./migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx#keep-trace-reporting-inside-each-cluster) about half of the spans are sent across clusters and dropped.
 
 Stop after the prerequisites. The mesh-side configuration already exists from the migration, and the next step updates it.
 
