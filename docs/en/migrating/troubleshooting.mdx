@@ -155,6 +155,21 @@ kubectl -n sail-operator delete pod -l control-plane=servicemesh-operator2
 kubectl wait --for condition=Ready istiocni/default --timeout=5m
 ```
 
+## A part of the cross-cluster requests fail with 503 \{#cross-cluster-503}
+
+**Symptom.** In a multi-network mesh, requests that reach a workload in another cluster fail from time to time, a few percent of them. The gateway logs `503 UC upstream_reset_before_response_started{connection_termination}`, and the upstream host is the east-west gateway address of the other cluster.
+
+**Cause.** The Mesh v2 east-west gateway has no network view. It is then given the endpoints of every network, including the east-west gateway of the cluster the request came from, and sends part of the traffic back there.
+
+**Resolution.** Set `ISTIO_META_REQUESTED_NETWORK_VIEW` on the gateway container to the network of its cluster, see [Migrating a multi-network mesh](./migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx#deploy-the-mesh-v2-east-west-gateway). Check the result on the gateway pod:
+
+```bash
+kubectl -n istio-system exec "${POD}" -c istio-proxy -- \
+  pilot-agent request GET clusters | grep "${TARGET_SERVICE}" | grep cx_total
+```
+
+Every endpoint must be a pod address of the local cluster.
+
 ## Traces of a multi-cluster mesh are incomplete
 
 **Symptom.** After the observability stack is migrated, traces contain the spans of one cluster only, or spans are missing at random. Each cluster runs its own collector and both are healthy.

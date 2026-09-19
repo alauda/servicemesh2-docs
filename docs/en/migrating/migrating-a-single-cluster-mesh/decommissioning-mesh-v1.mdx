@@ -237,7 +237,7 @@ spec:
       overrides:
         - tagOverrides:
             mesh_id:
-              value: node.metadata['MESH_ID']
+              value: xds.node.metadata['MESH_ID']
   tracing:
     - providers:
         - name: zipkin
@@ -248,6 +248,7 @@ EOF
 <Callouts>
 1. Keep the provider name of the Mesh v1 configuration until Phase 6 repoints it at the new collector. [Migrating the observability stack](../migrating-observability.mdx) replaces both the provider and this value.
 2. Set the sampling percentage to the value recorded in Phase 0, `traceSampling` in `${BACKUP_DIR}/v1-mesh-settings.json`.
+3. The `mesh_id` tag is what Kiali filters the metrics of a mesh by. Check it on a proxy after the resource is applied: `kubectl -n "${MESH_NAMESPACE}" exec "deploy/${WORKLOAD}" -c istio-proxy -- pilot-agent request GET stats/prometheus | grep istio_requests_total | head -1`. A tag that reads `mesh_id="unknown"` means the expression did not resolve.
 </Callouts>
 
 ### Uninstall the Mesh v1 operators
