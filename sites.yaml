@@ -4,3 +4,6 @@
 - name: distributed-tracing
   base: /distributed-tracing
   version: "2.1"
+- name: opentelemetry
+  base: /opentelemetry
+  version: "2.1"

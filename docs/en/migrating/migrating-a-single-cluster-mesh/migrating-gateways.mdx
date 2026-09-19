@@ -1,0 +1,284 @@
+---
+weight: 30
+---
+
+# Migrating gateways
+
+Phase 4 of the migration. For each Mesh v1 gateway you deploy a Mesh v2 gateway next to it, move traffic over, and scale the Mesh v1 gateway to zero. The `Gateway` and `VirtualService` resources are not changed: the new deployment is selected by the same labels as the old one.
+
+Migrate the workloads behind a gateway first, see [Migrating workloads](./migrating-workloads.mdx).
+
+## Collect the gateway configuration
+
+<Steps>
+
+### List the Mesh v1 gateways
+
+```bash {name=migrate-gateways:list-gateways}
+kubectl get gatewaydeploys.asm.alauda.io -A -o json | jq -r '.items[] | "\(.metadata.namespace)/\(.metadata.name)"'
+export GATEWAY_NAMESPACE=<gateway-namespace>
+export GATEWAY_NAME=<gateway-name>
+```
+
+### Read the selectors, the service and the certificates
+
+The Mesh v2 gateway pods must carry every label that selects the Mesh v1 gateway today: the selector of the gateway `Service`, and the selector of each `Gateway` resource that is served by this gateway.
+
+```bash {name=migrate-gateways:collect-selectors}
+echo "service selector:"
+kubectl -n "${GATEWAY_NAMESPACE}" get svc "${GATEWAY_NAME}" -o jsonpath='{.spec.selector}{"\n"}'
+echo "service owner:"
+kubectl -n "${GATEWAY_NAMESPACE}" get svc "${GATEWAY_NAME}" -o jsonpath='{.metadata.ownerReferences}{"\n"}'
+echo "gateway selectors and credentials:"
+kubectl get gateways.networking.istio.io -A -o json | jq -r '.items[]
+  | "\(.metadata.namespace)/\(.metadata.name) selector=\(.spec.selector | tojson) credentials=\([.spec.servers[]?.tls.credentialName // empty] | join(","))"'
+echo "namespace revision label:"
+kubectl get ns "${GATEWAY_NAMESPACE}" -o jsonpath='{.metadata.labels.istio\.io/rev}{"\n"}'
+```
+
+**Example output**
+
+```text
+service selector:
+{"app":"ingress-1"}
+service owner:
+[{"apiVersion":"asm.alauda.io/v1alpha1","kind":"GatewayDeploy","name":"ingress-1",...}]
+gateway selectors and credentials:
+gw/http-gw selector={"app":"ingress-1","istio":"gw-ingress-1"} credentials=
+gw/https-gw selector={"app":"ingress-1","istio":"gw-ingress-1"} credentials=example-com-tls
+namespace revision label:
+
+```
+
+Record three things:
+
+1. The union of the selector labels — `app: ingress-1` and `istio: gw-ingress-1` in the example. A Mesh v2 gateway that carries only the `Service` selector receives traffic but has no listeners, and every request returns 404.
+2. Whether the gateway `Service` is owned by a `GatewayDeploy` resource. It usually is, which means Kubernetes deletes the service together with the Mesh v1 resources in Phase 5 unless the owner reference is removed.
+3. Whether the gateway namespace carries an `istio.io/rev` label. The steps below differ.
+
+</Steps>
+
+## Choose how the Mesh v2 gateway is injected
+
+| Gateway namespace | How to inject the Mesh v2 gateway | Effect on the Mesh v1 gateway |
+|---|---|---|
+| No `istio.io/rev` label — the Mesh v1 gateway carries the revision on its pod template | Give the Mesh v2 gateway pods the label `istio.io/rev: ${V2_REVISION}` | None. The Mesh v1 gateway keeps running and can be scaled back up at any time |
+| Labeled `istio.io/rev: ${V1_REVISION}` | Switch the namespace label to `${V2_REVISION}` first, then deploy the Mesh v2 gateway | The Mesh v1 gateway can no longer be recreated, see the warning below |
+
+```bash {name=migrate-gateways:switch-gateway-namespace}
+kubectl label ns "${GATEWAY_NAMESPACE}" istio.io/rev="${V2_REVISION}" --overwrite
+```
+
+:::warning Switching the namespace label is a one-way step
+Run this command only when the gateway namespace already carries a revision label. Mesh v1 injects its gateways with a template (`asm-gateway`) that does not exist in Mesh v2, so once the namespace points at the Mesh v2 revision, a Mesh v1 gateway pod can no longer be created. Existing pods keep running, but a rollback then means switching the label back, not scaling the old gateway up. Deploy and verify the Mesh v2 gateway immediately after switching the label.
+:::
+
+## Deploy the Mesh v2 gateway \{#deploy-the-mesh-v2-gateway}
+
+:::warning The new gateway receives traffic as soon as it is ready
+The Mesh v2 gateway carries the selector labels of the Mesh v1 gateway, so the existing `Service` starts load-balancing across both of them the moment the new pod becomes ready. Complete the certificate and permission steps below **before** you create the deployment, and run the verification immediately after. To send all traffic back to the Mesh v1 gateway at any point, scale the Mesh v2 deployment to zero.
+:::
+
+<Steps>
+
+### Copy the TLS certificates into the gateway namespace
+
+Mesh v1 resolves a `credentialName` in the gateway namespace first and falls back to `istio-system`. Mesh v2 runs upstream Istio, which only looks in the namespace of the gateway workload. Certificates created through the web console are stored in `istio-system`, so copy each one that a `Gateway` of this gateway references:
+
+```bash {name=migrate-gateways:copy-tls-secrets}
+for secret in $(kubectl get gateways.networking.istio.io -A -o json \
+  | jq -r --arg sel "${GATEWAY_NAME}" '.items[] | select(.spec.selector | tostring | contains($sel))
+          | .spec.servers[]?.tls.credentialName // empty' | sort -u); do
+  src_ns=$(kubectl get secret -A --field-selector "metadata.name=${secret}" -o jsonpath='{.items[0].metadata.namespace}')
+  echo "${secret}: ${src_ns} -> ${GATEWAY_NAMESPACE}"
+  [ "${src_ns}" = "${GATEWAY_NAMESPACE}" ] && continue
+  kubectl -n "${src_ns}" get secret "${secret}" -o json \
+    | jq 'del(.metadata.namespace, .metadata.uid, .metadata.resourceVersion, .metadata.creationTimestamp,
+              .metadata.ownerReferences, .metadata.managedFields, .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"])' \
+    | kubectl -n "${GATEWAY_NAMESPACE}" apply -f -
+done
+```
+
+Leave the original secret in place: the Mesh v1 gateway still uses it until Phase 5.
+
+### Create the service account and the SDS permissions
+
+`istiod` only sends a certificate to a gateway whose service account may read secrets in its namespace. Without this role the TLS listener stays in `WARMING` state, and the gateway answers plain HTTP while every HTTPS request fails.
+
+```bash {name=migrate-gateways:create-sds-rbac}
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ${GATEWAY_NAME}-v2
+  namespace: ${GATEWAY_NAMESPACE}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ${GATEWAY_NAME}-v2-sds
+  namespace: ${GATEWAY_NAMESPACE}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ${GATEWAY_NAME}-v2-sds
+  namespace: ${GATEWAY_NAMESPACE}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ${GATEWAY_NAME}-v2-sds
+subjects:
+  - kind: ServiceAccount
+    name: ${GATEWAY_NAME}-v2
+    namespace: ${GATEWAY_NAMESPACE}
+EOF
+```
+
+### Deploy the gateway
+
+The deployment below is a standard [gateway injection](../../gateways/gateway-installation/installing-a-gateway-via-injection.mdx) deployment. It carries the selector labels of the Mesh v1 gateway so that the existing `Service` and `Gateway` resources select it, plus a label of its own so that you can scale the two generations independently.
+
+```bash {name=migrate-gateways:deploy-v2-gateway}
+cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${GATEWAY_NAME}-v2
+  namespace: ${GATEWAY_NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      gateway.migration: ${GATEWAY_NAME}-v2
+  template:
+    metadata:
+      annotations:
+        inject.istio.io/templates: gateway
+      labels:
+        gateway.migration: ${GATEWAY_NAME}-v2
+        sidecar.istio.io/inject: "true"
+        istio.io/rev: ${V2_REVISION}
+        app: ${GATEWAY_NAME}
+        istio: ${GATEWAY_NAMESPACE}-${GATEWAY_NAME}
+    spec:
+      serviceAccountName: ${GATEWAY_NAME}-v2
+      containers:
+        - name: istio-proxy
+          image: auto
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+EOF
+kubectl -n "${GATEWAY_NAMESPACE}" rollout status "deploy/${GATEWAY_NAME}-v2" --timeout=300s
+```
+
+<Callouts>
+1. `inject.istio.io/templates: gateway` makes the injected proxy a gateway rather than a sidecar, and `image: auto` lets the control plane fill in the proxy image.
+2. `sidecar.istio.io/inject: "true"` is required because the mesh keeps the injection policy of Mesh v1, where a pod is injected only when it opts in.
+3. `istio.io/rev` selects the Mesh v2 control plane. Remove this label when the namespace already carries the revision label.
+4. Replace the last two labels with the union of the selectors you collected: every label used by the gateway `Service` and by the `Gateway` resources. The values in this example follow the Mesh v1 naming, `app: <gateway>` and `istio: <namespace>-<gateway>`.
+5. The `securityContext` satisfies the `Restricted` Pod Security Admission profile. Gateways installed through injection are your own deployments, so this is set here rather than on the `Istio` resource. See [Pod Security Admission](../../installing/pod-security-admission.mdx).
+</Callouts>
+
+### Recreate the access logging configuration
+
+The `Telemetry` resource that enables access logging for a Mesh v1 gateway selects pods by labels that only Mesh v1 sets, and it is deleted with its owner in Phase 5. Create an equivalent that matches the Mesh v2 gateway:
+
+```bash {name=migrate-gateways:create-gateway-telemetry}
+cat <<EOF | kubectl apply -f -
+apiVersion: telemetry.istio.io/v1
+kind: Telemetry
+metadata:
+  name: ${GATEWAY_NAME}-access-logging
+  namespace: ${GATEWAY_NAMESPACE}
+spec:
+  selector:
+    matchLabels:
+      app: ${GATEWAY_NAME}
+  accessLogging:
+    - providers:
+        - name: envoy
+EOF
+```
+
+### Verify the Mesh v2 gateway
+
+```bash {name=migrate-gateways:verify-v2-gateway}
+POD=$(kubectl -n "${GATEWAY_NAMESPACE}" get pod -l "gateway.migration=${GATEWAY_NAME}-v2" -o jsonpath='{.items[0].metadata.name}')
+istioctl proxy-config listener "${POD}" -n "${GATEWAY_NAMESPACE}"
+istioctl proxy-config secret "${POD}" -n "${GATEWAY_NAMESPACE}"
+```
+
+- The listeners match the ports of the `Gateway` resources. No listeners means the pod labels do not match the `Gateway` selectors.
+- Every `kubernetes://<credential>` secret is `ACTIVE`. A secret in `WARMING` state means the certificate is missing in this namespace, or the service account may not read it — half of the HTTPS requests fail while this is the case.
+
+If either check fails, scale the deployment to zero, fix the cause, and scale it back up:
+
+```bash {name=migrate-gateways:pause-v2-gateway}
+kubectl -n "${GATEWAY_NAMESPACE}" scale deploy "${GATEWAY_NAME}-v2" --replicas=0
+```
+
+</Steps>
+
+## Shift traffic
+
+Both deployments are selected by the same `Service`, so the ratio of traffic follows the replica counts.
+
+<Steps>
+
+### Scale the Mesh v2 gateway to the size of the Mesh v1 gateway
+
+```bash {name=migrate-gateways:scale-up-v2-gateway}
+replicas=$(kubectl -n "${GATEWAY_NAMESPACE}" get deploy "${GATEWAY_NAME}" -o jsonpath='{.spec.replicas}')
+kubectl -n "${GATEWAY_NAMESPACE}" scale deploy "${GATEWAY_NAME}-v2" --replicas="${replicas}"
+kubectl -n "${GATEWAY_NAMESPACE}" rollout status "deploy/${GATEWAY_NAME}-v2" --timeout=300s
+```
+
+Half of the requests now reach the Mesh v2 gateway. Check every route of this gateway, including the HTTPS ones, before you continue.
+
+### Scale the Mesh v1 gateway to zero
+
+```bash {name=migrate-gateways:scale-down-v1-gateway}
+kubectl -n "${GATEWAY_NAMESPACE}" scale deploy "${GATEWAY_NAME}" --replicas=0
+```
+
+Keep the deployment: until Phase 5 it is the fastest way back if the new gateway misbehaves. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx) deletes it.
+
+</Steps>
+
+## Protect the resources generated for external services
+
+Binding an external service to an egress gateway makes Mesh v1 generate `Gateway`, `VirtualService` and `DestinationRule` resources. Annotate them so that the Mesh v1 controllers stop managing them and leave them in place when the platform resources are deleted:
+
+```bash {name=migrate-gateways:protect-generated-resources}
+kubectl get gateways.networking.istio.io,virtualservices.networking.istio.io,destinationrules.networking.istio.io -A -o json \
+  | jq -r --arg gw "${GATEWAY_NAME}" '.items[]
+      | select(.metadata.name | contains("--" + $gw + "--"))
+      | "\(.kind) \(.metadata.namespace) \(.metadata.name)"' \
+  | while read -r kind ns name; do
+      kubectl -n "${ns}" annotate "$(echo "${kind}" | tr '[:upper:]' '[:lower:]').networking.istio.io" "${name}" \
+        asm.cpaas.io/user-managed=true --overwrite
+    done
+```
+
+## Verification
+
+- Every route of the gateway answers as before, over HTTP and over HTTPS.
+- The probes report no failures during the traffic shift.
+- `kubectl -n "${GATEWAY_NAMESPACE}" get deploy` shows the Mesh v1 gateway at 0 replicas and the Mesh v2 gateway at its full replica count.
+- `kubectl get gateways.networking.istio.io,virtualservices.networking.istio.io -A` returns the same resources as before the migration. The migration does not change them.
+- Access logs are still produced by the new gateway pods.
+
+Repeat for every gateway — ingress and egress — then continue with [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx).
