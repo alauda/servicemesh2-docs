@@ -56,9 +56,13 @@ done
 If pods of one cluster can reach pods of the other directly, the mesh is single network even when the `network` values differ by accident. Check before you decide:
 
 ```bash {name=migrate-mc:check-pod-ip-reachability}
-PEER_POD_IP=$(kubectl --context "${CTX_CLUSTER2}" -n "${MESH_NAMESPACE}" get pod -o jsonpath='{.items[0].status.podIP}')
+PEER=$(kubectl --context "${CTX_CLUSTER2}" -n "${MESH_NAMESPACE}" get endpointslices \
+  -l "kubernetes.io/service-name=${TARGET_APP}" \
+  -o jsonpath='{.items[0].endpoints[0].addresses[0]}:{.items[0].ports[0].port}')
 kubectl --context "${CTX_CLUSTER1}" -n "${MESH_NAMESPACE}" exec "deploy/${WORKLOAD}" -c "${APP_CONTAINER}" -- \
-  curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 "http://${PEER_POD_IP}:${APP_PORT}/"
+  curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 "http://${PEER}/"
 ```
+
+`TARGET_APP` is a service of the other cluster. The address and the port come from its endpoints, which is the port the pod listens on — a request to a pod address on the service port is answered by the sidecar with `503`, whether the clusters share a network or not.
 
 <Overview overviewHeaders={[]} />
