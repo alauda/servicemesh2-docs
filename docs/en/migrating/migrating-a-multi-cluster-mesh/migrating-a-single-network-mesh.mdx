@@ -1,0 +1,60 @@
+---
+weight: 20
+---
+
+# Migrating a single-network mesh
+
+The clusters of a single-network mesh share one flat pod network. A proxy reaches a workload of another cluster by its pod address, and the mesh has no east-west gateway. This document lists what differs from [Migrating a multi-network mesh](./migrating-a-multi-network-mesh.mdx); everything else is identical to [Migrating a single-cluster mesh](../migrating-a-single-cluster-mesh/index.mdx), applied per cluster.
+
+Confirm the topology first, see [Determine the network topology](./index.mdx#determine-the-network-topology).
+
+:::danger Never change the network topology during the migration
+Throughout the migration, keep every network setting of Mesh v2 identical to Mesh v1. **Never add the `topology.istio.io/network` label to the `istio-system` namespace, and never set `spec.values.global.network` on Mesh v2 to a value that differs from Mesh v1.** Otherwise the two control planes disagree about which network each endpoint belongs to: Mesh v2 rewrites remote endpoints to east-west gateway addresses that do not exist, and cross-cluster traffic fails.
+:::
+
+While both generations serve the same mesh, they have to agree on which network an endpoint belongs to. The network comes from `spec.values.global.network` of each control plane and from the `topology.istio.io/network` label on the `istio-system` namespace and on the pods — and that namespace label is read by both generations. Migrating the control plane and changing the topology are two changes of their own; make one at a time.
+
+## Differences from the multi-network procedure
+
+| Phase | Multi-network | Single network |
+|---|---|---|
+| Phase 0 | Record the mesh identity and the east-west gateways of every cluster | The same, plus confirm that pods of one cluster reach pods of the other directly; `network` has the same value on every cluster, and there is no east-west gateway to record or back up |
+| Phase 2 | Each `Istio` resource carries the `network` of its cluster | The `network` recorded from Mesh v1, which is the same value on every cluster. The remote secrets are reused as they are, exactly as in a multi-network mesh |
+| Phase 2 (after) | Deploy a Mesh v2 east-west gateway per cluster | Skipped: the mesh has no east-west gateway |
+| Phase 3 | Check the cross-cluster call matrix after each namespace | The same matrix, plus the assertion below that remote endpoints stay pod addresses |
+| Phase 5 | Detach the east-west gateway service before the Mesh v1 control plane is deleted | Not applicable. The north-south gateway services are detached as in a single-cluster mesh |
+
+Phase 1 and Phase 4 are the same as for a multi-network mesh: Kiali covers every cluster, and the north-south gateways are migrated per cluster.
+
+Phase 6 differs in one point. Each cluster gets its own intermediate certificate and the mesh uses one tracing index family, as in a multi-network mesh, but the collector service is **not** declared cluster-local. The control planes merge the collectors of all clusters into one set of endpoints here as well, and a proxy exports part of its spans to the collector of the other cluster — over a pod address that is directly reachable in this topology. The spans arrive, and both collectors write into the same index family, so traces are complete. Check it on any proxy:
+
+```bash {name=migrate-single-network:check-collector-endpoints}
+kubectl --context "${CTX}" -n "${MESH_NAMESPACE}" exec "deploy/${WORKLOAD}" -c "${APP_CONTAINER}" -- \
+  curl -s localhost:15000/clusters \
+  | grep 'outbound|4317||otel-collector' | grep -E 'rq_total|rq_error'
+```
+
+Both endpoints are used and neither reports errors.
+
+## Verification
+
+Check the remote endpoints of a service that has workloads in both clusters, from a proxy of each generation while they coexist, and again after the migration:
+
+```bash {name=migrate-single-network:check-remote-endpoints}
+istioctl --context "${CTX}" proxy-config endpoint "deploy/${WORKLOAD}.${MESH_NAMESPACE}" \
+  --cluster "outbound|${APP_PORT}||${TARGET_SERVICE}"
+```
+
+Every endpoint is a pod address of one of the clusters. An address on port 15443 means that a control plane treats the other cluster as a separate network and is looking for an east-west gateway: check `spec.values.global.network` of both `Istio` resources and the labels of the `istio-system` namespaces.
+
+- The cross-cluster call matrix passes in both directions, in every combination of generations.
+- The `istio-system` namespace of every cluster carries no `topology.istio.io/network` label, before, during and after the migration.
+- The `network`, `meshID` and cluster name of each `Istio` resource are field by field what Mesh v1 had.
+
+## After the migration
+
+The mesh stays single network: Mesh v2 supports this topology the same way Mesh v1 did, and nothing in the migration changes it.
+
+Moving to one network per cluster is a separate change with its own window, planned after the migration is finished and verified. It deploys an east-west gateway per cluster, gives each cluster its own `network` value and restarts the workloads so that their pods carry the network label — and it is what turns every remote endpoint from a pod address into a gateway address. Do not combine it with the migration.
+
+<Overview overviewHeaders={[]} />
