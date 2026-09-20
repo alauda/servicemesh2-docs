@@ -1,0 +1,261 @@
+---
+weight: 10
+---
+
+# Migrating a multi-network mesh
+
+Each cluster of a multi-network mesh has its own network and its own east-west gateway, and cross-cluster traffic passes through those gateways. This document lists what is added to each phase of [Migrating a single-cluster mesh](../migrating-a-single-cluster-mesh/index.mdx); everything not mentioned here is identical.
+
+Confirm the topology first, see [Determine the network topology](./index.mdx#determine-the-network-topology).
+
+## What is added per phase
+
+| Phase | Addition |
+|---|---|
+| Phase 0 | Record the mesh identity of every cluster, back up every cluster, and probe the cross-cluster call matrix |
+| Phase 1 | Install Kiali for a multi-cluster mesh |
+| Phase 2 | Create the `Istio` resource per cluster, each with its own `network` and cluster name |
+| Phase 2 (after) | Deploy a Mesh v2 east-west gateway per cluster before any workload moves |
+| Phase 3 | Migrate cluster by cluster, and check the call matrix after each namespace |
+| Phase 5 | Detach the east-west gateway service before the Mesh v1 control plane is deleted; the `global` steps cover the whole mesh at once |
+| Phase 6 | One intermediate certificate per cluster, one tracing index family for the mesh, and a cluster-local collector service |
+
+## Phase 0: record and probe every cluster
+
+Run [Preparing for the migration](../preparing-for-migration.mdx) against each cluster, with `--context` set to that cluster, and keep one variable set per cluster. The mesh identity differs per cluster and must be recorded per cluster:
+
+```bash {name=migrate-multi-network:record-identity}
+for ctx in "${CTX_CLUSTER1}" "${CTX_CLUSTER2}"; do
+  kubectl --context "${ctx}" -n istio-system get istiooperators.install.istio.io -l '!asm.cpaas.io/component' -o json \
+    | jq -r --arg ctx "${ctx}" '.items[0] | "\($ctx) meshID=\(.spec.values.global.meshID) network=\(.spec.values.global.network) clusterName=\(.spec.values.global.multiCluster.clusterName)"'
+  kubectl --context "${ctx}" -n istio-system get secret -l istio/multiCluster=true --no-headers | awk -v c="${ctx}" '{print c, "remote secret:", $1}'
+done
+```
+
+`meshID` is the same on every cluster; `network` and `clusterName` differ. Mesh v2 must reproduce all three per cluster.
+
+Extend the traffic probes to cover the cross-cluster matrix: a call that stays in the first cluster, a call that stays in the second, and a call from each cluster to a service backed by workloads in both. A service that exists in both clusters is load-balanced across them, so repeated calls exercise both paths.
+
+## Phase 1: Kiali for a multi-cluster mesh
+
+Kiali reads the metrics of every cluster from one store and needs read access to each cluster. Follow [Installing Kiali in a multi-cluster mesh](../../installing/multi-cluster/install-kiali-multi-cluster/install-kiali-in-multi-cluster-mesh.mdx) instead of the single-cluster instructions: the Kiali server runs on one cluster of the mesh, and every other cluster gets a `Kiali` resource that produces the remote cluster resources only.
+
+Its prerequisites are what a migrated mesh usually has to add:
+
+- The clusters report to the same monitoring store. `kubectl get feature monitoring -o jsonpath='{.spec.accessInfo.database.address}'` returns the same address on every cluster of the mesh.
+- The Kiali Operator is installed on every cluster, including the ones that run no Kiali server.
+- The `ServiceMonitor` and the `PodMonitor` exist on every cluster, and the mesh-wide `Telemetry` resource carries the `mesh_id` tag override on every cluster that runs a control plane. Kiali filters the metrics of the mesh by that label, so a proxy that reports `mesh_id="unknown"` is invisible to it.
+
+Kiali reports what it found in its log: one `Discovered cluster` line per cluster, each with `Accessible=true`.
+
+## Phase 2: one control plane per cluster
+
+Create the `IstioCNI` and `Istio` resources on each cluster as described in [Installing the Mesh v2 control plane](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx), with the values recorded for that cluster:
+
+```yaml
+spec:
+  values:
+    global:
+      meshID: ${MESH_ID}
+      network: ${NETWORK}
+      multiCluster:
+        clusterName: ${MESH_CLUSTER_NAME}
+```
+
+Nothing else changes: each control plane loads the `cacerts` secret of its own cluster, and both intermediates are signed by the same root, so workloads keep trusting each other across clusters and across generations.
+
+The remote secrets are reused. Verify that each Mesh v2 control plane sees the other cluster:
+
+```bash {name=migrate-multi-network:verify-remote-clusters}
+istioctl --context "${CTX_CLUSTER1}" remote-clusters --revision "${V2_REVISION}"
+istioctl --context "${CTX_CLUSTER2}" remote-clusters --revision "${V2_REVISION}"
+```
+
+Each control plane lists the other cluster with status `synced`.
+
+## Deploy the Mesh v2 east-west gateways
+
+Cross-cluster traffic reaches a workload through the east-west gateway of its cluster. A Mesh v2 proxy sends that traffic to the gateway address the control plane gives it, so every cluster needs a Mesh v2 east-west gateway before workloads are migrated.
+
+The Mesh v1 east-west gateway keeps running in parallel: both generations terminate the same SNI-based passthrough, and each proxy uses the gateway its own control plane advertises.
+
+<Steps>
+
+### Read the current gateway
+
+```bash {name=migrate-multi-network:read-eastwest-gateway}
+kubectl --context "${CTX}" -n istio-system get svc istio-eastwestgateway -o json \
+  | jq -c '{labels: .metadata.labels, selector: .spec.selector, type: .spec.type, ports: [.spec.ports[] | {name, port}]}'
+kubectl --context "${CTX}" -n istio-system get gateways.networking.istio.io istio-eastwestgateway -o json \
+  | jq -c '{selector: .spec.selector, servers: .spec.servers}'
+```
+
+Note the selector of the service and of the `Gateway` resource, and the network label. The Mesh v2 deployment carries the union, exactly as for a north-south gateway.
+
+### Deploy the Mesh v2 east-west gateway \{#deploy-the-mesh-v2-east-west-gateway}
+
+```bash {name=migrate-multi-network:deploy-v2-eastwest-gateway}
+cat <<EOF | kubectl --context "${CTX}" apply -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: istio-eastwestgateway-v2
+  namespace: istio-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: istio-eastwestgateway-v2
+  namespace: istio-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      gateway.migration: istio-eastwestgateway-v2
+  template:
+    metadata:
+      annotations:
+        inject.istio.io/templates: gateway
+      labels:
+        gateway.migration: istio-eastwestgateway-v2
+        sidecar.istio.io/inject: "true"
+        istio.io/rev: ${V2_REVISION}
+        app: istio-eastwestgateway
+        istio: eastwestgateway
+        topology.istio.io/network: ${NETWORK}
+    spec:
+      serviceAccountName: istio-eastwestgateway-v2
+      containers:
+        - name: istio-proxy
+          image: auto
+          env:
+            - name: ISTIO_META_REQUESTED_NETWORK_VIEW
+              value: ${NETWORK}
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+EOF
+kubectl --context "${CTX}" -n istio-system rollout status deploy/istio-eastwestgateway-v2 --timeout=300s
+```
+
+<Callouts>
+1. `topology.istio.io/network` is what makes this pod an east-west gateway for its network. Without it, the control plane does not advertise it to the other cluster.
+2. `ISTIO_META_REQUESTED_NETWORK_VIEW` restricts the endpoints the gateway is given to its own network, the same value the Mesh v1 gateway was configured with. Without it, the gateway also learns the endpoints of the other cluster and sends traffic that arrived from there straight back, see [A part of the cross-cluster requests fail with 503](../troubleshooting.mdx#cross-cluster-503).
+3. The existing `Service` selects the new pods through `app` and `istio`, so the gateway address published to the other cluster does not change.
+4. `sidecar.istio.io/inject: "true"` is required because the mesh keeps the injection policy of Mesh v1.
+</Callouts>
+
+### Check that the gateway is programmed
+
+```bash {name=migrate-multi-network:verify-eastwest-gateway}
+POD=$(kubectl --context "${CTX}" -n istio-system get pod -l gateway.migration=istio-eastwestgateway-v2 -o jsonpath='{.items[0].metadata.name}')
+istioctl --context "${CTX}" proxy-config listener "${POD}" -n istio-system | grep 15443
+kubectl --context "${CTX}" -n istio-system get endpoints istio-eastwestgateway -o jsonpath='{.subsets[*].addresses[*].ip}{"\n"}'
+kubectl --context "${CTX}" -n istio-system exec "${POD}" -c istio-proxy -- \
+  pilot-agent request GET clusters | grep "${TARGET_SERVICE}" | grep cx_total
+```
+
+The pod serves the passthrough listener on port 15443, and the service endpoints contain both the Mesh v1 and the Mesh v2 gateway pods.
+
+The last command lists the endpoints the gateway resolves a mesh service to. They must all be pod addresses of its own cluster. An address on port 15443 among them is the east-west gateway of the other cluster, which means the network view is missing and requests can be bounced back.
+
+</Steps>
+
+## Phase 3 and Phase 4: migrate cluster by cluster
+
+Migrate the workloads and gateways of one cluster as described for a single-cluster mesh, then move to the next cluster. After each namespace, check the call matrix:
+
+```bash {name=migrate-multi-network:check-cross-cluster-matrix}
+for i in $(seq 1 10); do
+  kubectl --context "${CTX_CLUSTER1}" -n "${MESH_NAMESPACE}" exec "deploy/${CLIENT}" -c "${APP_CONTAINER}" -- \
+    curl -s --max-time 5 "http://${TARGET_SERVICE}/" | grep -o '"ServerName":"[^"]*"'
+done | sort | uniq -c
+```
+
+The replies come from workloads in both clusters, in both directions, whichever generation of proxy is in use.
+
+Compare the result with the one recorded in Phase 0, not with an even split: a mesh that uses locality load balancing sends most calls to the local cluster by design, and a `DestinationRule` that distributes traffic from one locality only makes the two directions look different. When a direction that reached the other cluster before the migration no longer does, check the remote endpoint instead of the sample:
+
+```bash {name=migrate-multi-network:check-remote-endpoint}
+istioctl --context "${CTX}" proxy-config endpoint "deploy/${CLIENT}.${MESH_NAMESPACE}" \
+  --cluster "outbound|${APP_PORT}||${TARGET_SERVICE}" -o json \
+  | jq -r '.[0].hostStatuses[] | "\(.address.socketAddress.address):\(.address.socketAddress.portValue) \(.healthStatus.edsHealthStatus) rq_success=\(.stats[]? | select(.name=="rq_success") | .value // 0)"'
+```
+
+The endpoint of the other cluster is the address of its east-west gateway on port 15443, and it is healthy. An endpoint that is a raw pod address of the other cluster means the `network` value of that control plane is wrong.
+
+## Phase 5: decommission cluster by cluster
+
+The steps on the `global` cluster are run once: they delete the `ServiceMesh` resource of every cluster of the mesh and the `ServiceMeshGroup` that ties them together. `CLUSTER_NAMES` and `MESH_GROUP`, set in [Preparing for the migration](../preparing-for-migration.mdx), keep that deletion inside this mesh. The plugin is only uninstalled if no other Mesh v1 mesh is left on the platform.
+
+The steps on each mesh cluster are the same as for a single-cluster mesh, with one addition. The east-west gateway service belongs to the Mesh v1 control plane resource — not through an owner reference but through operator labels — and is deleted with it. Detach it first, on every cluster:
+
+```bash {name=migrate-multi-network:detach-eastwest-service}
+kubectl --context "${CTX}" -n istio-system label svc istio-eastwestgateway \
+  install.operator.istio.io/owning-resource- \
+  install.operator.istio.io/owning-resource-namespace- \
+  operator.istio.io/managed-
+kubectl --context "${CTX}" -n istio-system get svc istio-eastwestgateway -o jsonpath='{.metadata.labels}{"\n"}'
+```
+
+The remaining labels must still contain `app`, `istio` and `topology.istio.io/network`: they are what the Mesh v2 gateway pods are selected by. Deleting the Mesh v1 control plane resource then removes the Mesh v1 gateway pods and leaves the service, its address and the Mesh v2 pods behind it in place.
+
+## Phase 6: finalize every cluster \{#phase-6-finalize-every-cluster}
+
+- **Certificates.** Repeat [Hand over the certificate authority](../migrating-a-single-cluster-mesh/finalizing-the-migration.mdx#hand-over-the-certificate-authority) per cluster, signing each intermediate certificate with the same root and using the cluster name in its subject. Cross-cluster mutual TLS keeps working while the clusters hold certificates from different intermediates, because the root is unchanged.
+- **Revision tag and grace period.** Per cluster, as for a single-cluster mesh.
+- **Tracing.** Use one index family for the whole mesh: run the installation on every cluster with the same index prefix, so that a trace which crosses clusters is assembled from one place. The steps that act on Elasticsearch — the lifecycle policy, the index initialization, and attaching the existing Mesh v1 indices — are run once for the mesh, not once per cluster. Each cluster then keeps its own collector and its own Jaeger instance, and every instance serves the traces of the whole mesh.
+
+### Keep trace reporting inside each cluster \{#keep-trace-reporting-inside-each-cluster}
+
+Each cluster runs its own collector, and both are published under the same service name, `otel-collector.jaeger-system.svc.cluster.local`. The control planes merge them into one set of endpoints, and every proxy load-balances its span exports over both. The collector has no sidecar and therefore no network identity, so its endpoint is not rewritten to the east-west gateway address: every proxy receives the raw pod address of the remote collector, which belongs to the other network.
+
+```bash {name=migrate-multi-network:read-collector-endpoints}
+istioctl --context "${CTX}" proxy-config endpoint "deploy/${WORKLOAD}.${MESH_NAMESPACE}" \
+  --cluster "outbound|4317||otel-collector.jaeger-system.svc.cluster.local"
+kubectl --context "${CTX_CLUSTER2}" -n jaeger-system get pod -l app.kubernetes.io/component=opentelemetry-collector -o wide
+```
+
+Two endpoints, one of them the pod address of the collector in the other cluster. Both are reported `HEALTHY`: nothing checks them, so the failure is silent. When the clusters use the same pod address range, that address may even belong to a local pod of another workload, and the spans are sent there.
+
+Every export that goes to the remote endpoint is lost. The endpoint statistics of any proxy show it, with one endpoint failing every request it is given:
+
+```bash {name=migrate-multi-network:read-collector-endpoint-stats}
+kubectl --context "${CTX}" -n "${MESH_NAMESPACE}" exec "deploy/${WORKLOAD}" -c "${APP_CONTAINER}" -- \
+  curl -s localhost:15000/clusters \
+  | grep 'outbound|4317||otel-collector' | grep -E 'rq_total|rq_error'
+```
+
+How much of a trace disappears depends on how the exports are spread over the two endpoints — both spans of a cross-cluster call, the client one, or the server one. Traces appear broken, and some are missing entirely.
+
+Declare the collector service cluster-local on **every cluster that runs a control plane**:
+
+```bash {name=migrate-multi-network:collector-cluster-local}
+kubectl --context "${CTX}" patch istio default --type=merge -p '{"spec":{"values":{"meshConfig":{"serviceSettings":[{"settings":{"clusterLocal":true},"hosts":["otel-collector.jaeger-system.svc.cluster.local"]}]}}}}'
+```
+
+This affects only that host. Cross-cluster load balancing of application services, and the east-west gateway path they use, are unchanged. It does change the mesh configuration, and the control plane pushes the change to every proxy of its cluster, so make it in the same window as the other Phase 6 changes.
+
+Verify from any sidecar that only the local collector endpoint is left:
+
+```bash {name=migrate-multi-network:verify-collector-endpoints}
+istioctl --context "${CTX}" proxy-config endpoint "deploy/${WORKLOAD}.${MESH_NAMESPACE}" \
+  --cluster "outbound|4317||otel-collector.jaeger-system.svc.cluster.local"
+```
+
+One endpoint, in the local cluster. Traces that cross clusters then contain the spans of both sides.
+
+## Verification
+
+- `istioctl remote-clusters --revision "${V2_REVISION}"` reports `synced` on every cluster.
+- The cross-cluster call matrix passes in both directions, and replies come from workloads in both clusters.
+- Traffic policies that depend on the topology — locality load balancing and outlier detection, for example — behave as they did before the migration. They are Istio resources and are not changed by the migration.
+- Kiali shows the workloads of every cluster, and traces that cross clusters contain the spans of both sides. A span carries the cluster it was produced in as `istio.cluster_id`, which is what a trace of a cross-cluster call is read by.
+- The east-west gateway service on each cluster keeps its address, and its endpoints are the Mesh v2 gateway pods.
