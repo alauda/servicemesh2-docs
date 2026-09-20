@@ -72,12 +72,13 @@ kubectl wait --for condition=Ready istio/default --timeout=5m
 ```
 
 ```bash {name=migrate-observability:repoint-telemetry}
-kubectl -n istio-system patch telemetry mesh-default --type=merge -p '{"spec":{"tracing":[{"providers":[{"name":"otel"}],"randomSamplingPercentage":100}]}}'
+kubectl -n istio-system patch telemetry mesh-default --type=merge \
+  -p "{\"spec\":{\"tracing\":[{\"providers\":[{\"name\":\"otel\"}],\"randomSamplingPercentage\":${V1_TRACE_SAMPLING}}]}}"
 ```
 
 <Callouts>
 1. A merge patch replaces the whole `extensionProviders` list. If your mesh defines other providers, edit the resource with `kubectl edit istio default` instead.
-2. Keep the sampling percentage that the mesh used before the migration, recorded in `${BACKUP_DIR}/v1-mesh-settings.json`.
+2. `V1_TRACE_SAMPLING` is the sampling percentage the mesh used before the migration, recorded in `${BACKUP_DIR}/v1-mesh-settings.json`. Only the provider changes here; how much the mesh traces stays what it was.
 </Callouts>
 
 If the `Istio` resource restricts discovery with `discoverySelectors`, label the `jaeger-system` namespace so that the control plane can resolve the collector service.
@@ -146,13 +147,17 @@ Mesh v1 built the reported service name from the microservice name and the names
 Set the name explicitly on each workload, using the value recorded in `${BACKUP_DIR}/v1-instrumented-pods.txt`:
 
 ```bash {name=migrate-observability:set-service-name}
-kubectl -n "${MESH_NAMESPACE}" patch deploy "${WORKLOAD}" --type=json -p="$(cat <<EOF
-[{"op":"add","path":"/spec/template/spec/containers/0/env/-","value":{"name":"OTEL_SERVICE_NAME","value":"${SERVICE_NAME}"}}]
-EOF
-)"
+IDX=$(kubectl -n "${MESH_NAMESPACE}" get deploy "${WORKLOAD}" -o json \
+  | jq -r --arg c "${APP_CONTAINER}" '[.spec.template.spec.containers[].name] | index($c) // "none"')
+if [ "${IDX}" = "none" ]; then
+  echo "${WORKLOAD} has no container named ${APP_CONTAINER}"
+else
+  kubectl -n "${MESH_NAMESPACE}" patch deploy "${WORKLOAD}" --type=json \
+    -p="[{\"op\":\"add\",\"path\":\"/spec/template/spec/containers/${IDX}/env/-\",\"value\":{\"name\":\"OTEL_SERVICE_NAME\",\"value\":\"${SERVICE_NAME}\"}}]"
+fi
 ```
 
-If the container has no `env` list yet, add one with `kubectl edit`. Setting the variable on the application container keeps the name stable no matter which component injects the agent.
+The variable belongs to the application container, so the command looks up its index rather than writing to the first container of the pod. If that container has no `env` list yet, add one with `kubectl edit`. Setting the variable on the application container keeps the name stable no matter which component injects the agent.
 
 ### Turn injection back on
 
@@ -176,8 +181,8 @@ kubectl annotate ns "${MESH_NAMESPACE}" instrumentation.opentelemetry.io/inject-
 kubectl -n "${MESH_NAMESPACE}" rollout restart deploy
 ```
 
-<Directive type="note" title="Which container is instrumented">
-Without `java-container-names`, the agent is injected into the first container of the pod. Name the container explicitly whenever a pod runs more than one.
+<Directive type="warning" title="Name the container that is instrumented">
+Without `java-container-names`, the agent is injected into the first container of the pod — which in a mesh workload can be the proxy rather than your application. Name the container explicitly on every instrumented workload, with `instrumentation.opentelemetry.io/java-container-names` as above, or with `instrumentation.opentelemetry.io/container-names` when the pod runs applications in more than one language. An agent injected into the proxy container instruments nothing and the workload disappears from the traces.
 </Directive>
 
 </Steps>
@@ -193,13 +198,18 @@ In a multi-cluster mesh, point Kiali at the Jaeger instance of its own cluster a
 ```bash {name=migrate-observability:verify-tracing}
 kubectl -n jaeger-system get pod
 kubectl -n "${MESH_NAMESPACE}" get pod -o json | jq -r '.items[]
-  | select(.metadata.annotations["instrumentation.opentelemetry.io/inject-java"] != null)
-  | "\(.metadata.name) \([.spec.containers[].env[]? | select(.name=="OTEL_SERVICE_NAME") | .value] | join(","))"'
+  | select(any(.spec.initContainers[]?; .name == "opentelemetry-auto-instrumentation-java"))
+  | .metadata.name as $pod
+  | .spec.containers[]
+  | select(any(.env[]?; .name == "JAVA_TOOL_OPTIONS"))
+  | "\($pod) \(.name) \([.env[]? | select(.name=="OTEL_SERVICE_NAME") | .value] | join(","))"'
 ```
+
+The second command lists, for every pod the agent was injected into, the container it landed in and the name that container reports.
 
 - Traces produced after the migration appear in the Jaeger v2 UI, for the mesh proxies and for the instrumented applications.
 - The trace you kept from before the migration is still found by its trace ID, with the same span count and the same service name.
-- The service names of the instrumented applications are the ones they reported before the migration.
+- The service names of the instrumented applications are the ones they reported before the migration, and the container the agent landed in is the application container, never `istio-proxy`.
 - Kiali shows traces on the service detail pages.
 - Application metrics that were collected from the Java agent are available again, now through the collector.
 

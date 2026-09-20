@@ -92,7 +92,7 @@ Symptoms reported during a Mesh v1 to Mesh v2 migration, with the cause and what
 
 **Cause.** The service was owned by a Mesh v1 resource, and Kubernetes deleted it together with its owner.
 
-**Resolution.** Recreate it from `${BACKUP_DIR}/gateway-svc-<namespace>-<name>.yaml`. Endpoints are repopulated immediately because the Mesh v2 gateway pods carry the selector labels. Remove the owner reference from every resource you keep before deleting the Mesh v1 resources, see [Decommissioning Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx#keep-the-resources-that-mesh-v1-owns).
+**Resolution.** Recreate it from `${BACKUP_DIR}/gateway-svc-<namespace>-<name>.yaml` with the function from [Preparing for the migration](./preparing-for-migration.mdx#restore-a-resource-from-the-backup). The backup still carries the owner reference, and a service applied unchanged is deleted again within seconds for the same reason. Endpoints are repopulated immediately because the Mesh v2 gateway pods carry the selector labels. Remove the owner reference from every resource you keep before deleting the Mesh v1 resources, see [Decommissioning Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx#keep-the-resources-that-mesh-v1-owns).
 
 ## Access logs stop being produced
 
@@ -150,7 +150,7 @@ Symptoms reported during a Mesh v1 to Mesh v2 migration, with the cause and what
 
 **Resolution.** Restart the operator and reconcile again:
 
-```bash
+```bash {name=migrate-troubleshooting:restart-operator}
 kubectl -n sail-operator delete pod -l control-plane=servicemesh-operator2
 kubectl wait --for condition=Ready istiocni/default --timeout=5m
 ```
@@ -163,7 +163,7 @@ kubectl wait --for condition=Ready istiocni/default --timeout=5m
 
 **Resolution.** Set `ISTIO_META_REQUESTED_NETWORK_VIEW` on the gateway container to the network of its cluster, see [Migrating a multi-network mesh](./migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx#deploy-the-mesh-v2-east-west-gateway). Check the result on the gateway pod:
 
-```bash
+```bash {name=migrate-troubleshooting:check-eastwest-endpoints}
 kubectl -n istio-system exec "${POD}" -c istio-proxy -- \
   pilot-agent request GET clusters | grep "${TARGET_SERVICE}" | grep cx_total
 ```

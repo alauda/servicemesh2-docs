@@ -89,8 +89,13 @@ Mesh v1 resolves a `credentialName` in the gateway namespace first and falls bac
 for secret in $(kubectl get gateways.networking.istio.io -A -o json \
   | jq -r --arg sel "${GATEWAY_NAME}" '.items[] | select(.spec.selector | tostring | contains($sel))
           | .spec.servers[]?.tls.credentialName // empty' | sort -u); do
-  src_ns=$(kubectl get secret -A --field-selector "metadata.name=${secret}" -o jsonpath='{.items[0].metadata.namespace}')
-  echo "${secret}: ${src_ns} -> ${GATEWAY_NAMESPACE}"
+  src_ns=$(kubectl get secret -A --field-selector "metadata.name=${secret}" \
+    -o jsonpath='{range .items[*]}{.metadata.namespace}{"\n"}{end}' \
+    | awk -v gw="${GATEWAY_NAMESPACE}" '$0==gw{print; found=1; exit}
+                                        $0=="istio-system"{is=1}
+                                        END{if (!found && is) print "istio-system"}')
+  echo "${secret}: ${src_ns:-NOT FOUND} -> ${GATEWAY_NAMESPACE}"
+  [ -z "${src_ns}" ] && continue
   [ "${src_ns}" = "${GATEWAY_NAMESPACE}" ] && continue
   kubectl -n "${src_ns}" get secret "${secret}" -o json \
     | jq 'del(.metadata.namespace, .metadata.uid, .metadata.resourceVersion, .metadata.creationTimestamp,
@@ -98,6 +103,8 @@ for secret in $(kubectl get gateways.networking.istio.io -A -o json \
     | kubectl -n "${GATEWAY_NAMESPACE}" apply -f -
 done
 ```
+
+The lookup follows the resolution order of Mesh v1: the gateway namespace first, `istio-system` second. A certificate of the same name in a third namespace is a different certificate and is not copied — the gateway would serve it to clients without any check reporting a problem, because a wrong certificate is as `ACTIVE` as the right one.
 
 Leave the original secret in place: the Mesh v1 gateway still uses it until Phase 5.
 
@@ -232,7 +239,7 @@ kubectl -n "${GATEWAY_NAMESPACE}" scale deploy "${GATEWAY_NAME}-v2" --replicas=0
 
 </Steps>
 
-## Shift traffic
+## Shift traffic \{#shift-traffic}
 
 Both deployments are selected by the same `Service`, so the ratio of traffic follows the replica counts.
 
@@ -241,12 +248,15 @@ Both deployments are selected by the same `Service`, so the ratio of traffic fol
 ### Scale the Mesh v2 gateway to the size of the Mesh v1 gateway
 
 ```bash {name=migrate-gateways:scale-up-v2-gateway}
-replicas=$(kubectl -n "${GATEWAY_NAMESPACE}" get deploy "${GATEWAY_NAME}" -o jsonpath='{.spec.replicas}')
-kubectl -n "${GATEWAY_NAMESPACE}" scale deploy "${GATEWAY_NAME}-v2" --replicas="${replicas}"
+export GATEWAY_REPLICAS=$(kubectl -n "${GATEWAY_NAMESPACE}" get deploy "${GATEWAY_NAME}" -o jsonpath='{.spec.replicas}')
+echo "${GATEWAY_NAME} runs ${GATEWAY_REPLICAS} replicas" | tee -a "${BACKUP_DIR}/gateway-replicas.txt"
+kubectl -n "${GATEWAY_NAMESPACE}" scale deploy "${GATEWAY_NAME}-v2" --replicas="${GATEWAY_REPLICAS}"
 kubectl -n "${GATEWAY_NAMESPACE}" rollout status "deploy/${GATEWAY_NAME}-v2" --timeout=300s
 ```
 
 Half of the requests now reach the Mesh v2 gateway. Check every route of this gateway, including the HTTPS ones, before you continue.
+
+`GATEWAY_REPLICAS` is the size the Mesh v1 gateway has to be scaled back to if this gateway is rolled back. The next step sets its replica count to zero, so it cannot be read from the cluster afterwards — this is why it is also written to the backup.
 
 ### Scale the Mesh v1 gateway to zero
 

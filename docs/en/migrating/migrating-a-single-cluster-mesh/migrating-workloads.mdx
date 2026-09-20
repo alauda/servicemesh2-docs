@@ -72,7 +72,7 @@ The command compares a running pod with its template and writes only what is mis
 2. Do not add the `msname` and `asm.cpaas.io/msname` labels to the template. A template that carries `app`, `msname` and `asm.cpaas.io/msname` together is treated as a legacy workload by the Mesh v1 controller, which then removes the annotations you just wrote.
 </Callouts>
 
-For `StatefulSet` and `DaemonSet` workloads, run the same command with `sts` or `ds` in place of `deploy`.
+Every command on this page acts on deployments. A Mesh v1 microservice is always a `Deployment`, so a mesh namespace holds no other injected workload kind.
 
 ### Check the access logging configuration \{#check-the-access-logging-configuration}
 
