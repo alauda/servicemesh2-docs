@@ -24,7 +24,17 @@ While both generations serve the same mesh, they have to agree on which network 
 | Phase 3 | Check the cross-cluster call matrix after each namespace | The same matrix, plus the assertion below that remote endpoints stay pod addresses |
 | Phase 5 | Detach the east-west gateway service before the Mesh v1 control plane is deleted | Not applicable. The north-south gateway services are detached as in a single-cluster mesh |
 
-Phase 1, Phase 4 and Phase 6 are the same as for a multi-network mesh: Kiali covers every cluster, the north-south gateways are migrated per cluster, and each cluster gets its own intermediate certificate, one tracing index family for the mesh and a cluster-local collector service.
+Phase 1 and Phase 4 are the same as for a multi-network mesh: Kiali covers every cluster, and the north-south gateways are migrated per cluster.
+
+Phase 6 differs in one point. Each cluster gets its own intermediate certificate and the mesh uses one tracing index family, as in a multi-network mesh, but the collector service is **not** declared cluster-local. The control planes merge the collectors of all clusters into one set of endpoints here as well, and a proxy exports part of its spans to the collector of the other cluster — over a pod address that is directly reachable in this topology. The spans arrive, and both collectors write into the same index family, so traces are complete. Check it on any proxy:
+
+```bash {name=migrate-single-network:check-collector-endpoints}
+kubectl --context "${CTX}" -n "${MESH_NAMESPACE}" exec "deploy/${WORKLOAD}" -c "${APP_CONTAINER}" -- \
+  curl -s localhost:15000/clusters \
+  | grep 'outbound|4317||otel-collector' | grep -E 'rq_total|rq_error'
+```
+
+Both endpoints are used and neither reports errors.
 
 ## Verification
 

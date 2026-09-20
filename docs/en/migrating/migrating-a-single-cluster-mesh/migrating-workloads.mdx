@@ -132,6 +132,7 @@ To migrate every workload of the namespace, loop over the patches:
 
 ```bash {name=migrate-workloads:migrate-all-workloads}
 for f in "${BACKUP_DIR}/metadata-patches/${MESH_NAMESPACE}"/*.json; do
+  [ -e "${f}" ] || { echo "no patches in ${BACKUP_DIR}/metadata-patches/${MESH_NAMESPACE}"; break; }
   workload=$(basename "${f}" .json)
   jq -c --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     '.spec.template.metadata.annotations["kubectl.kubernetes.io/restartedAt"] = $now' "${f}" > /tmp/workload-patch.json
