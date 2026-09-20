@@ -26,8 +26,8 @@ Leave the tracing configuration of Kiali pointing at the Mesh v1 Jaeger instance
 
 Follow [Metrics and Service Mesh](../../integration/observability/metrics-and-mesh.mdx) to create the `ServiceMonitor` and `PodMonitor` resources that scrape the Mesh v2 control plane and the Mesh v2 proxies. Create the `PodMonitor` resource in every namespace that takes part in the mesh.
 
-:::note
-Do not create the mesh-wide `Telemetry` resource described in that document yet. Mesh v1 already owns a mesh-wide `Telemetry` resource in `istio-system`, and both control planes read it. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx) replaces it in Phase 5.
+:::note Do not create the `asm-default` telemetry resource yet
+Mesh v1 already owns a mesh-wide `Telemetry` resource in `istio-system`, and both control planes read it. Only one mesh-wide resource is ever in effect — the oldest one in `istio-system` that has no selector — so a second one created now would be ignored without any error, and the Mesh v1 one would keep configuring both generations. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx) creates `asm-default` in its place in Phase 5.
 :::
 
 ### Verification

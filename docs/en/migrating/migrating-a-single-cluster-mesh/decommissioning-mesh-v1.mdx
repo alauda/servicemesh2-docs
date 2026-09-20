@@ -233,7 +233,7 @@ The deletion of the `asm` resource runs a pre-uninstall check that counts pods w
 
 ### Replace the mesh-wide telemetry configuration
 
-Mesh v1 installs a mesh-wide `Telemetry` resource in `istio-system` that both control planes read. It is rendered by the Mesh v1 control plane and stays behind when that control plane is deleted, where it would keep configuring dead providers. Replace it with one for Mesh v2:
+Mesh v1 installs a mesh-wide `Telemetry` resource in `istio-system` that both control planes read. It is rendered by the Mesh v1 control plane and stays behind when that control plane is deleted, where it would keep configuring dead providers. Replace it with `asm-default`, the mesh-wide resource of a Mesh v2 mesh — the one [Metrics and Service Mesh](../../integration/observability/metrics-and-mesh.mdx) creates and the rest of the Mesh v2 documentation works with:
 
 ```bash {name=migrate-decommission:replace-mesh-telemetry}
 kubectl -n istio-system get telemetries.telemetry.istio.io -o yaml > "${BACKUP_DIR}/telemetry-istio-system.yaml"
@@ -243,7 +243,7 @@ cat <<EOF | kubectl apply -f -
 apiVersion: telemetry.istio.io/v1
 kind: Telemetry
 metadata:
-  name: mesh-default
+  name: asm-default
   namespace: istio-system
 spec:
   metrics:

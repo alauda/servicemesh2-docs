@@ -72,7 +72,7 @@ kubectl wait --for condition=Ready istio/default --timeout=5m
 ```
 
 ```bash {name=migrate-observability:repoint-telemetry}
-kubectl -n istio-system patch telemetry mesh-default --type=merge \
+kubectl -n istio-system patch telemetry asm-default --type=merge \
   -p "{\"spec\":{\"tracing\":[{\"providers\":[{\"name\":\"otel\"}],\"randomSamplingPercentage\":${V1_TRACE_SAMPLING}}]}}"
 ```
 
