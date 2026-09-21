@@ -174,9 +174,17 @@ Every endpoint must be a pod address of the local cluster.
 
 **Symptom.** After the observability stack is migrated, traces contain the spans of one cluster only, or spans are missing at random. Each cluster runs its own collector and both are healthy.
 
-**Cause.** The collectors of all clusters share one service name, and the control planes merge them into one set of endpoints. Spans sent to the collector of another network never arrive.
+**Cause.** The `Istio` resource of that cluster carries no `serviceSettings` entry that declares the collector service cluster-local, so the control plane merges the collectors of all clusters into one set of endpoints and the proxies export to all of them. Spans sent to the collector of another network never arrive. The entry is as easily lost as it is set: `serviceSettings` is a list, and a merge patch on `meshConfig` replaces it as a whole.
 
-**Resolution.** Declare the collector service cluster-local on every cluster, see [Migrating a multi-network mesh](./migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx#keep-trace-reporting-inside-each-cluster).
+**Resolution.** Check the entry and the endpoints on every cluster:
+
+```bash {name=migrate-troubleshooting:check-collector-settings}
+kubectl --context "${CTX}" get istio default -o jsonpath='{.spec.values.meshConfig.serviceSettings}{"\n"}'
+istioctl --context "${CTX}" proxy-config endpoint "deploy/${WORKLOAD}.${MESH_NAMESPACE}" \
+  --cluster "outbound|4317||otel-collector.jaeger-system.svc.cluster.local"
+```
+
+A proxy must be given one endpoint, the collector of its own cluster. [Repoint the mesh at the new collector](./migrating-observability.mdx#repoint-the-mesh-at-the-new-collector) writes the entry back, and [Configuring distributed tracing platform with Service Mesh](../integration/observability/distributed-tracing/config-tracing-with-service-mesh.mdx) explains when it applies.
 
 ## Kiali shows no data
 
