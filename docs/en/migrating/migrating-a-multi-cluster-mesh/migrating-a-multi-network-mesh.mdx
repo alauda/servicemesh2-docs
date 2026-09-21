@@ -8,6 +8,12 @@ Each cluster of a multi-network mesh has its own network and its own east-west g
 
 Confirm the topology first, see [Determine the network topology](./index.mdx#determine-the-network-topology).
 
+Most blocks below act on one cluster and address it as `${CTX}`. Set it before the first of them, and again every time you move to the next cluster, see [Address one cluster at a time](./index.mdx#address-one-cluster-at-a-time):
+
+```bash {name=migrate-multi-network:set-context}
+export CTX="${CTX_CLUSTER1}"
+```
+
 ## What is added per phase
 
 | Phase | Addition |
@@ -42,7 +48,7 @@ Kiali reads the metrics of every cluster from one store and needs read access to
 
 Its prerequisites are what a migrated mesh usually has to add:
 
-- The clusters report to the same monitoring store. `kubectl get feature monitoring -o jsonpath='{.spec.accessInfo.database.address}'` returns the same address on every cluster of the mesh.
+- The clusters report to the same monitoring store. `kubectl --context "${CTX}" get feature monitoring -o jsonpath='{.spec.accessInfo.database.address}'` returns the same address on every cluster of the mesh.
 - The Kiali Operator is installed on every cluster, including the ones that run no Kiali server.
 - The `PodMonitor` exists on every cluster, restricted as described in [Create the metrics resources](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#create-the-metrics-resources); the `ServiceMonitor` follows in [Phase 5](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx). The mesh-wide `Telemetry` resource carries the `mesh_id` tag override on every cluster that runs a control plane. Kiali filters the metrics of the mesh by that label, so a proxy that reports `mesh_id="unknown"` is invisible to it.
 
@@ -262,7 +268,7 @@ One endpoint, in the local cluster. Traces that cross clusters then contain the 
 
 ## Verification
 
-- `istioctl remote-clusters --revision "${V2_REVISION}"` reports `synced` on every cluster.
+- `istioctl --context "${CTX}" remote-clusters --revision "${V2_REVISION}"` reports `synced` on every cluster.
 - The cross-cluster call matrix passes in both directions, and replies come from workloads in both clusters.
 - Traffic policies that depend on the topology — locality load balancing and outlier detection, for example — behave as they did before the migration. They are Istio resources and are not changed by the migration.
 - Kiali shows the workloads of every cluster, and traces that cross clusters contain the spans of both sides. A span carries the cluster it was produced in as `istio.cluster_id`, which is what a trace of a cross-cluster call is read by.

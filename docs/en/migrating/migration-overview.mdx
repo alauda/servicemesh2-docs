@@ -100,6 +100,9 @@ Environment-specific values are shell variables. Every page that uses a variable
 | `MESH_ID`, `TRUST_DOMAIN`, `NETWORK`, `V1_AUTO_INJECT` | Mesh identity and injection policy of Mesh v1 | [Preparing for the migration](./preparing-for-migration.mdx) |
 | `V1_TRACE_SAMPLING` | Trace sampling percentage of Mesh v1 | [Preparing for the migration](./preparing-for-migration.mdx) |
 | `V2_REVISION` | Active Mesh v2 revision, for example `default-v1-30-4` | [Installing the Mesh v2 control plane](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#get-the-mesh-v2-revision) |
-| `MESH_NAMESPACE`, `WORKLOAD` | Namespace and workload being migrated | You set them per step |
+| `MESH_NAMESPACE`, `WORKLOAD`, `APP_CONTAINER` | Namespace, workload and application container a step acts on | You set them per step |
+| `CTX_CLUSTER1`, `CTX_CLUSTER2` | `kubectl` contexts of the two clusters of a multi-cluster mesh | [Migrating a multi-cluster mesh](./migrating-a-multi-cluster-mesh/index.mdx#determine-the-network-topology) |
+| `CTX` | Context of the cluster the current multi-cluster step acts on | [Address one cluster at a time](./migrating-a-multi-cluster-mesh/index.mdx#address-one-cluster-at-a-time) |
+| `CLIENT`, `TARGET_SERVICE`, `TARGET_APP`, `APP_PORT` | Workload and service a cross-cluster probe calls | You set them per step |
 | `GATEWAY_NAMESPACE`, `GATEWAY_NAME` | Namespace and name of a Mesh v1 gateway | [Migrating gateways](./migrating-a-single-cluster-mesh/migrating-gateways.mdx) |
 | `GATEWAY_REPLICAS` | Replica count the Mesh v1 gateway had, needed to roll [Phase 4](./migrating-a-single-cluster-mesh/migrating-gateways.mdx) back | [Migrating gateways](./migrating-a-single-cluster-mesh/migrating-gateways.mdx#shift-traffic) |

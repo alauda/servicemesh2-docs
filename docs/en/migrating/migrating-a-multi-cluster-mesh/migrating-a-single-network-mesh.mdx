@@ -8,6 +8,12 @@ The clusters of a single-network mesh share one flat pod network. A proxy reache
 
 Confirm the topology first, see [Determine the network topology](./index.mdx#determine-the-network-topology).
 
+The blocks below act on one cluster and address it as `${CTX}`. Set it before the first of them, and again for the next cluster, see [Address one cluster at a time](./index.mdx#address-one-cluster-at-a-time):
+
+```bash {name=migrate-single-network:set-context}
+export CTX="${CTX_CLUSTER1}"
+```
+
 :::danger Never change the network topology during the migration
 Throughout the migration, keep every network setting of Mesh v2 identical to Mesh v1. **Never add the `topology.istio.io/network` label to the `istio-system` namespace, and never set `spec.values.global.network` on Mesh v2 to a value that differs from Mesh v1.** Otherwise the two control planes disagree about which network each endpoint belongs to: Mesh v2 rewrites remote endpoints to east-west gateway addresses that do not exist, and cross-cluster traffic fails.
 :::
