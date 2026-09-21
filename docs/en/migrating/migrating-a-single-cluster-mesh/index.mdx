@@ -1,0 +1,22 @@
+---
+weight: 30
+---
+
+# Migrating a single-cluster mesh
+
+The phases below migrate a mesh that runs in one cluster. A mesh that spans several clusters follows the same phases with additional steps, see [Migrating a multi-cluster mesh](../migrating-a-multi-cluster-mesh/index.mdx).
+
+Run the phases in order. Each one ends with checks that must pass before the next one starts.
+
+1. [Preparing for the migration](../preparing-for-migration.mdx) — [Phase 0](../migration-overview.mdx#migration-phases). Check the cluster, record the Mesh v1 configuration, back everything up, start the probes. Nothing changes yet.
+2. [Installing the Mesh v2 control plane](./installing-the-v2-control-plane.mdx) — [Phase 1](./installing-the-v2-control-plane.mdx#phase-1-prepare-observability) and [Phase 2](./installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane). Install Kiali and the metrics resources, then create `IstioCNI` and `Istio` next to Mesh v1. Workloads are untouched, and both resources can be deleted to roll back.
+3. [Migrating workloads](./migrating-workloads.mdx) — [Phase 3](../migration-overview.mdx#migration-phases). Move namespaces and workloads to the Mesh v2 revision one at a time. Each move can be reversed.
+4. [Migrating gateways](./migrating-gateways.mdx) — [Phase 4](../migration-overview.mdx#migration-phases). Run a Mesh v2 gateway next to each Mesh v1 gateway and shift traffic to it. The Mesh v1 gateway stays in place, scaled to zero, until [Phase 5](./decommissioning-mesh-v1.mdx).
+5. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx) — [Phase 5](../migration-overview.mdx#migration-phases). Remove Mesh v1 by hand. **This phase cannot be rolled back**: afterwards, recovery means reinstalling Mesh v1 from the backups.
+6. [Finalizing the migration](./finalizing-the-migration.mdx) and [Migrating the observability stack](../migrating-observability.mdx) — [Phase 6](../migration-overview.mdx#migration-phases). Adopt the default revision tag, hand over the certificate authority, and move tracing to OpenTelemetry v2 and Jaeger v2.
+
+Mesh v2 reads the Istio resources of your mesh as they are, but not the Mesh v1 resources that configure the mesh itself. Whatever you changed in the Mesh v1 control plane has to be expressed the Mesh v2 way before the workloads move, see [Collect the custom Istio configuration](../preparing-for-migration.mdx#collect-the-custom-istio-configuration).
+
+See [Rolling back the migration](../rollback.mdx) for what each phase can be rolled back to, and [Troubleshooting the migration](../troubleshooting.mdx) for the problems reported most often.
+
+<Overview overviewHeaders={[]} />
