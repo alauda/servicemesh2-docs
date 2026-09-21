@@ -4,17 +4,17 @@ weight: 50
 
 # Migrating the observability stack
 
-Part of Phase 6. Mesh v1 shipped its own tracing pipeline — an OpenTelemetry v1 collector and a Jaeger 1.x backend — and both were removed with it in Phase 5. This document installs the current stack, keeps the traces that were collected before the migration queryable, and restores the telemetry behavior of your applications.
+Part of [Phase 6](./migration-overview.mdx#migration-phases). Mesh v1 shipped its own tracing pipeline — an OpenTelemetry v1 collector and a Jaeger 1.x backend — and both were removed with it in [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx). This document installs the current stack, keeps the traces that were collected before the migration queryable, and restores the telemetry behavior of your applications.
 
 :::warning Tracing is interrupted until this document is finished
-Spans are dropped between the moment the Mesh v1 collector is deleted in Phase 5 and the moment the mesh is repointed at the new collector here. Metrics and access logs are not affected. Plan this part for a window where a gap in traces is acceptable.
+Spans are dropped between the moment the Mesh v1 collector is deleted in [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) and the moment the mesh is repointed at the new collector here. Metrics and access logs are not affected. Plan this part for a window where a gap in traces is acceptable.
 :::
 
 The OpenTelemetry v1 and v2 Operators own the same custom resource definitions, so v2 can only be installed after Mesh v1 — which brought v1 — is gone.
 
 ## Before you begin
 
-Collect what Phase 0 recorded:
+Collect what [Phase 0](./preparing-for-migration.mdx) recorded:
 
 - `${BACKUP_DIR}/v1-jaeger.txt` — the Elasticsearch index prefix and the retention of the Mesh v1 tracing backend.
 - `${BACKUP_DIR}/instrumentations.yaml` — the Mesh v1 `Instrumentation` resource, which holds the exporter endpoint, the sampler and the service name pattern your applications report.
@@ -89,7 +89,7 @@ In Mesh v1, a platform webhook added the injection annotations and the identity 
 
 <Steps>
 
-### Prepare the Java agent image
+### Prepare the Java agent image \{#prepare-the-java-agent-image}
 
 Mesh v1 shipped its own Java agent image. Mesh v2 does not, so choose an image and make it reachable from the cluster, as described in <ExternalSiteLink name="opentelemetry" href="/migrating/migrating-to-v2.html#preparing-the-java-agent-image" children="Preparing the Java agent image" />.
 

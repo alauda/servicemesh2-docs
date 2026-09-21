@@ -18,15 +18,15 @@ While both generations serve the same mesh, they have to agree on which network 
 
 | Phase | Multi-network | Single network |
 |---|---|---|
-| Phase 0 | Record the mesh identity and the east-west gateways of every cluster | The same, plus confirm that pods of one cluster reach pods of the other directly; `network` has the same value on every cluster, and there is no east-west gateway to record or back up |
-| Phase 2 | Each `Istio` resource carries the `network` of its cluster | The `network` recorded from Mesh v1, which is the same value on every cluster. The remote secrets are reused as they are, exactly as in a multi-network mesh |
-| Phase 2 (after) | Deploy a Mesh v2 east-west gateway per cluster | Skipped: the mesh has no east-west gateway |
-| Phase 3 | Check the cross-cluster call matrix after each namespace | The same matrix, plus the assertion below that remote endpoints stay pod addresses |
-| Phase 5 | Detach the east-west gateway service before the Mesh v1 control plane is deleted | Not applicable. The north-south gateway services are detached as in a single-cluster mesh |
+| [Phase 0](../preparing-for-migration.mdx) | Record the mesh identity and the east-west gateways of every cluster | The same, plus confirm that pods of one cluster reach pods of the other directly; `network` has the same value on every cluster, and there is no east-west gateway to record or back up |
+| [Phase 2](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane) | Each `Istio` resource carries the `network` of its cluster | The `network` recorded from Mesh v1, which is the same value on every cluster. The remote secrets are reused as they are, exactly as in a multi-network mesh |
+| [Phase 2](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane) (after) | Deploy a Mesh v2 east-west gateway per cluster | Skipped: the mesh has no east-west gateway |
+| [Phase 3](../migrating-a-single-cluster-mesh/migrating-workloads.mdx) | Check the cross-cluster call matrix after each namespace | The same matrix, plus the assertion below that remote endpoints stay pod addresses |
+| [Phase 5](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) | Detach the east-west gateway service before the Mesh v1 control plane is deleted | Not applicable. The north-south gateway services are detached as in a single-cluster mesh |
 
-Phase 1 and Phase 4 are the same as for a multi-network mesh: Kiali covers every cluster, and the north-south gateways are migrated per cluster.
+[Phase 1](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-1-prepare-observability) and [Phase 4](../migrating-a-single-cluster-mesh/migrating-gateways.mdx) are the same as for a multi-network mesh: Kiali covers every cluster, and the north-south gateways are migrated per cluster.
 
-Phase 6 differs in one point. Each cluster gets its own intermediate certificate and the mesh uses one tracing index family, as in a multi-network mesh, but the collector service is **not** declared cluster-local. The control planes merge the collectors of all clusters into one set of endpoints here as well, and a proxy exports part of its spans to the collector of the other cluster — over a pod address that is directly reachable in this topology. The spans arrive, and both collectors write into the same index family, so traces are complete. Check it on any proxy:
+[Phase 6](../migrating-a-single-cluster-mesh/finalizing-the-migration.mdx) differs in one point. Each cluster gets its own intermediate certificate and the mesh uses one tracing index family, as in a multi-network mesh, but the collector service is **not** declared cluster-local. The control planes merge the collectors of all clusters into one set of endpoints here as well, and a proxy exports part of its spans to the collector of the other cluster — over a pod address that is directly reachable in this topology. The spans arrive, and both collectors write into the same index family, so traces are complete. Check it on any proxy:
 
 ```bash {name=migrate-single-network:check-collector-endpoints}
 kubectl --context "${CTX}" -n "${MESH_NAMESPACE}" exec "deploy/${WORKLOAD}" -c "${APP_CONTAINER}" -- \

@@ -18,12 +18,12 @@ Roll back when one of these is true and you cannot explain it within your change
 
 | Phase | How to roll back | Conditions |
 |---|---|---|
-| Phase 1 — observability | Delete the `Kiali` resource and the monitoring resources you created | None |
-| Phase 2 — control plane | Delete the `Istio` and `IstioCNI` resources | No namespace points at the Mesh v2 revision yet |
-| Phase 3 — workloads | Move the namespace label back and restart the workloads | Mesh v1 still runs |
-| Phase 4 — gateways | Scale the Mesh v1 gateway back up and the Mesh v2 gateway down | The Mesh v1 gateway deployment still exists, see the note below |
-| Phase 5 — decommissioning | Reinstall Mesh v1 from the backups | Disaster recovery, see below |
-| Phase 6 — finalization | Re-create the previous `cacerts` from the backup; delete the `default` revision tag | Mesh v2 keeps running |
+| [Phase 1](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-1-prepare-observability) — observability | Delete the `Kiali` resource and the monitoring resources you created | None |
+| [Phase 2](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane) — control plane | Delete the `Istio` and `IstioCNI` resources | No namespace points at the Mesh v2 revision yet |
+| [Phase 3](./migrating-a-single-cluster-mesh/migrating-workloads.mdx) — workloads | Move the namespace label back and restart the workloads | Mesh v1 still runs |
+| [Phase 4](./migrating-a-single-cluster-mesh/migrating-gateways.mdx) — gateways | Scale the Mesh v1 gateway back up and the Mesh v2 gateway down | The Mesh v1 gateway deployment still exists, see the note below |
+| [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) — decommissioning | Reinstall Mesh v1 from the backups | Disaster recovery, see below |
+| [Phase 6](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx) — finalization | Re-create the previous `cacerts` from the backup; delete the `default` revision tag | Mesh v2 keeps running |
 
 ### Phase 2
 
@@ -67,8 +67,8 @@ Mesh v1 is gone. Recovery means installing it again. Restore every resource with
 2. Restore the `ServiceMesh` and `ServiceMeshGroup` resources from `${BACKUP_DIR}/global-servicemeshes.yaml` and `${BACKUP_DIR}/global-servicemeshgroups.yaml`, and wait for the Mesh v1 control plane to be running.
 3. Restore the platform resources — microservices, gateways, policies — from the `${BACKUP_DIR}/asm-*.yaml` files. Leave out what Mesh v1 generates for itself; it is recreated by its controllers.
 4. Restore the namespace labels from `${BACKUP_DIR}/namespaces.yaml` and restart the workloads.
-5. Remove the Mesh v2 resources — `Istio`, `IstioCNI`, `IstioRevisionTag` — and, if Mesh v2 is not to be reinstalled later, its operator.
-6. Restore `cacerts` from `${BACKUP_DIR}/cacerts.yaml` if Phase 6 already replaced it.
+5. Remove the Mesh v2 resources — `Istio`, `IstioCNI`, `IstioRevisionTag`, and the `PodMonitor` and `ServiceMonitor` created for it — and, if Mesh v2 is not to be reinstalled later, its operator. The reinstalled Mesh v1 brings its own monitors, and keeping both sets scrapes every proxy twice.
+6. Restore `cacerts` from `${BACKUP_DIR}/cacerts.yaml` if [Phase 6](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx) already replaced it.
 7. Verify with the probes, and check that every pod reports the Mesh v1 revision in its `sidecar.istio.io/status` annotation.
 
 Traces and metrics collected by Mesh v2 stay in their own indices and are not restored by this procedure.
