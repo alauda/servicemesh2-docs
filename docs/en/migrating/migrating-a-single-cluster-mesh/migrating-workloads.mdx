@@ -4,7 +4,7 @@ weight: 20
 
 # Migrating workloads
 
-Phase 3 of the migration. Workloads move from the Mesh v1 revision to the Mesh v2 revision one namespace — or one workload — at a time. Each move is a rolling restart, and each one can be reversed until Mesh v1 is decommissioned in Phase 5.
+[Phase 3](../migration-overview.mdx#migration-phases) of the migration. Workloads move from the Mesh v1 revision to the Mesh v2 revision one namespace — or one workload — at a time. Each move is a rolling restart, and each one can be reversed until Mesh v1 is decommissioned in [Phase 5](./decommissioning-mesh-v1.mdx).
 
 Before you start, complete [Installing the Mesh v2 control plane](./installing-the-v2-control-plane.mdx) and keep the shell variables set by that page and by [Preparing for the migration](../preparing-for-migration.mdx).
 
@@ -17,15 +17,15 @@ Two Mesh v1 behaviors matter here:
 - The Mesh v1 controllers do not change a revision label that already has a value, but they do add the label back when it is missing. Never remove the label from a namespace while Mesh v1 is running.
 - A pod-level `istio.io/rev` label does not override the namespace label. While the namespace carries a revision label, that revision injects every pod in it.
 
-With `autoInject: disabled` — the Mesh v1 default, recorded in Phase 0 — a pod is injected only when it carries `sidecar.istio.io/inject: "true"`. Mesh v1 adds that annotation to the pods of every microservice that has a sidecar, together with the sidecar settings of that microservice. Mesh v2 has no component that does this, which is what the next section is about.
+With `autoInject: disabled` — the Mesh v1 default, recorded in [Phase 0](../preparing-for-migration.mdx) — a pod is injected only when it carries `sidecar.istio.io/inject: "true"`. Mesh v1 adds that annotation to the pods of every microservice that has a sidecar, together with the sidecar settings of that microservice. Mesh v2 has no component that does this, which is what the next section is about.
 
 :::warning Keep the Mesh v1 controllers running until Phase 5
-Do not scale down `asm-controller` before Phase 5. Its pod mutating webhook uses `failurePolicy: Fail`, so while the controller is down the API server rejects every new pod in namespaces labeled `cpaas.io/serviceMesh=enabled`, including the pods created by the rollouts on this page.
+Do not scale down `asm-controller` before [Phase 5](./decommissioning-mesh-v1.mdx). Its pod mutating webhook uses `failurePolicy: Fail`, so while the controller is down the API server rejects every new pod in namespaces labeled `cpaas.io/serviceMesh=enabled`, including the pods created by the rollouts on this page.
 :::
 
 ## Persist the Mesh v1 pod settings \{#persist-the-mesh-v1-pod-settings}
 
-Mesh v1 adds the settings of each `MicroService` to its pods when the pods are created: whether to inject a sidecar, the proxy resources, the proxy log level, and the ports or address ranges excluded from capture. They are not in the workload template, so they disappear as soon as the Mesh v1 webhook is removed in Phase 5 — a pod restarted after that point runs without them, and with `autoInject: disabled` without a sidecar at all.
+Mesh v1 adds the settings of each `MicroService` to its pods when the pods are created: whether to inject a sidecar, the proxy resources, the proxy log level, and the ports or address ranges excluded from capture. They are not in the workload template, so they disappear as soon as the Mesh v1 webhook is removed in [Phase 5](./decommissioning-mesh-v1.mdx) — a pod restarted after that point runs without them, and with `autoInject: disabled` without a sidecar at all.
 
 Write them into the workload template while you migrate the workload. The same rollout applies both changes.
 
@@ -76,7 +76,7 @@ Every command on this page acts on deployments. A Mesh v1 microservice is always
 
 ### Check the access logging configuration \{#check-the-access-logging-configuration}
 
-Mesh v1 enables access logging with a `Telemetry` resource per microservice, and those resources select pods by the `msname` label that the Mesh v1 webhook adds. After Phase 5 the label is gone and the resources no longer match anything.
+Mesh v1 enables access logging with a `Telemetry` resource per microservice, and those resources select pods by the `msname` label that the Mesh v1 webhook adds. After [Phase 5](./decommissioning-mesh-v1.mdx) the label is gone and the resources no longer match anything.
 
 ```bash {name=migrate-workloads:list-access-log-telemetry}
 kubectl -n "${MESH_NAMESPACE}" get telemetries.telemetry.istio.io -o json | jq -r '.items[]

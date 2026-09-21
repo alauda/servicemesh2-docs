@@ -4,17 +4,17 @@ weight: 50
 
 # Migrating the observability stack
 
-Part of Phase 6. Mesh v1 shipped its own tracing pipeline — an OpenTelemetry v1 collector and a Jaeger 1.x backend — and both were removed with it in Phase 5. This document installs the current stack, keeps the traces that were collected before the migration queryable, and restores the telemetry behavior of your applications.
+Part of [Phase 6](./migration-overview.mdx#migration-phases). Mesh v1 shipped its own tracing pipeline — an OpenTelemetry v1 collector and a Jaeger 1.x backend — and both were removed with it in [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx). This document installs the current stack, keeps the traces that were collected before the migration queryable, and restores the telemetry behavior of your applications.
 
 :::warning Tracing is interrupted until this document is finished
-Spans are dropped between the moment the Mesh v1 collector is deleted in Phase 5 and the moment the mesh is repointed at the new collector here. Metrics and access logs are not affected. Plan this part for a window where a gap in traces is acceptable.
+Spans are dropped between the moment the Mesh v1 collector is deleted in [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) and the moment the mesh is repointed at the new collector here. Metrics and access logs are not affected. Plan this part for a window where a gap in traces is acceptable.
 :::
 
 The OpenTelemetry v1 and v2 Operators own the same custom resource definitions, so v2 can only be installed after Mesh v1 — which brought v1 — is gone.
 
 ## Before you begin
 
-Collect what Phase 0 recorded:
+Collect what [Phase 0](./preparing-for-migration.mdx) recorded:
 
 - `${BACKUP_DIR}/v1-jaeger.txt` — the Elasticsearch index prefix and the retention of the Mesh v1 tracing backend.
 - `${BACKUP_DIR}/instrumentations.yaml` — the Mesh v1 `Instrumentation` resource, which holds the exporter endpoint, the sampler and the service name pattern your applications report.
@@ -39,7 +39,7 @@ Two choices matter for a migrated mesh:
 
 - **Use the same Elasticsearch cluster** as the Mesh v1 backend, otherwise the existing traces cannot be served by the new one.
 - **Choose the index prefix per mesh, not per cluster.** A mesh that spans several clusters writes into one index family so that a trace which crosses clusters is assembled from one place. The steps that act on Elasticsearch — the lifecycle policy and the index initialization — then belong to the mesh, not to a cluster: run them once, with the prefix of the mesh, and skip them on every other cluster. The Jaeger instance of any cluster serves the traces of the whole mesh afterwards.
-- **In a multi-cluster mesh, keep each proxy reporting to the collector of its own cluster.** The collectors of all clusters share one service name, and without the setting described in [Migrating a multi-network mesh](./migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx#keep-trace-reporting-inside-each-cluster) about half of the spans are sent across clusters and dropped.
+- **Give every cluster its own collector.** The collectors of all clusters share one service name, and the step that repoints the mesh declares that service cluster-local, so each proxy exports to the collector of its own cluster, see [Keep trace reporting inside each cluster](./migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx#keep-trace-reporting-inside-each-cluster).
 
 Stop after the prerequisites. The mesh-side configuration already exists from the migration, and the next step updates it.
 
@@ -53,15 +53,21 @@ Follow <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-f
 The Mesh v1 backend writes only span and service indices. The attach step also covers dependency and sampling indices, and reports `index_not_found_exception` for those two. That is expected and does not affect the result.
 :::
 
-## Repoint the mesh at the new collector
+## Repoint the mesh at the new collector \{#repoint-the-mesh-at-the-new-collector}
 
 The mesh sends spans to a provider defined in the `Istio` resource. Replace the Mesh v1 provider with one that points at the new collector, and update the mesh-wide `Telemetry` resource to use it.
 
 ```bash {name=migrate-observability:repoint-istio}
+SETTINGS=$(kubectl get istio default -o json \
+  | jq -c '[(.spec.values.meshConfig.serviceSettings // [])[]
+            | select((.hosts // []) | index("otel-collector.jaeger-system.svc.cluster.local") | not)]
+           + [{settings: {clusterLocal: true}, hosts: ["otel-collector.jaeger-system.svc.cluster.local"]}]')
 kubectl patch istio default --type=merge -p "$(cat <<EOF
-{"spec":{"values":{"meshConfig":{"extensionProviders":[
-  {"name":"otel","opentelemetry":{"port":4317,"service":"otel-collector.jaeger-system.svc.cluster.local"}}
-]}}}}
+{"spec":{"values":{"meshConfig":{
+  "extensionProviders":[
+    {"name":"otel","opentelemetry":{"port":4317,"service":"otel-collector.jaeger-system.svc.cluster.local"}}
+  ],
+  "serviceSettings":${SETTINGS}}}}}
 EOF
 )"
 kubectl wait --for condition=Ready istio/default --timeout=5m
@@ -73,7 +79,7 @@ kubectl -n istio-system patch telemetry asm-default --type=merge \
 ```
 
 <Callouts>
-1. A merge patch replaces the whole `extensionProviders` list. If your mesh defines other providers, edit the resource with `kubectl edit istio default` instead.
+1. `serviceSettings` declares the collector service cluster-local, which keeps every proxy exporting to the collector of its own cluster, see [Configuring distributed tracing platform with Service Mesh](../integration/observability/distributed-tracing/config-tracing-with-service-mesh.mdx). The setting changes nothing in a single-cluster mesh. A merge patch replaces both lists as a whole, so the command reads the service settings the mesh already has — Phase 2 copied them from Mesh v1 — and writes them back with the collector entry appended. The `extensionProviders` list is replaced: if your mesh defines other providers, edit the resource with `kubectl edit istio default` instead.
 2. `V1_TRACE_SAMPLING` is the sampling percentage the mesh used before the migration, recorded in `${BACKUP_DIR}/v1-mesh-settings.json`. Only the provider changes here; how much the mesh traces stays what it was.
 </Callouts>
 
@@ -89,7 +95,7 @@ In Mesh v1, a platform webhook added the injection annotations and the identity 
 
 <Steps>
 
-### Prepare the Java agent image
+### Prepare the Java agent image \{#prepare-the-java-agent-image}
 
 Mesh v1 shipped its own Java agent image. Mesh v2 does not, so choose an image and make it reachable from the cluster, as described in <ExternalSiteLink name="opentelemetry" href="/migrating/migrating-to-v2.html#preparing-the-java-agent-image" children="Preparing the Java agent image" />.
 

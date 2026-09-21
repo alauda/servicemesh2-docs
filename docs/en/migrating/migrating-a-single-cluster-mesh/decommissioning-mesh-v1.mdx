@@ -4,14 +4,14 @@ weight: 40
 
 # Decommissioning Mesh v1
 
-Phase 5 of the migration. Mesh v1 is removed by hand, in an order that leaves the Mesh v2 control plane, the gateway services and the certificates untouched.
+[Phase 5](../migration-overview.mdx#migration-phases) of the migration. Mesh v1 is removed by hand, in an order that leaves the Mesh v2 control plane, the gateway services and the certificates untouched.
 
 :::danger Never delete the Mesh v1 service mesh from the platform UI
 **After you create the Mesh v2 `Istio` resource, never delete the Mesh v1 service mesh from the platform UI, and never delete a `ServiceMesh` resource and leave the cleanup to the Mesh v1 controllers.** The Mesh v1 deletion flow deletes the whole `istio-system` namespace, including the Mesh v2 control plane that runs in it. Follow the manual procedure on this page.
 :::
 
 :::warning This phase cannot be rolled back
-Up to Phase 4 every step can be reversed. Once the Mesh v1 control plane is removed, going back means reinstalling Mesh v1 from the backups, as described in [Rolling back the migration](../rollback.mdx). Do not start this phase until the checklist below passes.
+Up to [Phase 4](./migrating-gateways.mdx) every step can be reversed. Once the Mesh v1 control plane is removed, going back means reinstalling Mesh v1 from the backups, as described in [Rolling back the migration](../rollback.mdx). Do not start this phase until the checklist below passes.
 :::
 
 ## Before you start
@@ -51,7 +51,7 @@ Expected output: none. A workload listed here has a sidecar today but no injecti
 - Every gateway is served by its Mesh v2 deployment, and the Mesh v1 gateways are scaled to zero.
 - The backup from [Preparing for the migration](../preparing-for-migration.mdx#back-up-the-mesh) is complete and reachable, in particular the gateway services, the gateway certificates and `${BACKUP_DIR}/asm-owned-resources.txt`.
 - The probes are running and report no failures.
-- The application owners know that the tracing pipeline is interrupted from this phase until the end of Phase 6.
+- The application owners know that the tracing pipeline is interrupted from this phase until the end of [Phase 6](../migrating-observability.mdx).
 
 </Steps>
 
@@ -231,6 +231,20 @@ kubectl delete flaggers.operator.alauda.io --all -A --wait=false 2>/dev/null
 
 The deletion of the `asm` resource runs a pre-uninstall check that counts pods with a sidecar. Because Mesh v2 now injects those pods, the check never passes and the deletion blocks — removing the finalizer is the way through. The Mesh v1 operator then removes the components it installed: the controller, the collectors, the tracing backend and the platform webhooks.
 
+### Take over the metrics collection \{#take-over-the-metrics-collection}
+
+The Mesh v1 monitors belong to the installation resource and are deleted with it. From that moment nothing scrapes the gateways and the control plane, so run this step right away: it waits for the Mesh v1 monitors to be gone, then lifts the restriction that [Phase 1](./installing-the-v2-control-plane.mdx#phase-1-prepare-observability) put on the Mesh v2 `PodMonitor`.
+
+```bash {name=migrate-decommission:take-over-metrics}
+while kubectl -n istio-system get podmonitor sidecar-monitor >/dev/null 2>&1 \
+  || kubectl -n istio-system get servicemonitor istio-monitor >/dev/null 2>&1; do sleep 5; done
+kubectl -n istio-system get podmonitor istio-proxies-monitor -o json \
+  | jq '.spec.podMetricsEndpoints[0].relabelings |= map(select(.sourceLabels != ["__meta_kubernetes_pod_container_init"]))' \
+  | kubectl replace -f -
+```
+
+Then create the `ServiceMonitor` resource of [Metrics and Service Mesh](../../integration/observability/metrics-and-mesh.mdx). The Mesh v2 resources now scrape every proxy, the gateways included, and the control plane.
+
 ### Replace the mesh-wide telemetry configuration
 
 Mesh v1 installs a mesh-wide `Telemetry` resource in `istio-system` that both control planes read. It is rendered by the Mesh v1 control plane and stays behind when that control plane is deleted, where it would keep configuring dead providers. Replace it with `asm-default`, the mesh-wide resource of a Mesh v2 mesh — the one [Metrics and Service Mesh](../../integration/observability/metrics-and-mesh.mdx) creates and the rest of the Mesh v2 documentation works with:
@@ -261,8 +275,8 @@ EOF
 ```
 
 <Callouts>
-1. Keep the provider name of the Mesh v1 configuration until Phase 6 repoints it at the new collector. [Migrating the observability stack](../migrating-observability.mdx) replaces both the provider and this value.
-2. `V1_TRACE_SAMPLING` is the sampling percentage recorded in Phase 0, `traceSampling` in `${BACKUP_DIR}/v1-mesh-settings.json`. From here on it is this resource, not the control plane setting, that decides how much the mesh traces.
+1. Keep the provider name of the Mesh v1 configuration until [Phase 6](../migration-overview.mdx#migration-phases) repoints it at the new collector. [Migrating the observability stack](../migrating-observability.mdx) replaces both the provider and this value.
+2. `V1_TRACE_SAMPLING` is the sampling percentage recorded in [Phase 0](../preparing-for-migration.mdx), `traceSampling` in `${BACKUP_DIR}/v1-mesh-settings.json`. From here on it is this resource, not the control plane setting, that decides how much the mesh traces.
 3. The `mesh_id` tag is what Kiali filters the metrics of a mesh by. Check it on a proxy after the resource is applied: `kubectl -n "${MESH_NAMESPACE}" exec "deploy/${WORKLOAD}" -c istio-proxy -- pilot-agent request GET stats/prometheus | grep istio_requests_total | head -1`. A tag that reads `mesh_id="unknown"` means the expression did not resolve.
 </Callouts>
 
@@ -308,7 +322,7 @@ Deleting the control plane resource removes the Mesh v1 `istiod`, the gateways i
 Deleting a gateway resource usually takes its deployment with it, because the operator prunes what it managed while it processes its own finalizer. The loop above removes any deployment that is left.
 
 :::note
-`--cascade=orphan` does not protect the resources that a Mesh v1 gateway resource manages: the operator prunes them from its own finalizer. This is why the gateway services were detached from their owner earlier, and why the certificates were copied into the gateway namespace in Phase 4.
+`--cascade=orphan` does not protect the resources that a Mesh v1 gateway resource manages: the operator prunes them from its own finalizer. This is why the gateway services were detached from their owner earlier, and why the certificates were copied into the gateway namespace in [Phase 4](./migrating-gateways.mdx).
 :::
 
 ### Clean up what is left
@@ -349,7 +363,8 @@ kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get deploy | grep -E 'asm|
 - `istio-system` contains the Mesh v2 control plane and Kiali, and nothing from Mesh v1.
 - On the `global` cluster: no Mesh v1 components if this was the last Mesh v1 mesh of the platform. If other meshes are left, the plugin and `global-asm-controller` stay, and only the `ServiceMesh` and `ServiceMeshGroup` resources of the mesh you migrated are gone.
 - The gateway services, the gateway certificates and the telemetry resources you kept are still there.
-- The probes report no failures. Tracing is interrupted from here until the end of Phase 6.
+- Kiali still shows the traffic of the gateways and the workloads: the Mesh v2 monitors have taken over.
+- The probes report no failures. Tracing is interrupted from here until the end of [Phase 6](../migrating-observability.mdx).
 
 List the resources that were kept:
 

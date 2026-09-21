@@ -43,19 +43,19 @@ Istio resources — `Gateway`, `VirtualService`, `DestinationRule`, `ServiceEntr
 
 | Mesh v1 feature | In Mesh v2 | Action before or during the migration |
 |---|---|---|
-| Mesh lifecycle (`ServiceMesh`, `ServiceMeshGroup`) | `Istio` and `IstioCNI` resources | Phase 2 |
-| Microservice onboarding (`MicroService`) | No equivalent; injection is driven by labels | The sidecar settings of each microservice are written into the workload template in Phase 3 |
-| Sidecar injection settings (proxy resources, log level, traffic exclusions) | Pod annotations in the workload template | Phase 3 |
-| Ingress and egress gateways (`GatewayDeploy`) | Gateway injection deployments | Phase 4 |
+| Mesh lifecycle (`ServiceMesh`, `ServiceMeshGroup`) | `Istio` and `IstioCNI` resources | [Phase 2](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane) |
+| Microservice onboarding (`MicroService`) | No equivalent; injection is driven by labels | The sidecar settings of each microservice are written into the workload template in [Phase 3](./migrating-a-single-cluster-mesh/migrating-workloads.mdx) |
+| Sidecar injection settings (proxy resources, log level, traffic exclusions) | Pod annotations in the workload template | [Phase 3](./migrating-a-single-cluster-mesh/migrating-workloads.mdx) |
+| Ingress and egress gateways (`GatewayDeploy`) | Gateway injection deployments | [Phase 4](./migrating-a-single-cluster-mesh/migrating-gateways.mdx) |
 | Traffic policies (`ConnectionPool`, `OutlierDetection`, `LoadBalancer`) | The `DestinationRule` resources these already generate | Keep the generated `DestinationRule`, delete the platform resources with Mesh v1 |
-| Security policies (`Whitelist`, `JWTPolicy`) | `AuthorizationPolicy`, `RequestAuthentication` | Convert before Phase 5, then delete the platform resources with Mesh v1 |
+| Security policies (`Whitelist`, `JWTPolicy`) | `AuthorizationPolicy`, `RequestAuthentication` | Convert before [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx), then delete the platform resources with Mesh v1 |
 | Progressive delivery (`CanaryDelivery`) | Not available | Finish or cancel every running canary before you start |
 | Global rate limiting (`GlobalRateLimiter`) | Not available | Stop depending on it before you start |
 | API management and API metrics (`APIAttribute`) | Not available | Stop depending on it before you start; the `EnvoyFilter` resources it generates target Istio 1.22 proxies and stop applying once workloads run on Mesh v2 |
 | Instance isolation (`IsolatePod`) | Not available | Release every isolated pod before you start |
-| Tracing console and topology | Jaeger v2 UI and Kiali | Phase 1 and Phase 6 |
+| Tracing console and topology | Jaeger v2 UI and Kiali | [Phase 1](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-1-prepare-observability) and [Phase 6](./migrating-observability.mdx) |
 
-## Migration phases
+## Migration phases \{#migration-phases}
 
 The migration runs in seven phases. Each phase ends with checks that must pass before you start the next one.
 
@@ -73,7 +73,7 @@ For a mesh that spans several clusters, follow the single-cluster phases and add
 
 ## Why running both control planes is safe
 
-During Phase 2 to Phase 5 the two control planes share one cluster. Four properties keep them apart:
+During [Phase 2](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane) to [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) the two control planes share one cluster. Four properties keep them apart:
 
 - **One certificate authority.** Mesh v1 stores its intermediate certificate in the `cacerts` secret of the `istio-system` namespace, in the format `istiod` expects. The Mesh v2 `istiod` runs in the same namespace and loads the same secret, so both sides issue workload certificates from the same root and mutual TLS keeps working across them.
 - **Revision isolation.** Mesh v1 is itself a revisioned deployment (`1-22`). Mesh v2 uses the `RevisionBased` update strategy, so its injection and validation webhooks carry its own revision suffix. The `istio.io/rev` label selects exactly one control plane per namespace.
@@ -81,7 +81,7 @@ During Phase 2 to Phase 5 the two control planes share one cluster. Four propert
 - **Separate traffic capture.** Mesh v1 captures traffic with the `istio-init` container, Mesh v2 with `IstioCNI`. The CNI plugin skips pods that already carry `istio-init`, so pods of both generations run on the same node without interfering.
 
 :::danger Never delete the Mesh v1 service mesh from the platform UI
-**After you create the Mesh v2 `Istio` resource, never delete the Mesh v1 service mesh from the platform UI, and never delete a `ServiceMesh` resource and leave the cleanup to the Mesh v1 controllers.** The Mesh v1 deletion flow deletes the whole `istio-system` namespace, including the Mesh v2 control plane that runs in it. Remove Mesh v1 only by following [Decommissioning Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx). This rule takes effect in Phase 2.
+**After you create the Mesh v2 `Istio` resource, never delete the Mesh v1 service mesh from the platform UI, and never delete a `ServiceMesh` resource and leave the cleanup to the Mesh v1 controllers.** The Mesh v1 deletion flow deletes the whole `istio-system` namespace, including the Mesh v2 control plane that runs in it. Remove Mesh v1 only by following [Decommissioning Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx). This rule takes effect in [Phase 2](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane).
 :::
 
 ## Conventions \{#conventions}
@@ -100,6 +100,9 @@ Environment-specific values are shell variables. Every page that uses a variable
 | `MESH_ID`, `TRUST_DOMAIN`, `NETWORK`, `V1_AUTO_INJECT` | Mesh identity and injection policy of Mesh v1 | [Preparing for the migration](./preparing-for-migration.mdx) |
 | `V1_TRACE_SAMPLING` | Trace sampling percentage of Mesh v1 | [Preparing for the migration](./preparing-for-migration.mdx) |
 | `V2_REVISION` | Active Mesh v2 revision, for example `default-v1-30-4` | [Installing the Mesh v2 control plane](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#get-the-mesh-v2-revision) |
-| `MESH_NAMESPACE`, `WORKLOAD` | Namespace and workload being migrated | You set them per step |
+| `MESH_NAMESPACE`, `WORKLOAD`, `APP_CONTAINER` | Namespace, workload and application container a step acts on | You set them per step |
+| `CTX_CLUSTER1`, `CTX_CLUSTER2` | `kubectl` contexts of the two clusters of a multi-cluster mesh | [Migrating a multi-cluster mesh](./migrating-a-multi-cluster-mesh/index.mdx#determine-the-network-topology) |
+| `CTX` | Context of the cluster the current multi-cluster step acts on | [Address one cluster at a time](./migrating-a-multi-cluster-mesh/index.mdx#address-one-cluster-at-a-time) |
+| `CLIENT`, `TARGET_SERVICE`, `TARGET_APP`, `APP_PORT` | Workload and service a cross-cluster probe calls | You set them per step |
 | `GATEWAY_NAMESPACE`, `GATEWAY_NAME` | Namespace and name of a Mesh v1 gateway | [Migrating gateways](./migrating-a-single-cluster-mesh/migrating-gateways.mdx) |
-| `GATEWAY_REPLICAS` | Replica count the Mesh v1 gateway had, needed to roll Phase 4 back | [Migrating gateways](./migrating-a-single-cluster-mesh/migrating-gateways.mdx#shift-traffic) |
+| `GATEWAY_REPLICAS` | Replica count the Mesh v1 gateway had, needed to roll [Phase 4](./migrating-a-single-cluster-mesh/migrating-gateways.mdx) back | [Migrating gateways](./migrating-a-single-cluster-mesh/migrating-gateways.mdx#shift-traffic) |

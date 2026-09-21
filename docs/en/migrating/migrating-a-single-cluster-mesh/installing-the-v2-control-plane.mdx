@@ -4,9 +4,9 @@ weight: 10
 
 # Installing the Mesh v2 control plane
 
-Phase 1 installs the observability components that let you watch the mesh during the migration. Phase 2 creates the Mesh v2 control plane next to Mesh v1. No workload changes in either phase: the mesh keeps running on Mesh v1 until [Migrating workloads](./migrating-workloads.mdx).
+[Phase 1](#phase-1-prepare-observability) installs the observability components that let you watch the mesh during the migration. [Phase 2](#phase-2-install-the-mesh-v2-control-plane) creates the Mesh v2 control plane next to Mesh v1. No workload changes in either phase: the mesh keeps running on Mesh v1 until [Migrating workloads](./migrating-workloads.mdx).
 
-Both phases are reversible — deleting the `Istio` and `IstioCNI` resources removes everything Phase 2 created.
+Both phases are reversible — deleting the `Istio` and `IstioCNI` resources removes everything [Phase 2](#phase-2-install-the-mesh-v2-control-plane) created.
 
 Before you start, complete [Preparing for the migration](../preparing-for-migration.mdx) and keep the shell variables it sets.
 
@@ -20,14 +20,26 @@ Kiali reads the metrics of the mesh, so it shows the Mesh v1 traffic before the 
 
 Follow [Alauda Build of Kiali](../../integration/observability/kiali.mdx) to install the Kiali Operator and create the `Kiali` resource, and [Configuring Monitoring with Kiali](../../integration/observability/kiali.mdx#configuring-monitoring-with-kiali) to connect it to the monitoring store of the platform.
 
-Leave the tracing configuration of Kiali pointing at the Mesh v1 Jaeger instance for now. [Migrating the observability stack](../migrating-observability.mdx) repoints it at Jaeger v2 in Phase 6.
+Leave the tracing configuration of Kiali pointing at the Mesh v1 Jaeger instance for now. [Migrating the observability stack](../migrating-observability.mdx) repoints it at Jaeger v2 in [Phase 6](../migration-overview.mdx#migration-phases).
 
-### Create the metrics resources
+### Create the metrics resources \{#create-the-metrics-resources}
 
-Follow [Metrics and Service Mesh](../../integration/observability/metrics-and-mesh.mdx) to create the `ServiceMonitor` and `PodMonitor` resources that scrape the Mesh v2 control plane and the Mesh v2 proxies. Create the `PodMonitor` resource in every namespace that takes part in the mesh.
+Until [Phase 5](./decommissioning-mesh-v1.mdx), Mesh v1 keeps collecting what it collects today. Its `sidecar-monitor` pod monitor scrapes every proxy that runs as a regular container — the Mesh v1 proxies, and from [Phase 4](./migrating-gateways.mdx) on the Mesh v2 gateways — and its `istio-monitor` service monitor scrapes every `istiod` in `istio-system`, the Mesh v2 one included. It skips only native sidecars, the init containers with `restartPolicy: Always` that Mesh v2 injects into workloads.
+
+Create the `PodMonitor` resource of [Metrics and Service Mesh](../../integration/observability/metrics-and-mesh.mdx) once, in `istio-system`: its `namespaceSelector` covers every namespace, and a copy in another namespace would scrape every proxy again. Then restrict it to native sidecars:
+
+```bash {name=migrate-cp:restrict-podmonitor}
+kubectl -n istio-system get podmonitor istio-proxies-monitor -o json \
+  | jq '.spec.podMetricsEndpoints[0].relabelings |=
+          [{action: "keep", sourceLabels: ["__meta_kubernetes_pod_container_init"], regex: "true"}]
+          + map(select(.sourceLabels != ["__meta_kubernetes_pod_container_init"]))' \
+  | kubectl replace -f -
+```
+
+A proxy that both monitors scrape reports every request twice, and Kiali shows twice the traffic it carries. For the same reason, do not create the `ServiceMonitor` resource yet. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx#take-over-the-metrics-collection) lifts the restriction and creates it once the Mesh v1 monitors are gone.
 
 :::note Do not create the asm-default telemetry resource yet
-Mesh v1 already owns a mesh-wide `Telemetry` resource in `istio-system`, and both control planes read it. Only one mesh-wide resource is ever in effect — the oldest one in `istio-system` that has no selector — so a second one created now would be ignored without any error, and the Mesh v1 one would keep configuring both generations. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx) creates `asm-default` in its place in Phase 5.
+Mesh v1 already owns a mesh-wide `Telemetry` resource in `istio-system`, and both control planes read it. Only one mesh-wide resource is ever in effect — the oldest one in `istio-system` that has no selector — so a second one created now would be ignored without any error, and the Mesh v1 one would keep configuring both generations. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx) creates `asm-default` in its place in [Phase 5](../migration-overview.mdx#migration-phases).
 :::
 
 ### Verification
@@ -126,7 +138,7 @@ jq . <<<"${V2_MESH_CONFIG}"
 
 <Callouts>
 1. `proxyMetadata` carries settings that change how every proxy behaves. `ISTIO_META_DNS_CAPTURE`, for example, is what makes a `ServiceEntry` host resolvable inside the mesh. A Mesh v2 proxy without it cannot reach hosts that only exist as `ServiceEntry` resources.
-2. The tracing provider is kept as it is, so that proxies of both generations report to the Mesh v1 tracing backend during the migration. Phase 6 repoints it.
+2. The tracing provider is kept as it is, so that proxies of both generations report to the Mesh v1 tracing backend during the migration. [Phase 6](../migrating-observability.mdx) repoints it.
 </Callouts>
 
 The trust domain of the mesh is part of the identity of every workload certificate. Mesh v1 keeps it in the mesh configuration, where the command above copies it, but a mesh that was configured elsewhere would fall back to `cluster.local` and break every authorization policy whose `principals` name the trust domain the mesh used. Make it explicit:
@@ -138,7 +150,7 @@ fi
 jq -r '.trustDomain // "cluster.local"' <<<"${V2_MESH_CONFIG}"
 ```
 
-The output is the `${TRUST_DOMAIN}` recorded in Phase 0.
+The output is the `${TRUST_DOMAIN}` recorded in [Phase 0](../preparing-for-migration.mdx).
 
 ### Create the `Istio` resource \{#create-the-istio-resource}
 
@@ -177,7 +189,7 @@ kubectl wait --for condition=Ready istio/default --timeout=5m
 3. `RevisionBased` keeps Mesh v1 and Mesh v2 apart: the Mesh v2 webhooks carry their own revision suffix and never claim the `default` slot that Mesh v1 owns.
 4. `inactiveRevisionDeletionGracePeriodSeconds` keeps a revision that no longer has workloads for 30 days instead of 30 seconds, so a revision is not removed while the migration is still running. [Finalizing the migration](./finalizing-the-migration.mdx#restore-the-revision-deletion-grace-period) restores the default.
 5. `seccompProfile` is required when any mesh namespace enforces the `Restricted` Pod Security Admission profile. See [Pod Security Admission](../../installing/pod-security-admission.mdx#sidecars).
-6. `traceSampling` is the sampling percentage recorded from Mesh v1. Without it the Mesh v2 control plane uses the Istio default of 1 percent, and a workload traced at 100 percent under Mesh v1 is traced at 1 percent from the moment it is migrated until Phase 5 replaces the mesh-wide `Telemetry` resource.
+6. `traceSampling` is the sampling percentage recorded from Mesh v1. Without it the Mesh v2 control plane uses the Istio default of 1 percent, and a workload traced at 100 percent under Mesh v1 is traced at 1 percent from the moment it is migrated until [Phase 5](./decommissioning-mesh-v1.mdx) replaces the mesh-wide `Telemetry` resource.
 </Callouts>
 
 Copy any other Mesh v1 proxy setting that differs from the Istio defaults — `includeIPRanges`, `excludeIPRanges` and the default sidecar resources are in `${BACKUP_DIR}/v1-mesh-settings.json` — into `spec.values.global.proxy`.
@@ -188,7 +200,7 @@ Mesh v1 owns the `default` injection webhook. An `IstioRevisionTag` named `defau
 
 ### Prepare the Istio reader service account \{#prepare-the-istio-reader-service-account}
 
-Mesh v1 created the `istio-reader-service-account` service account in `istio-system` without Helm metadata. The `IstioRevisionTag` that Phase 6 creates claims that account through Helm and fails while the metadata is missing. Adding it now costs nothing and has no effect on Mesh v1.
+Mesh v1 created the `istio-reader-service-account` service account in `istio-system` without Helm metadata. The `IstioRevisionTag` that [Phase 6](./finalizing-the-migration.mdx) creates claims that account through Helm and fails while the metadata is missing. Adding it now costs nothing and has no effect on Mesh v1.
 
 ```bash {name=migrate-cp:prepare-reader-service-account}
 kubectl -n istio-system label sa istio-reader-service-account app.kubernetes.io/managed-by=Helm --overwrite
@@ -235,7 +247,7 @@ kubectl get pod -A -o json | jq -r --arg rev "${V1_REVISION}" '[.items[]
   | select((.metadata.annotations["sidecar.istio.io/status"] // "") | test("\"revision\":\"" + $rev + "\""))] | length'
 ```
 
-The count matches the number of injected pods recorded in Phase 0: creating the Mesh v2 control plane does not restart or re-inject anything.
+The count matches the number of injected pods recorded in [Phase 0](../preparing-for-migration.mdx): creating the Mesh v2 control plane does not restart or re-inject anything.
 
 :::danger Never delete the Mesh v1 service mesh from the platform UI
 **After you create the Mesh v2 `Istio` resource, never delete the Mesh v1 service mesh from the platform UI, and never delete a `ServiceMesh` resource and leave the cleanup to the Mesh v1 controllers.** The Mesh v1 deletion flow deletes the whole `istio-system` namespace, including the Mesh v2 control plane that runs in it. Remove Mesh v1 only by following [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx).

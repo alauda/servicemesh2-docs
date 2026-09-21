@@ -4,7 +4,7 @@ weight: 50
 
 # Finalizing the migration
 
-Phase 6 of the migration. Mesh v1 is gone, and the mesh runs on Mesh v2. Three things are left: adopting the `default` revision tag, taking over the certificate authority that Mesh v1 used to renew, and moving the observability stack.
+[Phase 6](../migration-overview.mdx#migration-phases) of the migration. Mesh v1 is gone, and the mesh runs on Mesh v2. Three things are left: adopting the `default` revision tag, taking over the certificate authority that Mesh v1 used to renew, and moving the observability stack.
 
 ## Adopt the default revision tag
 
@@ -61,6 +61,7 @@ If the secret no longer exists on the `global` cluster, take both files from `${
 ### Issue the new intermediate certificate
 
 ```bash {name=migrate-finalize:issue-intermediate-ca}
+export CA_DAYS=${CA_DAYS:-3650}
 openssl genrsa -out "${CA_DIR}/ca-key.pem" 4096
 openssl req -new -key "${CA_DIR}/ca-key.pem" -subj "/O=Istio/CN=Intermediate CA/L=${CLUSTER_NAME}" \
   -out "${CA_DIR}/ca.csr"
@@ -71,12 +72,12 @@ keyUsage = critical, digitalSignature, keyEncipherment, keyCertSign
 subjectKeyIdentifier = hash
 EOF
 openssl x509 -req -in "${CA_DIR}/ca.csr" -CA "${CA_DIR}/root-cert.pem" -CAkey "${CA_DIR}/root-key.pem" \
-  -CAcreateserial -days 730 -extensions v3_ca -extfile "${CA_DIR}/ca-ext.cnf" -out "${CA_DIR}/ca-cert.pem"
+  -CAcreateserial -days "${CA_DAYS}" -extensions v3_ca -extfile "${CA_DIR}/ca-ext.cnf" -out "${CA_DIR}/ca-cert.pem"
 cat "${CA_DIR}/ca-cert.pem" "${CA_DIR}/root-cert.pem" > "${CA_DIR}/cert-chain.pem"
 openssl x509 -in "${CA_DIR}/ca-cert.pem" -noout -subject -issuer -enddate
 ```
 
-Choose the lifetime (`-days`) according to your certificate policy, and plan the rotation before it expires. A mesh that spans several clusters gets one intermediate certificate per cluster, all signed by the same root.
+`CA_DAYS` is the lifetime of the intermediate certificate in days, 3650 unless you set it before running the block. Choose it according to your certificate policy, keep it within the lifetime of the root printed in the previous step, and plan the rotation before it expires. A mesh that spans several clusters gets one intermediate certificate per cluster, all signed by the same root.
 
 ### Replace the `cacerts` secret
 
@@ -134,7 +135,7 @@ Tracing has been interrupted since Mesh v1 was removed. Follow [Migrating the ob
 
 ## Restore the revision deletion grace period \{#restore-the-revision-deletion-grace-period}
 
-Phase 2 raised `inactiveRevisionDeletionGracePeriodSeconds` to 30 days so that a revision was not removed during the migration. Once the mesh has been stable for a week or two, restore the default:
+[Phase 2](./installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane) raised `inactiveRevisionDeletionGracePeriodSeconds` to 30 days so that a revision was not removed during the migration. Once the mesh has been stable for a week or two, restore the default:
 
 ```bash {name=migrate-finalize:restore-grace-period}
 kubectl patch istio default --type=json \
@@ -159,6 +160,6 @@ done
 - Every injected pod runs the Mesh v2 revision.
 - No Mesh v1 resources are left.
 - Kiali shows the full traffic graph, and — after the observability stack is migrated — traces are queryable in Jaeger v2.
-- The probes have reported no failures since Phase 5.
+- The probes have reported no failures since [Phase 5](./decommissioning-mesh-v1.mdx).
 
 Stop the probes, archive the backup with the certificate material, and record the new intermediate certificate in your rotation schedule.

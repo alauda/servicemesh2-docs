@@ -4,7 +4,7 @@ weight: 30
 
 # Migrating gateways
 
-Phase 4 of the migration. For each Mesh v1 gateway you deploy a Mesh v2 gateway next to it, move traffic over, and scale the Mesh v1 gateway to zero. The `Gateway` and `VirtualService` resources are not changed: the new deployment is selected by the same labels as the old one.
+[Phase 4](../migration-overview.mdx#migration-phases) of the migration. For each Mesh v1 gateway you deploy a Mesh v2 gateway next to it, move traffic over, and scale the Mesh v1 gateway to zero. The `Gateway` and `VirtualService` resources are not changed: the new deployment is selected by the same labels as the old one.
 
 Migrate the workloads behind a gateway first, see [Migrating workloads](./migrating-workloads.mdx).
 
@@ -53,7 +53,7 @@ namespace revision label:
 Record three things:
 
 1. The union of the selector labels — `app: ingress-1` and `istio: gw-ingress-1` in the example. A Mesh v2 gateway that carries only the `Service` selector receives traffic but has no listeners, and every request returns 404.
-2. Whether the gateway `Service` is owned by a `GatewayDeploy` resource. It usually is, which means Kubernetes deletes the service together with the Mesh v1 resources in Phase 5 unless the owner reference is removed.
+2. Whether the gateway `Service` is owned by a `GatewayDeploy` resource. It usually is, which means Kubernetes deletes the service together with the Mesh v1 resources in [Phase 5](./decommissioning-mesh-v1.mdx) unless the owner reference is removed.
 3. Whether the gateway namespace carries an `istio.io/rev` label. The steps below differ.
 
 </Steps>
@@ -106,11 +106,11 @@ done
 
 The lookup follows the resolution order of Mesh v1: the gateway namespace first, `istio-system` second. A certificate of the same name in a third namespace is a different certificate and is not copied — the gateway would serve it to clients without any check reporting a problem, because a wrong certificate is as `ACTIVE` as the right one.
 
-Leave the original secret in place: the Mesh v1 gateway still uses it until Phase 5.
+Leave the original secret in place: the Mesh v1 gateway still uses it until [Phase 5](./decommissioning-mesh-v1.mdx).
 
 ### Create the service account and the SDS permissions
 
-`istiod` only sends a certificate to a gateway whose service account may read secrets in its namespace. Without this role the TLS listener stays in `WARMING` state, and the gateway answers plain HTTP while every HTTPS request fails.
+`istiod` only sends a certificate to a gateway whose service account may read secrets in its namespace. Without this role the certificate stays in `WARMING` state: the gateway keeps answering its HTTP routes, and every TLS handshake on its HTTPS port is reset.
 
 ```bash {name=migrate-gateways:create-sds-rbac}
 cat <<EOF | kubectl apply -f -
@@ -201,7 +201,7 @@ kubectl -n "${GATEWAY_NAMESPACE}" rollout status "deploy/${GATEWAY_NAME}-v2" --t
 
 ### Recreate the access logging configuration
 
-The `Telemetry` resource that enables access logging for a Mesh v1 gateway selects pods by labels that only Mesh v1 sets, and it is deleted with its owner in Phase 5. Create an equivalent that matches the Mesh v2 gateway:
+The `Telemetry` resource that enables access logging for a Mesh v1 gateway selects pods by labels that only Mesh v1 sets, and it is deleted with its owner in [Phase 5](./decommissioning-mesh-v1.mdx). Create an equivalent that matches the Mesh v2 gateway:
 
 ```bash {name=migrate-gateways:create-gateway-telemetry}
 cat <<EOF | kubectl apply -f -
@@ -228,8 +228,10 @@ istioctl proxy-config listener "${POD}" -n "${GATEWAY_NAMESPACE}"
 istioctl proxy-config secret "${POD}" -n "${GATEWAY_NAMESPACE}"
 ```
 
+`proxy-config` reads the configuration from the proxy of the pod, not from a control plane, so unlike `proxy-status` it takes no `--revision`.
+
 - The listeners match the ports of the `Gateway` resources. No listeners means the pod labels do not match the `Gateway` selectors.
-- Every `kubernetes://<credential>` secret is `ACTIVE`. A secret in `WARMING` state means the certificate is missing in this namespace, or the service account may not read it — half of the HTTPS requests fail while this is the case.
+- If the gateway serves HTTPS, every `kubernetes://<credential>` secret is `ACTIVE`. A secret in `WARMING` state means the certificate is missing in this namespace, or the service account may not read it — half of the HTTPS requests fail while this is the case. A gateway that serves only HTTP — its `credentials` were empty when you collected the configuration — lists no `kubernetes://` secret, and this check does not apply.
 
 If either check fails, scale the deployment to zero, fix the cause, and scale it back up:
 
@@ -264,7 +266,7 @@ Half of the requests now reach the Mesh v2 gateway. Check every route of this ga
 kubectl -n "${GATEWAY_NAMESPACE}" scale deploy "${GATEWAY_NAME}" --replicas=0
 ```
 
-Keep the deployment: until Phase 5 it is the fastest way back if the new gateway misbehaves. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx) deletes it.
+Keep the deployment: until [Phase 5](../migration-overview.mdx#migration-phases) it is the fastest way back if the new gateway misbehaves. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx) deletes it.
 
 </Steps>
 
@@ -285,7 +287,7 @@ kubectl get gateways.networking.istio.io,virtualservices.networking.istio.io,des
 
 ## Verification
 
-- Every route of the gateway answers as before, over HTTP and over HTTPS.
+- Every route of the gateway answers as before, over HTTP and, if the gateway serves it, over HTTPS.
 - The probes report no failures during the traffic shift.
 - `kubectl -n "${GATEWAY_NAMESPACE}" get deploy` shows the Mesh v1 gateway at 0 replicas and the Mesh v2 gateway at its full replica count.
 - `kubectl get gateways.networking.istio.io,virtualservices.networking.istio.io -A` returns the same resources as before the migration. The migration does not change them.

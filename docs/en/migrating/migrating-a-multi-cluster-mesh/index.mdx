@@ -11,7 +11,8 @@ Read [Migrating a single-cluster mesh](../migrating-a-single-cluster-mesh/index.
 ## How the clusters are migrated
 
 - The `global` cluster orchestrates the mesh. Its steps — freezing the Mesh v1 controllers, deleting the mesh resources, uninstalling the plugin — are run once and cover every cluster.
-- Every other step runs per cluster. Complete a phase on all clusters before you start the next one, so that the mesh never has a control plane generation missing on one side.
+- Every other command of [Migrating a single-cluster mesh](../migrating-a-single-cluster-mesh/index.mdx) is run once per cluster, against that cluster.
+- Two points in the order are fixed. Every cluster has its Mesh v2 control plane — and, in a multi-network mesh, its Mesh v2 east-west gateway — before the first workload of any cluster moves. And every cluster serves its workloads and gateways from Mesh v2 before Mesh v1 is decommissioned on any of them. Between those two points the clusters are migrated one at a time, so that a workload that has moved always finds a control plane and a gateway of its own generation on the other side.
 - The certificate authority is shared: each cluster has its own intermediate certificate signed by one root. Mesh v2 reuses the `cacerts` secret of each cluster, so workload certificates stay mutually trusted across clusters during the whole migration.
 - The remote secrets that let each control plane read the other clusters are reused as they are. Mesh v2 discovers them by label, exactly as Mesh v1 did.
 - The custom configuration of the mesh is collected per cluster and expressed the Mesh v2 way per cluster, see [Collect the custom Istio configuration](../preparing-for-migration.mdx#collect-the-custom-istio-configuration). Clusters of one mesh rarely have identical control plane settings.
@@ -64,5 +65,18 @@ kubectl --context "${CTX_CLUSTER1}" -n "${MESH_NAMESPACE}" exec "deploy/${WORKLO
 ```
 
 `TARGET_APP` is a service of the other cluster. The address and the port come from its endpoints, which is the port the pod listens on — a request to a pod address on the service port is answered by the sidecar with `503`, whether the clusters share a network or not.
+
+## Address one cluster at a time \{#address-one-cluster-at-a-time}
+
+`CTX_CLUSTER1` and `CTX_CLUSTER2` name the two clusters of the mesh and keep those values for the whole migration. They appear in the commands that compare the clusters or act on both of them.
+
+Every other command acts on one cluster, and names it `${CTX}`. Set it to the cluster you are working on, and set it again each time you move to the next one:
+
+```bash {name=migrate-mc:set-context}
+export CTX="${CTX_CLUSTER1}"
+kubectl config get-contexts "${CTX}"
+```
+
+A command without `--context` runs against whatever context your kubeconfig has selected, which is rarely the cluster you mean during a multi-cluster migration. Every command in this section passes it explicitly.
 
 <Overview overviewHeaders={[]} />

@@ -72,11 +72,23 @@ The Jaeger v2 instance and the OpenTelemetry Collector are not service-mesh-spec
           opentelemetry:
             port: 4317
             service: otel-collector.jaeger-system.svc.cluster.local  # [!code callout]
+        serviceSettings:  # [!code callout]
+        - hosts:
+          - otel-collector.jaeger-system.svc.cluster.local
+          settings:
+            clusterLocal: true
   ```
 
   <Callouts>
     1. The `service` field is the FQDN of the OpenTelemetry Collector Service. The default value targets the Collector deployed in the `jaeger-system` namespace as described in <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-elasticsearch.html#deploying-the-opentelemetry-collector" children="Deploying the OpenTelemetry Collector" />. Replace it with the actual Collector address if you deployed the Collector in a different namespace or with a different instance name.
+    2. Makes every proxy export its spans to the Collector of its own cluster. The setting changes nothing in a single-cluster mesh, and keeps traces complete once the mesh spans several clusters. Use the same host as the `service` field above.
   </Callouts>
+
+  :::note Each cluster needs its own Collector
+  In a mesh that spans several clusters, every cluster publishes its Collector under the same service name, and the control planes merge them into one set of endpoints: without `clusterLocal` a proxy spreads its spans over the Collectors of all clusters. Spans sent to another cluster are lost when the clusters are on separate networks, and cross the cluster boundary for nothing when they share one.
+
+  `clusterLocal` drops the endpoints that belong to another cluster, so set it only when every cluster runs its own Collector, which is what the prerequisites install. If one Collector serves several clusters, leave the entry out: the proxies of a cluster without a Collector would be left with no endpoint at all and would drop every span.
+  :::
 
   To apply this configuration, patch the `Istio` resource:
 
@@ -91,11 +103,16 @@ The Jaeger v2 instance and the OpenTelemetry Collector are not service-mesh-spec
           opentelemetry:
             port: 4317
             service: otel-collector.jaeger-system.svc.cluster.local
+        serviceSettings:
+        - hosts:
+          - otel-collector.jaeger-system.svc.cluster.local
+          settings:
+            clusterLocal: true
   '
   ```
 
   :::warning
-  This command uses a JSON merge patch, which replaces the entire `meshConfig.extensionProviders` array. If the `Istio` resource already defines other extension providers, they will be overwritten. To preserve them, edit the resource with `kubectl edit istio default` and append the `otel` entry by hand, or use a JSON Patch (`--type=json`) that appends to `/spec/values/meshConfig/extensionProviders/-`.
+  This command uses a JSON merge patch, which replaces the entire `meshConfig.extensionProviders` and `meshConfig.serviceSettings` arrays. If the `Istio` resource already defines other extension providers or service settings, they will be overwritten. To preserve them, edit the resource with `kubectl edit istio default` and append the entries by hand, or use a JSON Patch (`--type=json`) that appends to `/spec/values/meshConfig/extensionProviders/-` and `/spec/values/meshConfig/serviceSettings/-`.
   :::
 
   ### Update the `Telemetry` resource to enable the tracing provider defined in the `meshConfig`:
@@ -154,7 +171,7 @@ Before removing the underlying components, detach the mesh from the OpenTelemetr
     kubectl -n istio-system patch telemetry asm-default --type=json -p='[{"op": "remove", "path": "/spec/tracing"}]'
     ```
 
-2. Edit the `Istio` resource and remove the `meshConfig.extensionProviders` entry named `otel`, or set `meshConfig.enableTracing` to `false`:
+2. Edit the `Istio` resource and remove the `meshConfig.extensionProviders` entry named `otel` and the `meshConfig.serviceSettings` entry for the Collector host, or set `meshConfig.enableTracing` to `false`:
 
     ```bash
     kubectl edit istio default

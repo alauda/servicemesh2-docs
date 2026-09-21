@@ -28,11 +28,11 @@ Symptoms reported during a Mesh v1 to Mesh v2 migration, with the cause and what
 
 **Cause.** `asm-controller` was scaled down while its pod webhook was still installed. The webhook matches every pod in namespaces labeled `cpaas.io/serviceMesh=enabled` and fails closed.
 
-**Resolution.** Scale `asm-controller` back to its original replica count. Do not stop the Mesh v1 controllers before Phase 5.
+**Resolution.** Scale `asm-controller` back to its original replica count. Do not stop the Mesh v1 controllers before [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx).
 
 ## A restarted workload comes back without a sidecar
 
-**Symptom.** After Phase 5, a workload that had a sidecar restarts and its pods have no `istio-proxy` container.
+**Symptom.** After [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx), a workload that had a sidecar restarts and its pods have no `istio-proxy` container.
 
 **Cause.** The injection setting was on the pod, added by the Mesh v1 webhook, and never written into the workload template. With the injection policy inherited from Mesh v1 (`autoInject: disabled`), a pod without `sidecar.istio.io/inject: "true"` is not injected.
 
@@ -72,7 +72,7 @@ Symptoms reported during a Mesh v1 to Mesh v2 migration, with the cause and what
 
 ## HTTPS through the new gateway fails while HTTP works
 
-**Symptom.** The Mesh v2 gateway serves HTTP, and TLS connections are refused or reset. `istioctl proxy-config secret` shows the certificate in `WARMING` state.
+**Symptom.** The Mesh v2 gateway answers its HTTP routes, and TLS handshakes on its HTTPS port are reset. `istioctl proxy-config secret` shows the certificate in `WARMING` state.
 
 **Cause.** Either the certificate secret is not in the gateway namespace, or the service account of the gateway may not read secrets there. Mesh v1 could fall back to a certificate stored in `istio-system`; Mesh v2 cannot.
 
@@ -88,7 +88,7 @@ Symptoms reported during a Mesh v1 to Mesh v2 migration, with the cause and what
 
 ## A gateway service disappears
 
-**Symptom.** During Phase 5, a gateway stops receiving traffic and its `Service` no longer exists.
+**Symptom.** During [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx), a gateway stops receiving traffic and its `Service` no longer exists.
 
 **Cause.** The service was owned by a Mesh v1 resource, and Kubernetes deleted it together with its owner.
 
@@ -96,7 +96,7 @@ Symptoms reported during a Mesh v1 to Mesh v2 migration, with the cause and what
 
 ## Access logs stop being produced
 
-**Symptom.** After Phase 5, or after a workload restarts, access logs are no longer written.
+**Symptom.** After [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx), or after a workload restarts, access logs are no longer written.
 
 **Cause.** The `Telemetry` resources of Mesh v1 select pods by labels that its webhook added. The labels are gone, and the resources themselves were deleted with their owners.
 
@@ -174,9 +174,17 @@ Every endpoint must be a pod address of the local cluster.
 
 **Symptom.** After the observability stack is migrated, traces contain the spans of one cluster only, or spans are missing at random. Each cluster runs its own collector and both are healthy.
 
-**Cause.** The collectors of all clusters share one service name, and the control planes merge them into one set of endpoints. Spans sent to the collector of another network never arrive.
+**Cause.** The `Istio` resource of that cluster carries no `serviceSettings` entry that declares the collector service cluster-local, so the control plane merges the collectors of all clusters into one set of endpoints and the proxies export to all of them. Spans sent to the collector of another network never arrive. The entry is as easily lost as it is set: `serviceSettings` is a list, and a merge patch on `meshConfig` replaces it as a whole.
 
-**Resolution.** Declare the collector service cluster-local on every cluster, see [Migrating a multi-network mesh](./migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx#keep-trace-reporting-inside-each-cluster).
+**Resolution.** Check the entry and the endpoints on every cluster:
+
+```bash {name=migrate-troubleshooting:check-collector-settings}
+kubectl --context "${CTX}" get istio default -o jsonpath='{.spec.values.meshConfig.serviceSettings}{"\n"}'
+istioctl --context "${CTX}" proxy-config endpoint "deploy/${WORKLOAD}.${MESH_NAMESPACE}" \
+  --cluster "outbound|4317||otel-collector.jaeger-system.svc.cluster.local"
+```
+
+A proxy must be given one endpoint, the collector of its own cluster. [Repoint the mesh at the new collector](./migrating-observability.mdx#repoint-the-mesh-at-the-new-collector) writes the entry back, and [Configuring distributed tracing platform with Service Mesh](../integration/observability/distributed-tracing/config-tracing-with-service-mesh.mdx) explains when it applies.
 
 ## Kiali shows no data
 
@@ -200,13 +208,13 @@ Every endpoint must be a pod address of the local cluster.
 No. They do not change a revision label that already has a value. Stopping them early breaks pod creation in mesh namespaces.
 
 **When is the `cpaas.io/serviceMesh` label removed from namespaces?**
-In Phase 5, together with the other Mesh v1 leftovers. Keeping it until then lets the Mesh v1 webhook keep configuring pods that have not been migrated yet.
+In [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx), together with the other Mesh v1 leftovers. Keeping it until then lets the Mesh v1 webhook keep configuring pods that have not been migrated yet.
 
 **Does upgrading the Istio custom resource definitions to 1.30 affect Mesh v1?**
 No. The definitions keep serving the API versions that Istio 1.22 uses.
 
 **How long is tracing interrupted?**
-From the moment the Mesh v1 collector is deleted in Phase 5 until the mesh is repointed at the new collector in Phase 6. Metrics and access logs are not interrupted.
+From the moment the Mesh v1 collector is deleted in [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) until the mesh is repointed at the new collector in [Phase 6](./migrating-observability.mdx). Metrics and access logs are not interrupted.
 
 **What happens to workloads with a single replica?**
 They are unavailable for the duration of their rolling restart. Scale them to two replicas and add a `PodDisruptionBudget` before the migration if that is not acceptable.
