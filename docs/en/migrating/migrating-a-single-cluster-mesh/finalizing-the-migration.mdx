@@ -45,8 +45,10 @@ The mesh keeps the root certificate authority it has always used. What changes i
 ### Export the root certificate authority
 
 ```bash {name=migrate-finalize:export-root-ca}
-export CA_DIR=${CA_DIR:-/tmp/ca-handover}
+umask 077
+export CA_DIR=${CA_DIR:-$(mktemp -d "${HOME}/ca-handover-XXXXXX")}
 mkdir -p "${CA_DIR}"
+chmod 700 "${CA_DIR}"
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get secret asm-istio-rootca \
   -o jsonpath='{.data.tls\.crt}' | base64 -d > "${CA_DIR}/root-cert.pem"
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get secret asm-istio-rootca \
@@ -91,11 +93,12 @@ kubectl -n istio-system create secret generic cacerts \
 
 ### Remove the private keys from your workstation
 
-```bash {name=migrate-finalize:clean-up-ca-workspace}
-shred -u "${CA_DIR}/root-key.pem" 2>/dev/null || rm -f "${CA_DIR}/root-key.pem"
-```
+Copy the root key to where you keep private keys first — it is needed again when the intermediate certificate is rotated — then remove the working directory. It holds the private key of the root and of the new intermediate certificate, and both are now in the cluster.
 
-Keep the root key where you keep private keys. It is needed again when the intermediate certificate is rotated. Remove the rest of `${CA_DIR}` as well once the secret is in place: it still holds the private key of the new intermediate certificate.
+```bash {name=migrate-finalize:clean-up-ca-workspace}
+shred -u "${CA_DIR}"/*key.pem 2>/dev/null || rm -f "${CA_DIR}"/*key.pem
+rm -rf "${CA_DIR}"
+```
 
 </Steps>
 

@@ -26,8 +26,8 @@ Leave the tracing configuration of Kiali pointing at the Mesh v1 Jaeger instance
 
 Follow [Metrics and Service Mesh](../../integration/observability/metrics-and-mesh.mdx) to create the `ServiceMonitor` and `PodMonitor` resources that scrape the Mesh v2 control plane and the Mesh v2 proxies. Create the `PodMonitor` resource in every namespace that takes part in the mesh.
 
-:::note
-Do not create the mesh-wide `Telemetry` resource described in that document yet. Mesh v1 already owns a mesh-wide `Telemetry` resource in `istio-system`, and both control planes read it. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx) replaces it in Phase 5.
+:::note Do not create the `asm-default` telemetry resource yet
+Mesh v1 already owns a mesh-wide `Telemetry` resource in `istio-system`, and both control planes read it. Only one mesh-wide resource is ever in effect — the oldest one in `istio-system` that has no selector — so a second one created now would be ignored without any error, and the Mesh v1 one would keep configuring both generations. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx) creates `asm-default` in its place in Phase 5.
 :::
 
 ### Verification
@@ -129,6 +129,17 @@ jq . <<<"${V2_MESH_CONFIG}"
 2. The tracing provider is kept as it is, so that proxies of both generations report to the Mesh v1 tracing backend during the migration. Phase 6 repoints it.
 </Callouts>
 
+The trust domain of the mesh is part of the identity of every workload certificate. Mesh v1 keeps it in the mesh configuration, where the command above copies it, but a mesh that was configured elsewhere would fall back to `cluster.local` and break every authorization policy whose `principals` name the trust domain the mesh used. Make it explicit:
+
+```bash {name=migrate-cp:keep-trust-domain}
+if [ "$(jq -r '.trustDomain // "cluster.local"' <<<"${V2_MESH_CONFIG}")" != "${TRUST_DOMAIN}" ]; then
+  export V2_MESH_CONFIG=$(jq -c --arg td "${TRUST_DOMAIN}" '.trustDomain = $td' <<<"${V2_MESH_CONFIG}")
+fi
+jq -r '.trustDomain // "cluster.local"' <<<"${V2_MESH_CONFIG}"
+```
+
+The output is the `${TRUST_DOMAIN}` recorded in Phase 0.
+
 ### Create the `Istio` resource \{#create-the-istio-resource}
 
 ```bash {name=migrate-cp:create-istio}
@@ -153,6 +164,8 @@ spec:
         autoInject: ${V1_AUTO_INJECT}
         seccompProfile:
           type: RuntimeDefault
+    pilot:
+      traceSampling: ${V1_TRACE_SAMPLING}
     meshConfig: ${V2_MESH_CONFIG}
 EOF
 kubectl wait --for condition=Ready istio/default --timeout=5m
@@ -164,6 +177,7 @@ kubectl wait --for condition=Ready istio/default --timeout=5m
 3. `RevisionBased` keeps Mesh v1 and Mesh v2 apart: the Mesh v2 webhooks carry their own revision suffix and never claim the `default` slot that Mesh v1 owns.
 4. `inactiveRevisionDeletionGracePeriodSeconds` keeps a revision that no longer has workloads for 30 days instead of 30 seconds, so a revision is not removed while the migration is still running. [Finalizing the migration](./finalizing-the-migration.mdx#restore-the-revision-deletion-grace-period) restores the default.
 5. `seccompProfile` is required when any mesh namespace enforces the `Restricted` Pod Security Admission profile. See [Pod Security Admission](../../installing/pod-security-admission.mdx#sidecars).
+6. `traceSampling` is the sampling percentage recorded from Mesh v1. Without it the Mesh v2 control plane uses the Istio default of 1 percent, and a workload traced at 100 percent under Mesh v1 is traced at 1 percent from the moment it is migrated until Phase 5 replaces the mesh-wide `Telemetry` resource.
 </Callouts>
 
 Copy any other Mesh v1 proxy setting that differs from the Istio defaults — `includeIPRanges`, `excludeIPRanges` and the default sidecar resources are in `${BACKUP_DIR}/v1-mesh-settings.json` — into `spec.values.global.proxy`.

@@ -35,10 +35,12 @@ Complete every section before you install the Mesh v2 control plane.
 Every page in this section uses these variables. Set them once per shell.
 
 ```bash {name=migrate-prep:set-variables}
+umask 077
 export GLOBAL_CONTEXT=<global-cluster-context>
 export CLUSTER_NAME=<cluster-name>
 export BACKUP_DIR=${HOME}/mesh-v1-migration-backup-${CLUSTER_NAME}
 mkdir -p "${BACKUP_DIR}"
+chmod 700 "${BACKUP_DIR}"
 
 export MESH_GROUP=$(kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshs.asm.alauda.io \
   "${CLUSTER_NAME}" -o jsonpath='{.metadata.labels.asm\.cpaas\.io/meshgroup}')
@@ -48,6 +50,8 @@ echo "mesh ${MESH_GROUP} spans: ${CLUSTER_NAMES}"
 ```
 
 `CLUSTER_NAME` is the name of the cluster in the platform. It is also the name of the `ServiceMesh` resource that represents this cluster on the `global` cluster. `MESH_GROUP` is the mesh this cluster belongs to, and `CLUSTER_NAMES` every cluster of that mesh — one name for a single-cluster mesh. Phase 5 uses them to delete only the resources of this mesh: a platform can host several.
+
+The backup written below holds the private key of the root certificate authority of the mesh and the private key of every gateway certificate. `umask 077` and the directory mode keep them readable only by you. Keep the `umask` for the rest of the migration shell.
 
 In a multi-cluster mesh, set `CLUSTER_NAME` and `BACKUP_DIR` again for each cluster. Everything recorded below differs per cluster.
 
@@ -109,9 +113,13 @@ kubectl -n istio-system get istiooperators.install.istio.io "${V1_CONTROL_PLANE_
          proxy: ((.spec.values.global.proxy // {}) | {includeIPRanges, excludeIPRanges, resources}),
          traceSampling: .spec.values.pilot.traceSampling}' \
   | tee "${BACKUP_DIR}/v1-mesh-settings.json"
+export V1_TRACE_SAMPLING=$(jq -r '.traceSampling // 1' "${BACKUP_DIR}/v1-mesh-settings.json")
+echo "traceSampling=${V1_TRACE_SAMPLING}"
 ```
 
 These settings change how every proxy in the mesh behaves — DNS capture for `ServiceEntry` hosts, the number of trusted proxies at the gateways, connection draining, the trace sampling rate. Phase 2 copies them into the Mesh v2 `Istio` resource.
+
+`traceSampling` is the percentage of requests the mesh traces, `100` in a default Mesh v1 installation. Istio itself defaults to `1`, so every phase that configures tracing uses `${V1_TRACE_SAMPLING}` rather than a fixed value.
 
 ### List the mesh namespaces and the injected workloads
 
@@ -336,6 +344,23 @@ The webhook configurations are needed again only if the `global` cluster keeps s
 :::warning The root certificate authority is in this backup
 `asm-istio-rootca` contains the private key of the root certificate authority of the mesh. Phase 6 signs a new intermediate certificate with it. Store the backup where you keep private keys, not on the cluster.
 :::
+
+### Restore a resource from the backup \{#restore-a-resource-from-the-backup}
+
+Every file above is a resource as the cluster held it, including the owner references that Mesh v1 had set. Applying such a file after the owner is gone recreates the resource and the garbage collector deletes it again within seconds, because it references an owner that no longer exists. Restore through this function instead, which strips the owner references and the fields that belonged to the deleted object:
+
+```bash {name=migrate-prep:restore-from-backup}
+restore_from_backup() {
+  kubectl create -f "$1" --dry-run=client -o json \
+    | jq 'def clean: del(.metadata.ownerReferences, .metadata.uid, .metadata.resourceVersion,
+                         .metadata.creationTimestamp, .metadata.generation, .metadata.managedFields,
+                         .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"], .status);
+          if .kind == "List" then .items |= map(clean) else clean end' \
+    | kubectl apply -f -
+}
+```
+
+It takes a file that holds one resource and a file that holds a list. If the API server rejects a restored `Service` because its cluster IP has been reassigned in the meantime, remove `spec.clusterIP` and `spec.clusterIPs` as well and apply again.
 
 </Steps>
 

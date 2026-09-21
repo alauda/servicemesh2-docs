@@ -102,11 +102,15 @@ kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system patch servicemeshgroups.as
 Verify that the resources are gone and that the mesh namespace of the cluster still exists:
 
 ```bash {name=migrate-decommission:verify-servicemesh-deleted}
+for cn in ${CLUSTER_NAMES}; do
+  kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshs.asm.alauda.io "${cn}" 2>&1 | tail -1
+done
+kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshgroups.asm.alauda.io "${MESH_GROUP}" 2>&1 | tail -1
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshs.asm.alauda.io,servicemeshgroups.asm.alauda.io
 kubectl get ns istio-system -o jsonpath='{.metadata.name} {.status.phase}{"\n"}'
 ```
 
-Expected: no resources on the `global` cluster, and `istio-system Active` on the mesh cluster.
+Expected: `NotFound` for every resource of this mesh, and `istio-system Active` on the mesh cluster. The last listing shows what is left on the `global` cluster: the meshes you did not migrate. It is empty only when this was the last Mesh v1 mesh of the platform.
 
 ### Uninstall the Service Mesh Essentials plugin \{#uninstall-the-service-mesh-essentials-plugin}
 
@@ -170,14 +174,20 @@ Review `${BACKUP_DIR}/asm-owned-resources.txt` before you run the command below 
 ```bash {name=migrate-decommission:detach-owned-resources}
 while read -r kind ns name owner; do
   [ -z "${name}" ] && continue
-  kubectl -n "${ns}" patch "${kind}" "${name}" --type=json -p='[{"op":"remove","path":"/metadata/ownerReferences"}]' 2>/dev/null
-  left=$(kubectl -n "${ns}" get "${kind}" "${name}" -o jsonpath='{.metadata.ownerReferences}')
+  keep=$(kubectl -n "${ns}" get "${kind}" "${name}" -o json \
+    | jq -c '[.metadata.ownerReferences[]? | select((.apiVersion | test("asm\\.alauda\\.io")) | not)]')
+  kubectl -n "${ns}" patch "${kind}" "${name}" --type=merge \
+    -p "{\"metadata\":{\"ownerReferences\":${keep}}}" >/dev/null 2>&1
+  left=$(kubectl -n "${ns}" get "${kind}" "${name}" \
+    -o jsonpath='{range .metadata.ownerReferences[*]}{.apiVersion}/{.kind} {end}')
   echo "${kind} ${ns}/${name} ownerReferences=${left:-none}"
 done < "${BACKUP_DIR}/asm-owned-resources.txt"
 ```
 
+Only the Mesh v1 owners are removed. A resource can have a second, legitimate owner — a controller of your own, or another platform component — and detaching that one too would hand the resource to nothing and change how it is managed after the migration.
+
 <Directive type="warning" title="Check the result, do not trust the patch">
-A `patch` that reports success can still be reverted by a controller that is still running. The command prints the owner references after the patch: every line must end with `ownerReferences=none` before you continue.
+A `patch` that reports success can still be reverted by a controller that is still running. The command prints the owner references that are left: no line may still name an `asm.alauda.io` owner before you continue.
 </Directive>
 
 ### Delete the Mesh v1 custom resources
@@ -204,7 +214,12 @@ while read -r kind ns name owner; do
 done < "${BACKUP_DIR}/asm-owned-resources.txt"
 ```
 
-A missing gateway service interrupts traffic immediately. Recreate it from `${BACKUP_DIR}/gateway-svc-<namespace>-<name>.yaml` if that happens.
+A missing gateway service interrupts traffic immediately. Recreate it if that happens, with the function from [Preparing for the migration](../preparing-for-migration.mdx#restore-a-resource-from-the-backup) — applying the file as it is recreates the owner reference of a Mesh v1 resource that no longer exists, and the service is deleted again within seconds:
+
+```bash {name=migrate-decommission:restore-gateway-service}
+restore_from_backup "${BACKUP_DIR}/gateway-svc-${GATEWAY_NAMESPACE}-${GATEWAY_NAME}.yaml"
+kubectl -n "${GATEWAY_NAMESPACE}" get endpointslices -l "kubernetes.io/service-name=${GATEWAY_NAME}"
+```
 
 ### Delete the Mesh v1 installation resource \{#delete-the-mesh-v1-installation-resource}
 
@@ -218,7 +233,7 @@ The deletion of the `asm` resource runs a pre-uninstall check that counts pods w
 
 ### Replace the mesh-wide telemetry configuration
 
-Mesh v1 installs a mesh-wide `Telemetry` resource in `istio-system` that both control planes read. It is rendered by the Mesh v1 control plane and stays behind when that control plane is deleted, where it would keep configuring dead providers. Replace it with one for Mesh v2:
+Mesh v1 installs a mesh-wide `Telemetry` resource in `istio-system` that both control planes read. It is rendered by the Mesh v1 control plane and stays behind when that control plane is deleted, where it would keep configuring dead providers. Replace it with `asm-default`, the mesh-wide resource of a Mesh v2 mesh — the one [Metrics and Service Mesh](../../integration/observability/metrics-and-mesh.mdx) creates and the rest of the Mesh v2 documentation works with:
 
 ```bash {name=migrate-decommission:replace-mesh-telemetry}
 kubectl -n istio-system get telemetries.telemetry.istio.io -o yaml > "${BACKUP_DIR}/telemetry-istio-system.yaml"
@@ -228,7 +243,7 @@ cat <<EOF | kubectl apply -f -
 apiVersion: telemetry.istio.io/v1
 kind: Telemetry
 metadata:
-  name: mesh-default
+  name: asm-default
   namespace: istio-system
 spec:
   metrics:
@@ -241,13 +256,13 @@ spec:
   tracing:
     - providers:
         - name: zipkin
-      randomSamplingPercentage: 100
+      randomSamplingPercentage: ${V1_TRACE_SAMPLING}
 EOF
 ```
 
 <Callouts>
 1. Keep the provider name of the Mesh v1 configuration until Phase 6 repoints it at the new collector. [Migrating the observability stack](../migrating-observability.mdx) replaces both the provider and this value.
-2. Set the sampling percentage to the value recorded in Phase 0, `traceSampling` in `${BACKUP_DIR}/v1-mesh-settings.json`.
+2. `V1_TRACE_SAMPLING` is the sampling percentage recorded in Phase 0, `traceSampling` in `${BACKUP_DIR}/v1-mesh-settings.json`. From here on it is this resource, not the control plane setting, that decides how much the mesh traces.
 3. The `mesh_id` tag is what Kiali filters the metrics of a mesh by. Check it on a proxy after the resource is applied: `kubectl -n "${MESH_NAMESPACE}" exec "deploy/${WORKLOAD}" -c istio-proxy -- pilot-agent request GET stats/prometheus | grep istio_requests_total | head -1`. A tag that reads `mesh_id="unknown"` means the expression did not resolve.
 </Callouts>
 
@@ -332,7 +347,7 @@ kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get deploy | grep -E 'asm|
 
 - Every Mesh v1 resource type reports `0`.
 - `istio-system` contains the Mesh v2 control plane and Kiali, and nothing from Mesh v1.
-- The `global` cluster has no Mesh v1 components.
+- On the `global` cluster: no Mesh v1 components if this was the last Mesh v1 mesh of the platform. If other meshes are left, the plugin and `global-asm-controller` stay, and only the `ServiceMesh` and `ServiceMeshGroup` resources of the mesh you migrated are gone.
 - The gateway services, the gateway certificates and the telemetry resources you kept are still there.
 - The probes report no failures. Tracing is interrupted from here until the end of Phase 6.
 

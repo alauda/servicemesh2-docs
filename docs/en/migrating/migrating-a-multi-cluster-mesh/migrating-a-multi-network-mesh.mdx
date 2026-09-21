@@ -238,10 +238,18 @@ How much of a trace disappears depends on how the exports are spread over the tw
 Declare the collector service cluster-local on **every cluster that runs a control plane**:
 
 ```bash {name=migrate-multi-network:collector-cluster-local}
-kubectl --context "${CTX}" patch istio default --type=merge -p '{"spec":{"values":{"meshConfig":{"serviceSettings":[{"settings":{"clusterLocal":true},"hosts":["otel-collector.jaeger-system.svc.cluster.local"]}]}}}}'
+SETTINGS=$(kubectl --context "${CTX}" get istio default -o json \
+  | jq -c '[(.spec.values.meshConfig.serviceSettings // [])[]
+            | select((.hosts // []) | index("otel-collector.jaeger-system.svc.cluster.local") | not)]
+           + [{settings: {clusterLocal: true}, hosts: ["otel-collector.jaeger-system.svc.cluster.local"]}]')
+kubectl --context "${CTX}" patch istio default --type=merge \
+  -p "{\"spec\":{\"values\":{\"meshConfig\":{\"serviceSettings\":${SETTINGS}}}}}"
+kubectl --context "${CTX}" get istio default -o jsonpath='{.spec.values.meshConfig.serviceSettings}{"\n"}'
 ```
 
-This affects only that host. Cross-cluster load balancing of application services, and the east-west gateway path they use, are unchanged. It does change the mesh configuration, and the control plane pushes the change to every proxy of its cluster, so make it in the same window as the other Phase 6 changes.
+`serviceSettings` is a list, and a merge patch replaces a list as a whole. The command reads what is there, appends the collector entry and writes the result back, so the settings your mesh already has are kept. The output must contain them all.
+
+The new entry affects only that host. Cross-cluster load balancing of application services, and the east-west gateway path they use, are unchanged. It does change the mesh configuration, and the control plane pushes the change to every proxy of its cluster, so make it in the same window as the other Phase 6 changes.
 
 Verify from any sidecar that only the local collector endpoint is left:
 
