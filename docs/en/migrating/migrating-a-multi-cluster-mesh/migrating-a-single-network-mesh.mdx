@@ -61,6 +61,4 @@ Every endpoint is a pod address of one of the clusters. An address on port 15443
 
 The mesh stays single network: Mesh v2 supports this topology the same way Mesh v1 did, and nothing in the migration changes it.
 
-Moving to one network per cluster is a separate change with its own window, planned after the migration is finished and verified. It deploys an east-west gateway per cluster, gives each cluster its own `network` value and restarts the workloads so that their pods carry the network label — and it is what turns every remote endpoint from a pod address into a gateway address. Do not combine it with the migration.
-
 <Overview overviewHeaders={[]} />
