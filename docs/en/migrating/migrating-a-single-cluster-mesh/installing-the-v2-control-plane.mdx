@@ -26,7 +26,7 @@ Leave the tracing configuration of Kiali pointing at the Mesh v1 Jaeger instance
 
 Follow [Metrics and Service Mesh](../../integration/observability/metrics-and-mesh.mdx) to create the `ServiceMonitor` and `PodMonitor` resources that scrape the Mesh v2 control plane and the Mesh v2 proxies. Create the `PodMonitor` resource in every namespace that takes part in the mesh.
 
-:::note Do not create the `asm-default` telemetry resource yet
+:::note Do not create the asm-default telemetry resource yet
 Mesh v1 already owns a mesh-wide `Telemetry` resource in `istio-system`, and both control planes read it. Only one mesh-wide resource is ever in effect — the oldest one in `istio-system` that has no selector — so a second one created now would be ignored without any error, and the Mesh v1 one would keep configuring both generations. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx) creates `asm-default` in its place in Phase 5.
 :::
 
@@ -182,7 +182,7 @@ kubectl wait --for condition=Ready istio/default --timeout=5m
 
 Copy any other Mesh v1 proxy setting that differs from the Istio defaults — `includeIPRanges`, `excludeIPRanges` and the default sidecar resources are in `${BACKUP_DIR}/v1-mesh-settings.json` — into `spec.values.global.proxy`.
 
-:::warning Do not create an `IstioRevisionTag` named `default`
+:::warning Do not create an IstioRevisionTag named default
 Mesh v1 owns the `default` injection webhook. An `IstioRevisionTag` named `default` collides with it and changes which control plane injects pods that have no revision label. [Finalizing the migration](./finalizing-the-migration.mdx) creates it after Mesh v1 is gone.
 :::
 

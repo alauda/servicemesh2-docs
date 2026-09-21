@@ -53,10 +53,6 @@ Follow <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-f
 The Mesh v1 backend writes only span and service indices. The attach step also covers dependency and sampling indices, and reports `index_not_found_exception` for those two. That is expected and does not affect the result.
 :::
 
-:::warning Do not write to both backends
-With the indices attached, a span exported to both the old and the new backend is stored twice and rendered twice in the UI. Export to one backend only.
-:::
-
 ## Repoint the mesh at the new collector
 
 The mesh sends spans to a provider defined in the `Istio` resource. Replace the Mesh v1 provider with one that points at the new collector, and update the mesh-wide `Telemetry` resource to use it.
