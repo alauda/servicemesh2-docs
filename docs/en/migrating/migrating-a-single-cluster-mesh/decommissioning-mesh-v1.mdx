@@ -125,7 +125,7 @@ Expected: `NotFound` for every resource of this mesh, and `istio-system Active` 
 
 The plugin serves every Mesh v1 mesh of the platform. Uninstall it only when the mesh you migrated was the last one:
 
-```bash title="Meshes still on Mesh v1" {name=migrate-decommission:check-remaining-meshes}
+```bash title="Meshes-still-on-Mesh-v1" {name=migrate-decommission:check-remaining-meshes}
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshs.asm.alauda.io
 ```
 
@@ -147,7 +147,7 @@ The components of the plugin are removed asynchronously, about a minute after th
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get deploy | grep -E 'asm|hermes' || echo "no Mesh v1 components left"
 ```
 
-If **Meshes still on Mesh v1** at the start of this step listed other meshes, do not uninstall the plugin. Put the `global` cluster back the way it was instead:
+If **Meshes-still-on-Mesh-v1** at the start of this step listed other meshes, do not uninstall the plugin. Put the `global` cluster back the way it was instead:
 
 ```bash {name=migrate-decommission:restore-global-controller}
 kubectl --context "${GLOBAL_CONTEXT}" apply -f "${BACKUP_DIR}/global-webhooks.yaml"
