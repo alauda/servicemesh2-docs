@@ -22,7 +22,7 @@ export GATEWAY_NAME=<gateway-name>
 
 ### Check the gateways of the control plane itself \{#check-the-gateways-of-the-control-plane-itself}
 
-The listing above covers the gateways the platform manages. The Mesh v1 control plane resource can enable gateways of its own — `istio-ingressgateway` and `istio-egressgateway` in `istio-system` — and those are not `GatewayDeploy` resources, so they are not listed and no step of this page touches them. [Phase 5](./decommissioning-mesh-v1.mdx#delete-the-mesh-v1-control-plane) deletes them together with the control plane.
+The listing above covers the gateways the platform manages. The Mesh v1 control plane deploys one of its own, `istio-ingressgateway` in `istio-system`, and a multi-network mesh adds `istio-eastwestgateway` next to it. Neither is a `GatewayDeploy` resource, so neither is listed above and no step of this page touches them. [Phase 5](./decommissioning-mesh-v1.mdx#delete-the-mesh-v1-control-plane) deletes them together with the control plane.
 
 ```bash {name=migrate-gateways:list-control-plane-gateways}
 export CP_GATEWAYS=$(kubectl -n istio-system get deploy -l "istio.io/rev=${V1_REVISION}" -o json | jq -c '[.items[]

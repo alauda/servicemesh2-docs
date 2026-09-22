@@ -125,7 +125,7 @@ Expected: `NotFound` for every resource of this mesh, and `istio-system Active` 
 
 The plugin serves every Mesh v1 mesh of the platform. Uninstall it only when the mesh you migrated was the last one:
 
-```bash {name=migrate-decommission:check-remaining-meshes}
+```bash title="Meshes still on Mesh v1" {name=migrate-decommission:check-remaining-meshes}
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshs.asm.alauda.io
 ```
 
@@ -147,7 +147,7 @@ The components of the plugin are removed asynchronously, about a minute after th
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get deploy | grep -E 'asm|hermes' || echo "no Mesh v1 components left"
 ```
 
-If `migrate-decommission:check-remaining-meshes` at the start of this step still listed other meshes, do not uninstall the plugin. Put the `global` cluster back the way it was instead:
+If **Meshes still on Mesh v1** at the start of this step listed other meshes, do not uninstall the plugin. Put the `global` cluster back the way it was instead:
 
 ```bash {name=migrate-decommission:restore-global-controller}
 kubectl --context "${GLOBAL_CONTEXT}" apply -f "${BACKUP_DIR}/global-webhooks.yaml"
@@ -356,7 +356,7 @@ Deleting the control plane resource removes the Mesh v1 `istiod`, the gateways i
 
 Deleting a gateway resource usually takes its deployment with it, because the operator prunes what it managed while it processes its own finalizer. The loop above removes any deployment that is left.
 
-The loop also removes the gateways that the Mesh v1 control plane deployed itself — `istio-ingressgateway` and `istio-egressgateway` in `istio-system` — because they carry the revision of the control plane. [Phase 4](./migrating-gateways.mdx#check-the-gateways-of-the-control-plane-itself) is where you established whether any `Gateway` resource routes traffic through them.
+The loop also removes the gateway that the Mesh v1 control plane deployed itself, `istio-ingressgateway` in `istio-system`, because it carries the revision of the control plane. [Phase 4](./migrating-gateways.mdx#check-the-gateways-of-the-control-plane-itself) is where you established whether any `Gateway` resource routes traffic through it.
 
 :::note
 `--cascade=orphan` does not protect the resources that a Mesh v1 gateway resource manages: the operator prunes them from its own finalizer. This is why the gateway services were detached from their owner earlier, and why the certificates were copied into the gateway namespace in [Phase 4](./migrating-gateways.mdx).
