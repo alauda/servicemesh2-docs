@@ -141,26 +141,6 @@ kubectl --context "${GLOBAL_CONTEXT}" get moduleinfoes.cluster.alauda.io -l cpaa
 kubectl --context "${GLOBAL_CONTEXT}" delete moduleinfoes.cluster.alauda.io -l cpaas.io/module-name=asm-global
 ```
 
-<Directive type="danger" title="Do not delete the ModulePlugin resource">
-`ModulePlugin/asm-global` is the entry of the plugin in the catalog of the platform, not the record that it is installed. Deleting it leaves `global-asm-controller` and `hermes` running — the verification below then never passes — and it blocks both ways of uninstalling afterwards: the plugin is gone from **Cluster Plugins**, so the web console has no **Uninstall** action left, and the admission webhook that validates a `ModuleInfo` deletion rejects it with `ModulePlugin.cluster.alauda.io "asm-global" not found`.
-
-If it has already been deleted, recreate it from the backup taken in [Phase 0](../preparing-for-migration.mdx#back-up-the-mesh), then uninstall as above:
-
-```bash {name=migrate-decommission:restore-moduleplugin}
-kubectl --context "${GLOBAL_CONTEXT}" apply -f "${BACKUP_DIR}/global-asm-moduleplugin.yaml"
-```
-
-Without that backup, the `ModuleConfig` of the installed version sometimes carries the same definition in its `kubectl.kubernetes.io/last-applied-configuration` annotation:
-
-```bash {name=migrate-decommission:restore-moduleplugin-from-moduleconfig}
-kubectl --context "${GLOBAL_CONTEXT}" get moduleconfigs.cluster.alauda.io -l cpaas.io/module-name=asm-global -o json \
-  | jq -r '.items[0].metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"] // empty' \
-  | kubectl --context "${GLOBAL_CONTEXT}" apply -f -
-```
-
-The annotation is not always there. When it is missing, the plugin definition has to come from the plugin package, which means contacting technical support.
-</Directive>
-
 The components of the plugin are removed asynchronously, about a minute after the `ModuleInfo` is gone. Check that they are gone before you continue:
 
 ```bash {name=migrate-decommission:verify-essentials-removed}
@@ -332,7 +312,7 @@ EOF
      | grep '^istio_requests_total' | grep -o 'mesh_id="[^"]*"' | sort -u
    ```
 
-   The output is `mesh_id="${MESH_ID}"`. A tag that reads `mesh_id="unknown"` means the expression did not resolve. Anchor the pattern and read every line: `grep istio_requests_total | head -1` returns the `# TYPE istio_requests_total counter` comment, which carries no tags at all. A proxy also keeps the counters it had before the resource was applied, under the previous set of tags, so a series without `mesh_id` is not in itself a failure — only the series that keep growing reflect the current configuration.
+   The output is `mesh_id="${MESH_ID}"`. A tag that reads `mesh_id="unknown"` means the expression did not resolve. A proxy also keeps the counters it had before the resource was applied, under the previous set of tags, so a series without `mesh_id` is not in itself a failure — only the series that keep growing reflect the current configuration.
 </Callouts>
 
 ### Uninstall the Mesh v1 operators

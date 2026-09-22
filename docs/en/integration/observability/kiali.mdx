@@ -188,10 +188,6 @@ kubectl -n kiali-operator wait --for=create "csv/${CSV}" --timeout=2m
 kubectl -n kiali-operator wait --for=jsonpath='{.status.phase}'=Succeeded "csv/${CSV}" --timeout=3m
 ```
 
-:::note
-Wait for the resource to be created before waiting for its phase. `kubectl wait --all` fails with `error: no matching resources found` when it runs before the Operator Lifecycle Manager has created the `ClusterServiceVersion`, which is what happens right after an install plan is approved.
-:::
-
 Check CSV status:
 
 ```shell {name=install-kiali:check-csv-status}
