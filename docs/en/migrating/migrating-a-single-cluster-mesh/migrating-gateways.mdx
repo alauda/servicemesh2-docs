@@ -20,6 +20,36 @@ export GATEWAY_NAMESPACE=<gateway-namespace>
 export GATEWAY_NAME=<gateway-name>
 ```
 
+### Check the gateways of the control plane itself \{#check-the-gateways-of-the-control-plane-itself}
+
+The listing above covers the gateways the platform manages. The Mesh v1 control plane resource can enable gateways of its own — `istio-ingressgateway` and `istio-egressgateway` in `istio-system` — and those are not `GatewayDeploy` resources, so they are not listed and no step of this page touches them. [Phase 5](./decommissioning-mesh-v1.mdx#delete-the-mesh-v1-control-plane) deletes them together with the control plane.
+
+```bash {name=migrate-gateways:list-control-plane-gateways}
+export CP_GATEWAYS=$(kubectl -n istio-system get deploy -l "istio.io/rev=${V1_REVISION}" -o json | jq -c '[.items[]
+  | select((.metadata.labels["operator.istio.io/component"] // "") | test("Gateways$"))
+  | {name: .metadata.name, labels: (.spec.template.metadata.labels // {})}]')
+jq -r '.[] | "\(.name) \(.labels | tojson)"' <<<"${CP_GATEWAYS}"
+echo "--- routed through them:"
+kubectl get gateways.networking.istio.io -A -o json | jq -r --argjson d "${CP_GATEWAYS}" '
+  .items[] as $gw
+  | ($gw.spec.selector // {}) as $sel
+  | select(($sel | length) > 0)
+  | $d[] as $dep
+  | select($sel | to_entries | all(.value == $dep.labels[.key]))
+  | "\($dep.name) <- \($gw.metadata.namespace)/\($gw.metadata.name)"'
+```
+
+**Example output**
+
+```text
+istio-ingressgateway {"app":"istio-ingressgateway","istio":"ingressgateway","istio.io/rev":"1-22",...}
+--- routed through them:
+```
+
+Nothing under `routed through them` means these gateways carry no routes, and losing them in [Phase 5](./decommissioning-mesh-v1.mdx) changes nothing. A `Gateway` listed there serves traffic that no step of this page has migrated: deploy a Mesh v2 gateway for it with the steps below, using the labels printed for its deployment as the selector labels.
+
+In a multi-network mesh, `istio-eastwestgateway` appears here and is routed through. It is not migrated on this page: [Migrating a multi-network mesh](../migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx#deploy-the-mesh-v2-east-west-gateway) deploys its Mesh v2 replacement in [Phase 2](./installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane), before any workload moves.
+
 ### Read the selectors, the service and the certificates
 
 The Mesh v2 gateway pods must carry every label that selects the Mesh v1 gateway today: the selector of the gateway `Service`, and the selector of each `Gateway` resource that is served by this gateway.
@@ -284,6 +314,15 @@ kubectl get gateways.networking.istio.io,virtualservices.networking.istio.io,des
         asm.cpaas.io/user-managed=true --overwrite
     done
 ```
+
+The name of a generated resource holds the external service, the gateway namespace and the gateway name, which is what the filter matches. Mesh v1 also generates resources whose names do not follow that pattern — a `DestinationRule` next to the `ServiceEntry` of each external service, and one per service that has a load balancing policy. They are not selected here, and they do not need to be: their owner is the `ServiceEntry` or the `Endpoints` of a service rather than a Mesh v1 resource, so [Phase 5](./decommissioning-mesh-v1.mdx) does not delete them and Mesh v2 keeps reading them as they are. `${BACKUP_DIR}/asm-generated-resources.txt` from [Phase 0](../preparing-for-migration.mdx#record-which-resources-mesh-v1-owns) lists all of them with their owner:
+
+```text
+destinationrules.networking.istio.io  istio-system  httpbingo-org-se        ServiceEntry/httpbingo-org-se
+destinationrules.networking.istio.io  app-partial   asm-backend             Endpoints/backend
+```
+
+Go through that list once here. Nothing has to be annotated, but after the migration these resources have no controller that maintains them, and they are yours to edit or delete from now on.
 
 ## Verification
 

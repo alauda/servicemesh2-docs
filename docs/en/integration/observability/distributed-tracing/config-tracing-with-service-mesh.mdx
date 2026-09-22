@@ -20,6 +20,7 @@ The Jaeger v2 instance and the OpenTelemetry Collector are not service-mesh-spec
 
 **Prerequisites**
 
+- The Alauda Build of Jaeger v2 cluster plugin is installed on the target cluster. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-elasticsearch.html#installing-the-alauda-build-of-jaeger-v2-cluster-plugin" children="Installing the Alauda Build of Jaeger v2 Cluster Plugin" />. The plugin publishes the container images of the tracing components to the registry of the platform and records their addresses in the `jaeger-cluster-plugin-manifest` ConfigMap in `cpaas-system`, which the steps below read.
 - The Alauda Build of OpenTelemetry v2 Operator is installed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-elasticsearch.html#installing-the-alauda-build-of-opentelemetry-v2-operator" children="Installing the Alauda Build of OpenTelemetry v2 Operator" />.
 - A Jaeger v2 instance is deployed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-elasticsearch.html#deploying-the-alauda-build-of-jaeger-v2" children="Deploying the Alauda Build of Jaeger v2 with Elasticsearch" /> or <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-opensearch.html#deploying-the-alauda-build-of-jaeger-v2" children="Deploying the Alauda Build of Jaeger v2 with OpenSearch" />.
   :::info
