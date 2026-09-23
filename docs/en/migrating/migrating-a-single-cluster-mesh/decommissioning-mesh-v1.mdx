@@ -25,6 +25,8 @@ echo "${V1_REVISION} ${V2_REVISION} ${MESH_GROUP} ${CLUSTER_NAMES}"
 
 No value may be empty. A step that runs with an empty `V1_REVISION` deletes nothing, reports no error, and leaves the mesh half cleaned up.
 
+The file holds what describes the mesh. What a single step acts on is not in it and does not belong in it: `MESH_NAMESPACE` and `WORKLOAD` name one workload, `GATEWAY_NAMESPACE` and `GATEWAY_NAME` name one gateway, and steps of this phase and of its verification use them. Set them again for each object you check, as in [Phase 3](./migrating-workloads.mdx) and [Phase 4](./migrating-gateways.mdx). Leaving them empty is worse than getting them wrong: `kubectl -n ""` does not fail, it falls back to whatever namespace your kubeconfig selects and reports that it found nothing there, which reads like a check that passed.
+
 <Steps>
 
 ### No workload is served by Mesh v1
@@ -268,7 +270,7 @@ kubectl -n istio-system get podmonitor istio-proxies-monitor -o json \
 
 Then create the `ServiceMonitor` resource of [Metrics and Service Mesh](../../integration/observability/metrics-and-mesh.mdx). The Mesh v2 resources now scrape every proxy, the gateways included, and the control plane.
 
-### Replace the mesh-wide telemetry configuration
+### Replace the mesh-wide telemetry configuration \{#replace-the-mesh-wide-telemetry-configuration}
 
 Mesh v1 installs a mesh-wide `Telemetry` resource in `istio-system` that both control planes read. It is rendered by the Mesh v1 control plane and stays behind when that control plane is deleted, where it would keep configuring dead providers. Replace it with `asm-default`, the mesh-wide resource of a Mesh v2 mesh — the one [Metrics and Service Mesh](../../integration/observability/metrics-and-mesh.mdx) creates and the rest of the Mesh v2 documentation works with:
 
@@ -418,9 +420,15 @@ Deleting one of these records is how the platform uninstalls the plugin from tha
 If you restored `global-asm-controller` for another mesh, this is also what stops it from reconciling the mesh you migrated. Its log reports `0` afterwards:
 
 ```bash {name=migrate-decommission:check-controller-log}
-kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system logs deploy/global-asm-controller --since=60s \
-  | grep -c "not found" || true
+if kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get deploy global-asm-controller >/dev/null 2>&1; then
+  kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system logs deploy/global-asm-controller --since=60s \
+    | grep -c "not found" || true
+else
+  echo "no controller: the plugin was uninstalled with the last mesh"
+fi
 ```
+
+The controller only exists on a platform that still has another Mesh v1 mesh. If you uninstalled the plugin, it went with it, and the command says so rather than failing.
 
 ## Verification
 
