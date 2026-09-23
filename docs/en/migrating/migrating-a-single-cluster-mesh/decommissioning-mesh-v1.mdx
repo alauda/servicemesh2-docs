@@ -156,7 +156,7 @@ kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system scale deploy global-asm-co
 
 The other meshes keep being managed. For the clusters you migrated the controller finds no `ServiceMesh` resource behind their plugin records, and logs an error for each of them every few seconds until the records are cleared.
 
-Either way, the plugin records of the migrated clusters stay in the plugin list of the platform. [Clear the Mesh v1 plugin records](#clear-the-mesh-v1-plugin-records) removes them at the end of this phase.
+Either way, the plugin records of the migrated clusters stay on the `global` cluster. [Clear the Mesh v1 plugin records](#clear-the-mesh-v1-plugin-records) removes them at the end of this phase.
 
 </Steps>
 
@@ -397,7 +397,7 @@ The custom resource definitions of both APIs are kept: `asm.alauda.io` because a
 
 Run this once, on the `global` cluster, after Mesh v1 is gone from every cluster of the mesh.
 
-Each cluster of a Mesh v1 mesh has two entries in the plugin list of the platform, `asm` and `istio` — **ASM** and **Istio 1-22** in the web console. The orchestration controller creates them with the mesh and deletes them with it, but it is scaled to zero while the mesh resources are deleted, so they stay behind. Both carry the name of the mesh group:
+Each cluster of a Mesh v1 mesh has two records on the `global` cluster that say which Mesh v1 modules are installed on it, `asm` and `istio`. The orchestration controller creates them with the mesh and deletes them with it, but it is scaled to zero while the mesh resources are deleted, so they stay behind. Both carry the name of the mesh group:
 
 ```bash {name=migrate-decommission:list-stale-plugin-records}
 kubectl --context "${GLOBAL_CONTEXT}" get moduleinfoes.cluster.alauda.io -l "asm.cpaas.io/meshgroup=${MESH_GROUP}"
@@ -405,7 +405,7 @@ kubectl --context "${GLOBAL_CONTEXT}" get moduleinfoes.cluster.alauda.io -l "asm
 
 The selector is what keeps the other meshes of the platform out of the list: their clusters still run Mesh v1 and their entries are not stale. Everything the command prints belongs to the mesh you migrated, and the components behind it were removed by hand earlier on this page.
 
-Clear both entries of every migrated cluster from **Marketplace** → **Cluster Plugins** → the cluster → **Uninstall**, or delete the records:
+Delete them. The web console does not list these two among the cluster plugins, so the command line is the only way:
 
 ```bash {name=migrate-decommission:delete-stale-plugin-records}
 kubectl --context "${GLOBAL_CONTEXT}" delete moduleinfoes.cluster.alauda.io -l "asm.cpaas.io/meshgroup=${MESH_GROUP}"

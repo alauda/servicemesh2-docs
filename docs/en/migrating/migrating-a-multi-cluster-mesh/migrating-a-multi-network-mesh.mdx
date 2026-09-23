@@ -40,7 +40,7 @@ done
 
 `meshID` is the same on every cluster; `network` and `clusterName` differ. Mesh v2 must reproduce all three per cluster.
 
-Extend the traffic probes to cover the cross-cluster matrix: a call that stays in the first cluster, a call that stays in the second, and a call from each cluster to a service backed by workloads in both. A service that exists in both clusters is load-balanced across them, so repeated calls exercise both paths.
+Extend the traffic probes to cover the cross-cluster matrix: a call that stays in the first cluster, a call that stays in the second, and a call from each cluster to a service backed by workloads in both. A service that exists in both clusters is load-balanced across them, so repeated calls exercise both paths unless a traffic policy keeps them in the local cluster.
 
 Record that matrix before anything changes. It is the baseline every later phase is compared against:
 
@@ -57,7 +57,9 @@ done | tee "${BACKUP_DIR}/v1-cross-cluster-matrix.txt"
 
 `REPLY_ID` is what tells the replying instances apart in the response of **your** application; the value above matches a demo that returns its own name as `ServerName`. Any field that differs per pod works. Check one response by hand first: a pattern that matches nothing produces an empty matrix, which looks exactly like every call failing.
 
-Thirty calls per direction are enough to show the split. The two directions are usually uneven — locality load balancing sends most calls to the local cluster by design — and it is that distribution, not an even split, that has to be there again after the migration.
+Thirty calls per direction record the distribution the mesh has today, whatever it is. The traffic policies of the mesh decide it: a weighted locality distribution makes both clusters answer in a fixed proportion, locality failover keeps every call in the local cluster for as long as it is healthy, and a mesh with neither spreads calls over all endpoints. It is the recorded result that the later phases are compared against, not an expectation of what it should be.
+
+Record the endpoints as well, with [the endpoint check of Phase 3 and Phase 4](#phase-3-and-phase-4-migrate-cluster-by-cluster). In a mesh where no call leaves its cluster, the matrix cannot show that the cross-cluster path broke; the endpoints of the other cluster are there whether traffic uses them or not.
 
 ## Phase 1: Kiali for a multi-cluster mesh
 
@@ -191,7 +193,7 @@ The last command lists the endpoints the gateway resolves a mesh service to. The
 
 </Steps>
 
-## Phase 3 and Phase 4: migrate cluster by cluster
+## Phase 3 and Phase 4: migrate cluster by cluster \{#phase-3-and-phase-4-migrate-cluster-by-cluster}
 
 Migrate the workloads and gateways of one cluster as described for a single-cluster mesh, then move to the next cluster. After each namespace, check the call matrix:
 
