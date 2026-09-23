@@ -26,7 +26,7 @@ export CTX="${CTX_CLUSTER1}"
 | [Phase 5](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) | Detach the east-west gateway service before the Mesh v1 control plane is deleted; the `global` steps cover the whole mesh at once |
 | [Phase 6](../migrating-a-single-cluster-mesh/finalizing-the-migration.mdx) | One intermediate certificate per cluster, and one tracing index family for the mesh |
 
-## Phase 0: record and probe every cluster
+## Phase 0: record and probe every cluster \{#phase-0-record-and-probe-every-cluster}
 
 Run [Preparing for the migration](../preparing-for-migration.mdx) against each cluster, with `--context` set to that cluster, and keep one variable set per cluster. The mesh identity differs per cluster and must be recorded per cluster:
 
@@ -41,6 +41,23 @@ done
 `meshID` is the same on every cluster; `network` and `clusterName` differ. Mesh v2 must reproduce all three per cluster.
 
 Extend the traffic probes to cover the cross-cluster matrix: a call that stays in the first cluster, a call that stays in the second, and a call from each cluster to a service backed by workloads in both. A service that exists in both clusters is load-balanced across them, so repeated calls exercise both paths.
+
+Record that matrix before anything changes. It is the baseline every later phase is compared against:
+
+```bash {name=migrate-multi-network:record-baseline-matrix}
+export REPLY_ID='"ServerName":"[^"]*"'
+for ctx in "${CTX_CLUSTER1}" "${CTX_CLUSTER2}"; do
+  echo "== from ${ctx}"
+  for i in $(seq 1 30); do
+    kubectl --context "${ctx}" -n "${MESH_NAMESPACE}" exec "deploy/${CLIENT}" -c "${APP_CONTAINER}" -- \
+      curl -s --max-time 5 "http://${TARGET_SERVICE}/" | grep -oE "${REPLY_ID}"
+  done | sort | uniq -c
+done | tee "${BACKUP_DIR}/v1-cross-cluster-matrix.txt"
+```
+
+`REPLY_ID` is what tells the replying instances apart in the response of **your** application; the value above matches a demo that returns its own name as `ServerName`. Any field that differs per pod works. Check one response by hand first: a pattern that matches nothing produces an empty matrix, which looks exactly like every call failing.
+
+Thirty calls per direction are enough to show the split. The two directions are usually uneven — locality load balancing sends most calls to the local cluster by design — and it is that distribution, not an even split, that has to be there again after the migration.
 
 ## Phase 1: Kiali for a multi-cluster mesh
 
@@ -162,13 +179,13 @@ kubectl --context "${CTX}" -n istio-system rollout status deploy/istio-eastwestg
 
 ```bash {name=migrate-multi-network:verify-eastwest-gateway}
 POD=$(kubectl --context "${CTX}" -n istio-system get pod -l gateway.migration=istio-eastwestgateway-v2 -o jsonpath='{.items[0].metadata.name}')
-istioctl --context "${CTX}" proxy-config listener "${POD}" -n istio-system | grep 15443
+istioctl --context "${CTX}" proxy-config listener "${POD}" -n istio-system --port 15443 | tail -n +2 | wc -l
 kubectl --context "${CTX}" -n istio-system get endpoints istio-eastwestgateway -o jsonpath='{.subsets[*].addresses[*].ip}{"\n"}'
 kubectl --context "${CTX}" -n istio-system exec "${POD}" -c istio-proxy -- \
   pilot-agent request GET clusters | grep "${TARGET_SERVICE}" | grep cx_total
 ```
 
-The pod serves the passthrough listener on port 15443, and the service endpoints contain both the Mesh v1 and the Mesh v2 gateway pods.
+The first number counts the SNI matches the pod terminates on port 15443, one per service and port the mesh publishes across clusters — a few dozen in a small mesh, and `0` when the gateway is not programmed as one. The service endpoints then contain both the Mesh v1 and the Mesh v2 gateway pods.
 
 The last command lists the endpoints the gateway resolves a mesh service to. They must all be pod addresses of its own cluster. An address on port 15443 among them is the east-west gateway of the other cluster, which means the network view is missing and requests can be bounced back.
 
@@ -181,13 +198,13 @@ Migrate the workloads and gateways of one cluster as described for a single-clus
 ```bash {name=migrate-multi-network:check-cross-cluster-matrix}
 for i in $(seq 1 10); do
   kubectl --context "${CTX_CLUSTER1}" -n "${MESH_NAMESPACE}" exec "deploy/${CLIENT}" -c "${APP_CONTAINER}" -- \
-    curl -s --max-time 5 "http://${TARGET_SERVICE}/" | grep -o '"ServerName":"[^"]*"'
+    curl -s --max-time 5 "http://${TARGET_SERVICE}/" | grep -oE "${REPLY_ID}"
 done | sort | uniq -c
 ```
 
 The replies come from workloads in both clusters, in both directions, whichever generation of proxy is in use.
 
-Compare the result with the one recorded in [Phase 0](../preparing-for-migration.mdx), not with an even split: a mesh that uses locality load balancing sends most calls to the local cluster by design, and a `DestinationRule` that distributes traffic from one locality only makes the two directions look different. When a direction that reached the other cluster before the migration no longer does, check the remote endpoint instead of the sample:
+Compare the result with `${BACKUP_DIR}/v1-cross-cluster-matrix.txt` from [Phase 0](#phase-0-record-and-probe-every-cluster), not with an even split: a mesh that uses locality load balancing sends most calls to the local cluster by design, and a `DestinationRule` that distributes traffic from one locality only makes the two directions look different. When a direction that reached the other cluster before the migration no longer does, check the remote endpoint instead of the sample:
 
 ```bash {name=migrate-multi-network:check-remote-endpoint}
 istioctl --context "${CTX}" proxy-config endpoint "deploy/${CLIENT}.${MESH_NAMESPACE}" \
@@ -231,6 +248,8 @@ istioctl --context "${CTX}" proxy-config endpoint "deploy/${WORKLOAD}.${MESH_NAM
 ```
 
 One endpoint, in the local cluster. Traces that cross clusters then contain the spans of both sides.
+
+The setting travels through the control plane — the Operator re-renders the mesh configuration, `istiod` reloads it and pushes it to every proxy — so a check that runs in the same breath as the patch still lists both collectors. Give it a few seconds and run it again.
 
 The entry affects only that host. Cross-cluster load balancing of application services, and the east-west gateway path they use, are unchanged.
 
