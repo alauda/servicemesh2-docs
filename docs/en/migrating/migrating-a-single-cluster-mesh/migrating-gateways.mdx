@@ -300,7 +300,7 @@ Keep the deployment: until [Phase 5](../migration-overview.mdx#migration-phases)
 
 </Steps>
 
-## Protect the resources generated for external services
+## Protect the resources generated for external services \{#protect-the-resources-generated-for-external-services}
 
 Binding an external service to an egress gateway makes Mesh v1 generate `Gateway`, `VirtualService` and `DestinationRule` resources. Annotate them so that the Mesh v1 controllers stop managing them and leave them in place when the platform resources are deleted:
 
