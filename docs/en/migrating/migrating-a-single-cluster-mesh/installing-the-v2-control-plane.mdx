@@ -20,7 +20,9 @@ Kiali reads the metrics of the mesh, so it shows the Mesh v1 traffic before the 
 
 Follow [Alauda Build of Kiali](../../integration/observability/kiali.mdx) to install the Kiali Operator and create the `Kiali` resource, and [Configuring Monitoring with Kiali](../../integration/observability/kiali.mdx#configuring-monitoring-with-kiali) to connect it to the monitoring store of the platform.
 
-Leave the tracing configuration of Kiali pointing at the Mesh v1 Jaeger instance for now. [Migrating the observability stack](../migrating-observability.mdx) repoints it at Jaeger v2 in [Phase 6](../migration-overview.mdx#migration-phases).
+Install it without a tracing configuration. The Mesh v1 Jaeger instance is removed in [Phase 5](./decommissioning-mesh-v1.mdx) and Jaeger v2 is installed in [Phase 6](../migration-overview.mdx#migration-phases), which is where [Migrating the observability stack](../migrating-observability.mdx#connect-kiali-to-jaeger-v2) connects Kiali to it. Until then Kiali shows the metrics of the mesh, and traces stay in the Mesh v1 Jaeger UI.
+
+If you want to read traces in Kiali during the migration, point it at the Mesh v1 Jaeger instance as described in [Integrating distributed tracing platform with Alauda Build of Kiali](../../integration/observability/kiali.mdx#integrating-distributed-tracing-platform-with-alauda-build-of-kiali), and expect that configuration to stop working in [Phase 5](./decommissioning-mesh-v1.mdx).
 
 ### Create the metrics resources \{#create-the-metrics-resources}
 
