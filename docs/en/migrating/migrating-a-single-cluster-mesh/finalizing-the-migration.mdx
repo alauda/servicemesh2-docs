@@ -6,7 +6,7 @@ weight: 50
 
 [Phase 6](../migration-overview.mdx#migration-phases) of the migration. Mesh v1 is gone, and the mesh runs on Mesh v2. Three things are left: adopting the `default` revision tag, taking over the certificate authority that Mesh v1 used to renew, and moving the observability stack.
 
-## Adopt the default revision tag
+## Adopt the default revision tag \{#adopt-the-default-revision-tag}
 
 While Mesh v1 existed, the `default` injection webhook belonged to it and Mesh v2 could not claim it. An `IstioRevisionTag` named `default` now lets namespaces use `istio-injection=enabled` instead of a revision-specific label, and keeps that label valid across future Mesh v2 updates.
 
