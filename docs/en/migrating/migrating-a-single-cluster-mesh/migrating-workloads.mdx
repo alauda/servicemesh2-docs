@@ -150,7 +150,14 @@ kubectl -n "${MESH_NAMESPACE}" get pod -o json | jq -r '.items[]
 istioctl proxy-status --revision "${V2_REVISION}"
 ```
 
-Every migrated pod reports `${V2_REVISION}`, and `istioctl` lists it as `SYNCED` against `istiod-${V2_REVISION}`.
+**Example output**
+
+```text
+NAME                                  CLUSTER     ISTIOD                                      VERSION           SUBSCRIBED TYPES
+frontend-567fbdc959-6g8v4.app-all     cluster-1   istiod-default-v1-30-4-6b9c94c84b-57qb2     1.30.4-asm-r0     5 (CDS,LDS,EDS,RDS,NDS)
+```
+
+Every migrated pod reports `${V2_REVISION}` in the first command and appears in the `istioctl` listing with `istiod-${V2_REVISION}` in the `ISTIOD` column. A pod that is missing from the listing is not connected to the Mesh v2 control plane. `istioctl proxy-status --revision "${V2_REVISION}" --verbosity=1` replaces the `SUBSCRIBED TYPES` column with one column per configuration type, each reporting `SYNCED` or `STALE`.
 
 :::note
 `istioctl` needs `--revision` because Mesh v2 uses the `RevisionBased` strategy and has no unsuffixed control plane. Without it, `istioctl` reports that no Istio pods are running.

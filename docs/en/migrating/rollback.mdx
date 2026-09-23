@@ -63,7 +63,7 @@ If the gateway namespace had an `istio.io/rev` label and you switched it to the 
 
 Mesh v1 is gone. Recovery means installing it again. Restore every resource with the function from [Preparing for the migration](./preparing-for-migration.mdx#restore-a-resource-from-the-backup): a backup holds the object as the cluster had it, and applying it unchanged recreates owner references to resources that no longer exist, which makes the garbage collector delete what you just restored.
 
-1. Install the Service Mesh Essentials plugin on the `global` cluster, and the Mesh v1 operators on the mesh cluster, at the versions recorded in `${BACKUP_DIR}/olm.yaml`.
+1. Install the Service Mesh Essentials plugin on the `global` cluster from **Marketplace** → **Cluster Plugins**, and the Mesh v1 operators on the mesh cluster, at the versions recorded in `${BACKUP_DIR}/olm.yaml`. If the plugin is no longer listed, apply `${BACKUP_DIR}/global-asm-moduleplugin.yaml` first: that resource is its catalog entry, and installing is then recreating `${BACKUP_DIR}/global-asm-moduleinfo.yaml`.
 2. Restore the `ServiceMesh` and `ServiceMeshGroup` resources from `${BACKUP_DIR}/global-servicemeshes.yaml` and `${BACKUP_DIR}/global-servicemeshgroups.yaml`, and wait for the Mesh v1 control plane to be running.
 3. Restore the platform resources — microservices, gateways, policies — from the `${BACKUP_DIR}/asm-*.yaml` files. Leave out what Mesh v1 generates for itself; it is recreated by its controllers.
 4. Restore the namespace labels from `${BACKUP_DIR}/namespaces.yaml` and restart the workloads.

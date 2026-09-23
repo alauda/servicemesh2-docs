@@ -183,7 +183,9 @@ Verify that the Operator installation status is reported as `Succeeded` in the *
 Wait for CSV creation; Phase changes to `Succeeded`:
 
 ```shell {name=install-kiali:wait-csv-succeeded}
-kubectl wait --for=jsonpath='{.status.phase}'=Succeeded csv --all -n kiali-operator --timeout=3m
+CSV="$(kubectl -n kiali-operator get subscription kiali-operator -o jsonpath='{.status.currentCSV}')"
+kubectl -n kiali-operator wait --for=create "csv/${CSV}" --timeout=2m
+kubectl -n kiali-operator wait --for=jsonpath='{.status.phase}'=Succeeded "csv/${CSV}" --timeout=3m
 ```
 
 Check CSV status:

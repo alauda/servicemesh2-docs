@@ -192,7 +192,22 @@ kubectl wait --for condition=Ready istio/default --timeout=5m
 6. `traceSampling` is the sampling percentage recorded from Mesh v1. Without it the Mesh v2 control plane uses the Istio default of 1 percent, and a workload traced at 100 percent under Mesh v1 is traced at 1 percent from the moment it is migrated until [Phase 5](./decommissioning-mesh-v1.mdx) replaces the mesh-wide `Telemetry` resource.
 </Callouts>
 
-Copy any other Mesh v1 proxy setting that differs from the Istio defaults — `includeIPRanges`, `excludeIPRanges` and the default sidecar resources are in `${BACKUP_DIR}/v1-mesh-settings.json` — into `spec.values.global.proxy`.
+Copy any other Mesh v1 proxy setting that differs from the Istio defaults — `includeIPRanges`, `excludeIPRanges` and the default sidecar resources are in `${BACKUP_DIR}/v1-mesh-settings.json` — into `spec.values.global.proxy`. The resource is created without them, so apply them now:
+
+```bash {name=migrate-cp:copy-proxy-settings}
+kubectl patch istio default --type=merge -p "$(jq -c '
+  {spec: {values: {global: {proxy:
+    ((if .proxy.resources then {resources: .proxy.resources} else {} end)
+     + (if .proxy.includeIPRanges then {includeIPRanges: .proxy.includeIPRanges} else {} end)
+     + (if .proxy.excludeIPRanges then {excludeIPRanges: .proxy.excludeIPRanges} else {} end))}}}}' \
+  "${BACKUP_DIR}/v1-mesh-settings.json")"
+kubectl get istio default -o jsonpath='{.spec.values.global.proxy}{"\n"}'
+kubectl wait --for condition=Ready istio/default --timeout=5m
+```
+
+The patch only writes the three fields that [Phase 0](../preparing-for-migration.mdx#record-the-mesh-v1-configuration) recorded, and leaves `autoInject` and `seccompProfile` as the resource above set them. Mesh v1 typically caps the sidecar at 500m and 512Mi where Istio defaults to 2000m and 1024Mi, so skipping this step multiplies what every migrated pod requests.
+
+Settings that are not proxy settings — replica counts, resources and scheduling of the control plane in `spec.components` of the Mesh v1 resource — belong under `spec.values.pilot`. Review `${BACKUP_DIR}/v1-control-plane-iop.yaml` and carry over the ones you need.
 
 :::warning Do not create an IstioRevisionTag named default
 Mesh v1 owns the `default` injection webhook. An `IstioRevisionTag` named `default` collides with it and changes which control plane injects pods that have no revision label. [Finalizing the migration](./finalizing-the-migration.mdx) creates it after Mesh v1 is gone.
@@ -214,6 +229,7 @@ With the `RevisionBased` strategy the control plane runs under a revision name d
 
 ```bash {name=migrate-cp:get-v2-revision}
 export V2_REVISION=$(kubectl get istio default -o jsonpath='{.status.activeRevisionName}')
+echo "export V2_REVISION='${V2_REVISION}'" >> "${BACKUP_DIR}/vars.env"
 echo "${V2_REVISION}"
 ```
 
@@ -247,7 +263,7 @@ kubectl get pod -A -o json | jq -r --arg rev "${V1_REVISION}" '[.items[]
   | select((.metadata.annotations["sidecar.istio.io/status"] // "") | test("\"revision\":\"" + $rev + "\""))] | length'
 ```
 
-The count matches the number of injected pods recorded in [Phase 0](../preparing-for-migration.mdx): creating the Mesh v2 control plane does not restart or re-inject anything.
+The count matches `${BACKUP_DIR}/v1-injected-pod-count.txt`, the baseline recorded in [Phase 0](../preparing-for-migration.mdx): creating the Mesh v2 control plane does not restart or re-inject anything. It is higher than the sum of the per-namespace listing of that phase, which only covers namespaces carrying the revision label — the gateway pods are counted here and not there.
 
 :::danger Never delete the Mesh v1 service mesh from the platform UI
 **After you create the Mesh v2 `Istio` resource, never delete the Mesh v1 service mesh from the platform UI, and never delete a `ServiceMesh` resource and leave the cleanup to the Mesh v1 controllers.** The Mesh v1 deletion flow deletes the whole `istio-system` namespace, including the Mesh v2 control plane that runs in it. Remove Mesh v1 only by following [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx).

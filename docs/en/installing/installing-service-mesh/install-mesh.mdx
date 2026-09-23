@@ -11,9 +11,9 @@ Installing Alauda Service Mesh consists four major parts:
 - Deploying the Istio control plane
 
 :::warning
-Do not install Alauda Service Mesh and Alauda Service Mesh v2 in the same Kubernetes cluster, as this may result in functional conflicts.
+Do not install Alauda Service Mesh v2 into a cluster that already runs Alauda Service Mesh, as this may result in functional conflicts.
 
-Migration guide will be available in a future release.
+The two generations run side by side only while a mesh is being migrated from Alauda Service Mesh to Alauda Service Mesh v2, and only by following [Migrating](../../migrating/index.mdx), which installs the control plane with the settings of the existing mesh and removes the old generation at the end. Do not install Alauda Service Mesh v2 next to an existing mesh in any other way.
 :::
 
 :::note
@@ -200,7 +200,9 @@ Verify that the Operator installation status is reported as `Succeeded` in the *
 Wait for CSV creation; Phase changes to `Succeeded`:
 
 ```shell {name=install-mesh:wait-csv-succeeded}
-kubectl wait --for=jsonpath='{.status.phase}'=Succeeded csv --all -n sail-operator --timeout=3m
+CSV="$(kubectl -n sail-operator get subscription servicemesh-operator2 -o jsonpath='{.status.currentCSV}')"
+kubectl -n sail-operator wait --for=create "csv/${CSV}" --timeout=2m
+kubectl -n sail-operator wait --for=jsonpath='{.status.phase}'=Succeeded "csv/${CSV}" --timeout=3m
 ```
 
 Check CSV status:
