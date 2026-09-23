@@ -40,11 +40,13 @@ done
 
 `meshID` is the same on every cluster; `network` and `clusterName` differ. Mesh v2 must reproduce all three per cluster.
 
-Extend the traffic probes to cover the cross-cluster matrix: a call that stays in the first cluster, a call that stays in the second, and a call from each cluster to a service backed by workloads in both. A service that exists in both clusters is load-balanced across them, so repeated calls exercise both paths unless a traffic policy keeps them in the local cluster.
+Extend the traffic probes to cover the cross-cluster matrix: a call that stays in the first cluster, a call that stays in the second, and a call from each cluster to a service backed by workloads in both. A service that exists in both clusters is load-balanced across them, so repeated calls exercise both paths unless a traffic policy keeps them in the local cluster. The workload and the service are the ones named in [The cross-cluster probe](./index.mdx#the-cross-cluster-probe).
 
 Record that matrix before anything changes. It is the baseline every later phase is compared against:
 
 ```bash {name=migrate-multi-network:record-baseline-matrix}
+export MESH_BACKUP_DIR="${HOME}/mesh-v1-migration-backup-${MESH_GROUP}"
+mkdir -p "${MESH_BACKUP_DIR}"
 export REPLY_ID='"ServerName":"[^"]*"'
 for ctx in "${CTX_CLUSTER1}" "${CTX_CLUSTER2}"; do
   echo "== from ${ctx}"
@@ -52,10 +54,12 @@ for ctx in "${CTX_CLUSTER1}" "${CTX_CLUSTER2}"; do
     kubectl --context "${ctx}" -n "${MESH_NAMESPACE}" exec "deploy/${CLIENT}" -c "${APP_CONTAINER}" -- \
       curl -s --max-time 5 "http://${TARGET_SERVICE}/" | grep -oE "${REPLY_ID}"
   done | sort | uniq -c
-done | tee "${BACKUP_DIR}/v1-cross-cluster-matrix.txt"
+done | tee "${MESH_BACKUP_DIR}/v1-cross-cluster-matrix.txt"
 ```
 
 `REPLY_ID` is what tells the replying instances apart in the response of **your** application; the value above matches a demo that returns its own name as `ServerName`. Any field that differs per pod works. Check one response by hand first: a pattern that matches nothing produces an empty matrix, which looks exactly like every call failing.
+
+The matrix describes the mesh, not one of its clusters, and it is recorded once. `BACKUP_DIR` is a different directory on every cluster, so a file written there is out of reach from the next cluster you work on; `MESH_BACKUP_DIR` is where the records of the mesh go, and the later phases read this one from whichever cluster they run on. It is derived from `MESH_GROUP`, so the first line above gives the same path in any shell.
 
 Thirty calls per direction record the distribution the mesh has today, whatever it is. The traffic policies of the mesh decide it: a weighted locality distribution makes both clusters answer in a fixed proportion, locality failover keeps every call in the local cluster for as long as it is healthy, and a mesh with neither spreads calls over all endpoints. It is the recorded result that the later phases are compared against, not an expectation of what it should be.
 
@@ -69,7 +73,8 @@ Its prerequisites are what a migrated mesh usually has to add:
 
 - The clusters report to the same monitoring store. `kubectl --context "${CTX}" get feature monitoring -o jsonpath='{.spec.accessInfo.database.address}'` returns the same address on every cluster of the mesh.
 - The Kiali Operator is installed on every cluster, including the ones that run no Kiali server.
-- The `PodMonitor` exists on every cluster, restricted as described in [Create the metrics resources](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#create-the-metrics-resources); the `ServiceMonitor` follows in [Phase 5](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx). The mesh-wide `Telemetry` resource carries the `mesh_id` tag override on every cluster that runs a control plane. Kiali filters the metrics of the mesh by that label, so a proxy that reports `mesh_id="unknown"` is invisible to it.
+- The `PodMonitor` exists on every cluster, restricted as described in [Create the metrics resources](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#create-the-metrics-resources); the `ServiceMonitor` follows in [Phase 5](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx).
+- The mesh-wide `Telemetry` resource carries the `mesh_id` tag override on every cluster that runs a control plane. Kiali filters the metrics of the mesh by that label, so a proxy that reports `mesh_id="unknown"` is invisible to it. A migrating mesh has nothing to add here: the Mesh v1 resource of each cluster carries the tag and configures the proxies of both generations, and [Phase 5](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx#replace-the-mesh-wide-telemetry-configuration) replaces it per cluster with an `asm-default` that carries it too. Creating `asm-default` now instead would change nothing, see [Create the metrics resources](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#create-the-metrics-resources).
 
 Kiali reports what it found in its log: one `Discovered cluster` line per cluster, each with `Accessible=true`.
 
@@ -198,15 +203,18 @@ The last command lists the endpoints the gateway resolves a mesh service to. The
 Migrate the workloads and gateways of one cluster as described for a single-cluster mesh, then move to the next cluster. After each namespace, check the call matrix:
 
 ```bash {name=migrate-multi-network:check-cross-cluster-matrix}
-for i in $(seq 1 10); do
-  kubectl --context "${CTX_CLUSTER1}" -n "${MESH_NAMESPACE}" exec "deploy/${CLIENT}" -c "${APP_CONTAINER}" -- \
-    curl -s --max-time 5 "http://${TARGET_SERVICE}/" | grep -oE "${REPLY_ID}"
-done | sort | uniq -c
+for ctx in "${CTX_CLUSTER1}" "${CTX_CLUSTER2}"; do
+  echo "== from ${ctx}"
+  for i in $(seq 1 10); do
+    kubectl --context "${ctx}" -n "${MESH_NAMESPACE}" exec "deploy/${CLIENT}" -c "${APP_CONTAINER}" -- \
+      curl -s --max-time 5 "http://${TARGET_SERVICE}/" | grep -oE "${REPLY_ID}"
+  done | sort | uniq -c
+done
 ```
 
-The replies come from workloads in both clusters, in both directions, whichever generation of proxy is in use.
+The replies come from workloads in both clusters, in both directions, whichever generation of proxy is in use. Both directions are probed, as in Phase 0, because a migration step on one cluster changes what the other one reaches.
 
-Compare the result with `${BACKUP_DIR}/v1-cross-cluster-matrix.txt` from [Phase 0](#phase-0-record-and-probe-every-cluster), not with an even split: a mesh that uses locality load balancing sends most calls to the local cluster by design, and a `DestinationRule` that distributes traffic from one locality only makes the two directions look different. When a direction that reached the other cluster before the migration no longer does, check the remote endpoint instead of the sample:
+Compare the result with `${MESH_BACKUP_DIR}/v1-cross-cluster-matrix.txt` from [Phase 0](#phase-0-record-and-probe-every-cluster), not with an even split: a mesh that uses locality load balancing sends most calls to the local cluster by design, and a `DestinationRule` that distributes traffic from one locality only makes the two directions look different. When a direction that reached the other cluster before the migration no longer does, check the remote endpoint instead of the sample:
 
 ```bash {name=migrate-multi-network:check-remote-endpoint}
 istioctl --context "${CTX}" proxy-config endpoint "deploy/${CLIENT}.${MESH_NAMESPACE}" \
@@ -214,7 +222,7 @@ istioctl --context "${CTX}" proxy-config endpoint "deploy/${CLIENT}.${MESH_NAMES
   | jq -r '.[0].hostStatuses[] | "\(.address.socketAddress.address):\(.address.socketAddress.portValue) \(.healthStatus.edsHealthStatus) rq_success=\(.stats[]? | select(.name=="rq_success") | .value // 0)"'
 ```
 
-The endpoint of the other cluster is the address of its east-west gateway on port 15443, and it is healthy. An endpoint that is a raw pod address of the other cluster means the `network` value of that control plane is wrong.
+The endpoint of the other cluster is the address of its east-west gateway on port 15443, and it is healthy. An endpoint that is a raw pod address of the other cluster means the `network` value of that control plane is wrong. No output at all beyond the header means `TARGET_SERVICE` is not the fully qualified name of the service, see [The cross-cluster probe](./index.mdx#the-cross-cluster-probe).
 
 ## Phase 5: decommission cluster by cluster
 

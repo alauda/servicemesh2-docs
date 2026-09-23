@@ -43,10 +43,10 @@ One endpoint, the collector of the local cluster.
 
 ## Verification
 
-Check the remote endpoints of a service that has workloads in both clusters, from a proxy of each generation while they coexist, and again after the migration:
+Check the remote endpoints of a service that has workloads in both clusters, from a proxy of each generation while they coexist, and again after the migration. The workload and the service are the ones named in [The cross-cluster probe](./index.mdx#the-cross-cluster-probe), and `TARGET_SERVICE` is the fully qualified name — the short name matches no Envoy cluster and prints an empty table:
 
 ```bash {name=migrate-single-network:check-remote-endpoints}
-istioctl --context "${CTX}" proxy-config endpoint "deploy/${WORKLOAD}.${MESH_NAMESPACE}" \
+istioctl --context "${CTX}" proxy-config endpoint "deploy/${CLIENT}.${MESH_NAMESPACE}" \
   --cluster "outbound|${APP_PORT}||${TARGET_SERVICE}"
 ```
 
