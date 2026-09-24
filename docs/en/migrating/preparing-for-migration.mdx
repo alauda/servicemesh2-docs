@@ -502,10 +502,10 @@ A probe loop can be as simple as this:
 while true; do
   ts=$(date -u +%FT%TZ)
   for target in "${PROBE_TARGETS[@]}"; do
-    code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "${target}" || echo "000")
+    code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "${target}")
     case "${code}" in
       2*|3*) echo "${ts} ${target} ${code} OK" ;;
-      *)     echo "${ts} ${target} ${code} FAIL" ;;
+      *)     echo "${ts} ${target} ${code:-000} FAIL" ;;
     esac
   done
   sleep 1
@@ -528,12 +528,21 @@ export PROBE_NAMESPACE=<namespace> PROBE_WORKLOAD=<workload> PROBE_CONTAINER=<ap
 export IN_MESH_TARGET=http://<service>.<namespace>:<port>/<path>
 while true; do
   ts=$(date -u +%FT%TZ)
-  code=$(kubectl -n "${PROBE_NAMESPACE}" exec "deploy/${PROBE_WORKLOAD}" -c "${PROBE_CONTAINER}" -- \
-    curl -s -o /dev/null -w '%{http_code}' --max-time 5 "${IN_MESH_TARGET}" 2>/dev/null || echo "000")
-  case "${code}" in 2*|3*) echo "${ts} ${IN_MESH_TARGET} ${code} OK" ;; *) echo "${ts} ${IN_MESH_TARGET} ${code} FAIL" ;; esac
+  out=$(kubectl -n "${PROBE_NAMESPACE}" exec "deploy/${PROBE_WORKLOAD}" -c "${PROBE_CONTAINER}" -- \
+    curl -s -o /dev/null -w '%{http_code}' --max-time 5 "${IN_MESH_TARGET}" 2>&1)
+  code=${out%%[!0-9]*}
+  case "${code}" in
+    2??|3??)         echo "${ts} ${IN_MESH_TARGET} ${code} OK" ;;
+    [0-9][0-9][0-9]) echo "${ts} ${IN_MESH_TARGET} ${code} FAIL" ;;
+    *)               echo "${ts} ${IN_MESH_TARGET} PROBE-ERROR ${out}" ;;
+  esac
   sleep 1
 done
 ```
+
+`kubectl exec` is part of this probe, so its own failures must not be read as mesh outages. The loop keeps the two apart: `FAIL` carries a status code that curl obtained, where `000` means the request got no response at all, and `PROBE-ERROR` is followed by the message kubectl printed — a container name that does not exist, a context that points at another cluster, an expired credential. Run one iteration and confirm it prints `OK` before you rely on the probe.
+
+A probe that reports every request as failing while the same curl succeeds inside the pod is a broken probe, not an outage. Each sample costs an exec round trip of one to three seconds, and a failing request waits for `--max-time` on top of that, so `FAIL` lines that arrive exactly one second apart mean `kubectl exec` returned without ever reaching the container.
 
 :::note Where to run the probes from
 Run the probes from outside the mesh, or from the namespace you migrate last. A probe that runs inside a workload being restarted reports its own restart as an outage.
@@ -549,7 +558,7 @@ An egress probe must be checked against the gateway, not only against its status
 - `cat "${BACKUP_DIR}/vars.env"` shows every variable the later phases need, with no empty value.
 - `ls "${BACKUP_DIR}"` lists the backup of the Istio resources, the Mesh v1 resources, the gateway services and certificates, the `cacerts` secret and the `global` cluster resources.
 - `cat "${BACKUP_DIR}/v1-jaeger.txt"` shows the index prefix, the retention and the credentials secret of the tracing backend, and `${BACKUP_DIR}/v1-jaeger-es-credentials.yaml` holds that secret.
-- The probes report `OK` for every target.
+- The probes report `OK` for every target, with no `PROBE-ERROR` line.
 - The compatibility audits return no unexpected resources.
 
 Continue with [Migrating a single-cluster mesh](./migrating-a-single-cluster-mesh/index.mdx), or with [Migrating a multi-cluster mesh](./migrating-a-multi-cluster-mesh/index.mdx) if the mesh spans several clusters.
