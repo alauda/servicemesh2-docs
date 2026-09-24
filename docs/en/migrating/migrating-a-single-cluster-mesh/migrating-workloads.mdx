@@ -33,6 +33,8 @@ Write them into the workload template while you migrate the workload. The same r
 
 ### Generate the patches
 
+Replace `<namespace>` with your own value.
+
 ```bash {name=migrate-workloads:build-metadata-patches}
 export MESH_NAMESPACE=<namespace>
 PATCH_DIR="${BACKUP_DIR}/metadata-patches/${MESH_NAMESPACE}"
@@ -117,7 +119,7 @@ Running pods keep their Mesh v1 proxy. Only pods created from now on are injecte
 
 ### Migrate the workloads
 
-Apply the patch of each workload. The patch also sets the restart annotation, so one rollout both persists the settings and moves the workload to Mesh v2.
+Apply the patch of each workload. The patch also sets the restart annotation, so one rollout both persists the settings and moves the workload to Mesh v2. Replace `<workload>` with your own value.
 
 ```bash {name=migrate-workloads:migrate-workload}
 export WORKLOAD=<workload>

@@ -14,6 +14,8 @@ Migrate the workloads behind a gateway first, see [Migrating workloads](./migrat
 
 ### List the Mesh v1 gateways
 
+Replace `<gateway-namespace>` and `<gateway-name>` with one of the gateways the first command lists.
+
 ```bash {name=migrate-gateways:list-gateways}
 kubectl get gatewaydeploys.asm.alauda.io -A -o json | jq -r '.items[] | "\(.metadata.namespace)/\(.metadata.name)"'
 export GATEWAY_NAMESPACE=<gateway-namespace>

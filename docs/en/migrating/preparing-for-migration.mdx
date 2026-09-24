@@ -33,7 +33,7 @@ Complete every section before you install the Mesh v2 control plane.
 
 ## Set the variables
 
-Every page in this section uses these variables. Set them once per shell.
+Every page in this section uses these variables. Set them once per shell. Replace `<global-cluster-context>` and `<cluster-name>` with your own values.
 
 ```bash {name=migrate-prep:set-variables}
 umask 077
@@ -512,7 +512,7 @@ while true; do
 done
 ```
 
-Set `PROBE_TARGETS` to your own URLs, for example:
+Set `PROBE_TARGETS` to your own URLs. Replace `<ingress-gateway-host>`, `<ingress-gateway-tls-host>` and `<path>`:
 
 ```bash {name=migrate-prep:set-probe-targets}
 export PROBE_TARGETS=(
@@ -521,7 +521,7 @@ export PROBE_TARGETS=(
 )
 ```
 
-The ingress routes are reachable from your machine. The other two paths — a call between two workloads and an egress route — are not: they only exist inside the mesh and have to be probed from a pod. Use a workload you migrate last, so that its own restart does not show up as an outage:
+The ingress routes are reachable from your machine. The other two paths — a call between two workloads and an egress route — are not: they only exist inside the mesh and have to be probed from a pod. Use a workload you migrate last, so that its own restart does not show up as an outage. Replace `<namespace>`, `<workload>`, `<application-container>`, `<service>`, `<port>` and `<path>` with your own values:
 
 ```bash {name=migrate-prep:run-in-mesh-probe}
 export PROBE_NAMESPACE=<namespace> PROBE_WORKLOAD=<workload> PROBE_CONTAINER=<application-container>
