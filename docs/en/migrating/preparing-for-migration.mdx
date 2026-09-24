@@ -33,7 +33,7 @@ Complete every section before you install the Mesh v2 control plane.
 
 ## Set the variables
 
-Every page in this section uses these variables. Set them once per shell.
+Every page in this section uses these variables. Set them once per shell. Replace `<global-cluster-context>` and `<cluster-name>` with your own values.
 
 ```bash {name=migrate-prep:set-variables}
 umask 077
@@ -502,17 +502,17 @@ A probe loop can be as simple as this:
 while true; do
   ts=$(date -u +%FT%TZ)
   for target in "${PROBE_TARGETS[@]}"; do
-    code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "${target}" || echo "000")
+    code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "${target}")
     case "${code}" in
       2*|3*) echo "${ts} ${target} ${code} OK" ;;
-      *)     echo "${ts} ${target} ${code} FAIL" ;;
+      *)     echo "${ts} ${target} ${code:-000} FAIL" ;;
     esac
   done
   sleep 1
 done
 ```
 
-Set `PROBE_TARGETS` to your own URLs, for example:
+Set `PROBE_TARGETS` to your own URLs. Replace `<ingress-gateway-host>`, `<ingress-gateway-tls-host>` and `<path>`:
 
 ```bash {name=migrate-prep:set-probe-targets}
 export PROBE_TARGETS=(
@@ -521,16 +521,21 @@ export PROBE_TARGETS=(
 )
 ```
 
-The ingress routes are reachable from your machine. The other two paths — a call between two workloads and an egress route — are not: they only exist inside the mesh and have to be probed from a pod. Use a workload you migrate last, so that its own restart does not show up as an outage:
+The ingress routes are reachable from your machine. The other two paths — a call between two workloads and an egress route — are not: they only exist inside the mesh and have to be probed from a pod. Use a workload you migrate last, so that its own restart does not show up as an outage. Replace `<namespace>`, `<workload>`, `<application-container>`, `<service>`, `<port>` and `<path>` with your own values:
 
 ```bash {name=migrate-prep:run-in-mesh-probe}
 export PROBE_NAMESPACE=<namespace> PROBE_WORKLOAD=<workload> PROBE_CONTAINER=<application-container>
 export IN_MESH_TARGET=http://<service>.<namespace>:<port>/<path>
 while true; do
   ts=$(date -u +%FT%TZ)
-  code=$(kubectl -n "${PROBE_NAMESPACE}" exec "deploy/${PROBE_WORKLOAD}" -c "${PROBE_CONTAINER}" -- \
-    curl -s -o /dev/null -w '%{http_code}' --max-time 5 "${IN_MESH_TARGET}" 2>/dev/null || echo "000")
-  case "${code}" in 2*|3*) echo "${ts} ${IN_MESH_TARGET} ${code} OK" ;; *) echo "${ts} ${IN_MESH_TARGET} ${code} FAIL" ;; esac
+  out=$(kubectl -n "${PROBE_NAMESPACE}" exec "deploy/${PROBE_WORKLOAD}" -c "${PROBE_CONTAINER}" -- \
+    curl -s -o /dev/null -w '%{http_code}' --max-time 5 "${IN_MESH_TARGET}" 2>&1)
+  code=${out%%[!0-9]*}
+  case "${code}" in
+    2??|3??)         echo "${ts} ${IN_MESH_TARGET} ${code} OK" ;;
+    [0-9][0-9][0-9]) echo "${ts} ${IN_MESH_TARGET} ${code} FAIL" ;;
+    *)               echo "${ts} ${IN_MESH_TARGET} PROBE-ERROR ${out}" ;;
+  esac
   sleep 1
 done
 ```
@@ -549,7 +554,7 @@ An egress probe must be checked against the gateway, not only against its status
 - `cat "${BACKUP_DIR}/vars.env"` shows every variable the later phases need, with no empty value.
 - `ls "${BACKUP_DIR}"` lists the backup of the Istio resources, the Mesh v1 resources, the gateway services and certificates, the `cacerts` secret and the `global` cluster resources.
 - `cat "${BACKUP_DIR}/v1-jaeger.txt"` shows the index prefix, the retention and the credentials secret of the tracing backend, and `${BACKUP_DIR}/v1-jaeger-es-credentials.yaml` holds that secret.
-- The probes report `OK` for every target.
+- The probes report `OK` for every target, with no `PROBE-ERROR` line.
 - The compatibility audits return no unexpected resources.
 
 Continue with [Migrating a single-cluster mesh](./migrating-a-single-cluster-mesh/index.mdx), or with [Migrating a multi-cluster mesh](./migrating-a-multi-cluster-mesh/index.mdx) if the mesh spans several clusters.

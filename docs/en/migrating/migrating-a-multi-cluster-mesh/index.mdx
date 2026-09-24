@@ -19,7 +19,7 @@ Read [Migrating a single-cluster mesh](../migrating-a-single-cluster-mesh/index.
 
 ## The cross-cluster probe \{#the-cross-cluster-probe}
 
-The checks on this page and on the two pages below all call one service of the mesh from one workload, and they name it with the same variables. Set them on a service that has pods in both clusters, and keep the values for the whole migration:
+The checks on this page and on the two pages below all call one service of the mesh from one workload, and they name it with the same variables. Set them on a service that has pods in both clusters, and keep the values for the whole migration. Replace `<namespace-they-run-in>`, `<deployment-that-makes-the-call>`, `<its-application-container>`, `<service-it-calls>` and `<port-of-that-service>` with your own values:
 
 ```bash {name=migrate-mc:set-probe-variables}
 export MESH_NAMESPACE=<namespace-they-run-in>
@@ -36,7 +36,7 @@ The service is named twice on purpose. `TARGET_APP` is its short name, which is 
 
 ## Determine the network topology \{#determine-the-network-topology}
 
-The migration steps differ depending on whether the clusters share one network or use one network each. Determine this before you start.
+The migration steps differ depending on whether the clusters share one network or use one network each. Determine this before you start. Replace `<context-of-the-first-cluster>` and `<context-of-the-second-cluster>` with your own values.
 
 ```bash {name=migrate-mc:collect-network}
 export CTX_CLUSTER1=<context-of-the-first-cluster>

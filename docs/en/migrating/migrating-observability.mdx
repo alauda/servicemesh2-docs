@@ -111,7 +111,7 @@ In Mesh v1, a platform webhook added the injection annotations and the identity 
 
 ### Prepare the Java agent image \{#prepare-the-java-agent-image}
 
-Mesh v1 shipped its own Java agent image. Mesh v2 does not, so choose an image and make it reachable from the cluster, as described in <ExternalSiteLink name="opentelemetry" href="/migrating/migrating-to-v2.html#preparing-the-java-agent-image" children="Preparing the Java agent image" />.
+Mesh v1 shipped its own Java agent image. Mesh v2 does not, so choose an image and make it reachable from the cluster, as described in <ExternalSiteLink name="opentelemetry" href="/migrating/migrating-to-v2.html#preparing-the-java-agent-image" children="Preparing the Java agent image" />. Replace `<java-auto-instrumentation-image>` with your own value.
 
 ```bash {name=migrate-observability:set-java-agent-image}
 export JAVA_AGENT_IMAGE=<java-auto-instrumentation-image>
@@ -179,7 +179,7 @@ The variable belongs to the application container, so the command looks up its i
 
 `OTEL_SERVICE_NAME` is not the only variable the Mesh v1 webhook added to the application container. `${BACKUP_DIR}/v1-injected-env.txt` from [Phase 0](./preparing-for-migration.mdx#record-the-variables-the-mesh-v1-webhooks-add-to-pods) lists the rest — `ASM_MS_NAME`, `ASM_POD_NAMESPACE`, `ASM_CLUSTER_NAME` and `ASM_CONTAINER_NAME`. An application that reads one of them keeps running after the migration, reads an empty value, and reports nothing: a field that used to hold `frontend.app-all` holds `null.null` instead.
 
-Add the ones your applications depend on to the workload template, as literal values:
+Add the ones your applications depend on to the workload template, as literal values. Replace `<microservice-name>` with your own value:
 
 ```bash {name=migrate-observability:restore-injected-env}
 export MS_NAME=<microservice-name>
