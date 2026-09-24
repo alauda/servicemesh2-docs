@@ -101,6 +101,40 @@ _mc_install_west_operator() {
     return 0
 }
 
+# 校验 East 上的远端集群 Secret。
+# kiali-prepare-remote-cluster.sh 使用 kubectl apply --server-side，kubectl 的
+# 状态词会随 kubectl / apply 模式变化（created、configured、serverside-applied），
+# 因此只校验稳定的业务结果：平台代理地址、Kiali 自动发现标签和 cluster2 kubeconfig。
+_mc_validate_remote_secret() {
+    local proxy_server="$1"
+    local output="$2"
+    local expected_server="INFO: remote_cluster_server_url=${proxy_server}"
+    local secret_json
+
+    if ! __cmp_contains "$output" "$expected_server"; then
+        log_error "remote cluster server 地址验证失败"
+        log_error "期待包含: $expected_server"
+        log_error "实际输出: $output"
+        return 1
+    fi
+
+    secret_json=$(kubectl --context "$CTX_CLUSTER1" -n istio-system \
+        get secret "$_MC_REMOTE_SECRET" -o json 2>/dev/null) || {
+        log_error "远端集群 Secret 不存在: istio-system/$_MC_REMOTE_SECRET"
+        return 1
+    }
+
+    if ! jq -e --arg cluster "$_MC_ISTIO_CLUSTER2" '
+        (.metadata.labels["kiali.io/multiCluster"] == "true")
+        and ((.data[$cluster] // "") | length > 0)
+    ' <<<"$secret_json" >/dev/null; then
+        log_error "远端集群 Secret 缺少 Kiali 自动发现标签或 cluster2 kubeconfig"
+        return 1
+    fi
+
+    return 0
+}
+
 # 把 West 的 proxy-connect kubeconfig 并入框架的 merged.yaml，供
 # kiali-prepare-remote-cluster.sh 同时读两个 context
 # 用法: _mc_merge_proxy_kubeconfig <work_dir>
@@ -285,8 +319,7 @@ _mc_test_impl() {
         return 1
     }
 
-    # 文档的期待输出是 `secret/... created`；重跑场景下若 Secret 已存在会变成
-    # configured，先删掉以保证与文档一致（与 kiali 用例创建 Secret 前的做法一致）
+    # 删除旧 Secret，保证本次测试验证的是当前命令生成的内容。
     kubectl --context "$CTX_CLUSTER1" -n istio-system \
         delete secret "$_MC_REMOTE_SECRET" --ignore-not-found=true > /dev/null 2>&1 || true
 
@@ -298,18 +331,11 @@ _mc_test_impl() {
         return 1
     }
 
-    # 期待输出的两行不相邻，按行关键字断言。脚本打印的 server 地址就是它从
-    # remote-cluster-context 读出来的，直接用步骤 4.2 校验过的那个值替换占位符
-    expected=$(runme print install-kiali-mc:run-prepare-script-output \
-        | sed -e "s|<platform-url>/kubernetes/<west-cluster-name>|${proxy_server}|g" \
-        | sed -e 's|^|+ |') || return 1
-    if ! __cmp_lines "$output" "$expected"; then
+    if ! _mc_validate_remote_secret "$proxy_server" "$output"; then
         log_error "remote cluster secret 生成结果验证失败"
-        log_error "期待包含: $expected"
-        log_error "实际输出: $output"
         return 1
     fi
-    log_success "remote cluster secret 已生成"
+    log_success "remote cluster secret 已生成且内容可供 Kiali 使用"
 
     # ============================================================
     # 步骤 6: 触发 Kiali server 调和

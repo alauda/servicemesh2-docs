@@ -217,11 +217,10 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
   - `--process-kiali-secret true`: creates the secret in the Kiali deployment namespace on the **East** cluster.
   - `--view-only false`: grants Kiali write access to the remote cluster. Set it to `true` to restrict Kiali to read-only operations on that cluster.
 
-  On success the script reports the server address it read from the context and the name of the secret it created:
+  On success the script reports the server address it read from the context. The `kubectl` status word for the Secret can vary by apply mode and kubectl version (`created`, `configured`, or `serverside-applied`); the test verifies the Secret resource and its kubeconfig instead of relying on that status word.
 
   ```text {name=install-kiali-mc:run-prepare-script-output}
   INFO: remote_cluster_server_url=<platform-url>/kubernetes/<west-cluster-name>
-  secret/kiali-remote-cluster-secret-cluster2 created
   ```
 
   :::tip
