@@ -8,6 +8,10 @@ weight: 20
 
 Before you start, complete [Installing the Mesh v2 control plane](./installing-the-v2-control-plane.mdx) and keep the shell variables set by that page and by [Preparing for the migration](../preparing-for-migration.mdx).
 
+:::note Migrate one namespace at a time
+Everything on this page is scoped to `MESH_NAMESPACE`. Run the whole page for one namespace — generate its patches, switch its revision label, migrate its workloads, check the result — before you set `MESH_NAMESPACE` to the next namespace and start again.
+:::
+
 ## How injection is decided
 
 A namespace carries the label `istio.io/rev`, and the value selects the control plane that injects its pods. Mesh v1 is itself a revisioned deployment (`1-22`), so changing the label from `${V1_REVISION}` to `${V2_REVISION}` moves the namespace to Mesh v2. Running pods are not affected; the change applies to pods created after it.

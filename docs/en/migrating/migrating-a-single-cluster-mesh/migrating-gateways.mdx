@@ -8,6 +8,10 @@ weight: 30
 
 Migrate the workloads behind a gateway first, see [Migrating workloads](./migrating-workloads.mdx).
 
+:::note Migrate one gateway at a time
+Everything on this page is scoped to `GATEWAY_NAMESPACE` and `GATEWAY_NAME`. Run the whole page for one gateway — collect its configuration, deploy the Mesh v2 gateway next to it, shift the traffic, verify — before you set the two variables to the next gateway and start again.
+:::
+
 ## Collect the gateway configuration
 
 <Steps>
