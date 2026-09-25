@@ -127,7 +127,7 @@ Expected: `NotFound` for every resource of this mesh, and `istio-system Active` 
 
 The plugin serves every Mesh v1 mesh of the platform, so what you do here depends on whether any mesh is left. List them — the mesh you migrated is already gone, its resources were deleted in the previous step:
 
-```bash title="Meshes-still-on-Mesh-v1" {name=migrate-decommission:check-remaining-meshes}
+```bash {name=migrate-decommission:check-remaining-meshes}
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshs.asm.alauda.io
 ```
 
