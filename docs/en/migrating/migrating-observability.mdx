@@ -30,7 +30,7 @@ Load the variables of the migration, `source "${BACKUP_DIR}/vars.env"`, and coll
   These are the `ES_ENDPOINT`, `ES_USER` and `ES_PASS` that the installation steps below ask for. The keys in the Mesh v1 secret are named `ES_USERNAME` and `ES_PASSWORD`.
 
 - `${BACKUP_DIR}/instrumentations.yaml` — the Mesh v1 `Instrumentation` resource, which holds the exporter endpoint, the sampler and the service name pattern your applications report.
-- `${BACKUP_DIR}/v1-instrumented-pods.txt` — the workloads that use Java auto-instrumentation.
+- `${BACKUP_DIR}/v1-instrumented-pods.txt` — the workloads that use Java auto-instrumentation, one line each: namespace, workload, application container, microservice name and reported service name.
 - `${BACKUP_DIR}/v1-injected-env.txt` — the variables the Mesh v1 webhooks added to the application containers.
 
 Keep one trace from before the migration at hand — its trace ID, its service name and its span count. It is the reference for the verification at the end.
@@ -107,7 +107,25 @@ Applications that are instrumented by the OpenTelemetry Operator need three thin
 
 In Mesh v1, a platform webhook added the injection annotations and the identity variables to each pod, and the `Instrumentation` resource in `cpaas-system` referenced them. Neither exists now, so both the annotations and the values must be written where they survive on their own.
 
+:::note Migrate one workload at a time
+Every step writes values that belong to one workload into that workload's template. Set `MESH_NAMESPACE`, `WORKLOAD`, `APP_CONTAINER`, `MS_NAME` and `SERVICE_NAME` for one workload, run the steps for it — service name, variables, annotations, rollout — and check the result before you set them for the next one. The agent image is chosen once for the cluster and the `Instrumentation` resource once per namespace; everything after them is per workload.
+:::
+
 <Steps>
+
+### Set the variables of the workload \{#set-the-variables-of-the-workload}
+
+Every step below acts on the workload these variables name. Take their values from the line of that workload in `${BACKUP_DIR}/v1-instrumented-pods.txt`, recorded in [Phase 0](./preparing-for-migration.mdx#record-the-instrumented-workloads) as `<namespace> <workload> <application-container> <microservice> <service-name>`. Replace `<namespace>` and `<workload>` with your own values:
+
+```bash {name=migrate-observability:set-workload-variables}
+export MESH_NAMESPACE=<namespace> WORKLOAD=<workload>
+read -r APP_CONTAINER MS_NAME SERVICE_NAME <<<"$(awk -v ns="${MESH_NAMESPACE}" -v w="${WORKLOAD}" \
+  '$1 == ns && $2 == w {print $3, $4, $5}' "${BACKUP_DIR}/v1-instrumented-pods.txt")"
+export APP_CONTAINER MS_NAME SERVICE_NAME
+echo "container=${APP_CONTAINER} msname=${MS_NAME} service=${SERVICE_NAME}"
+```
+
+No value may be empty or read `-`. `APP_CONTAINER` is the container the agent is injected into and the container the variables belong to, `MS_NAME` the microservice the workload belonged to in Mesh v1 — which is not always the name of the workload — and `SERVICE_NAME` the name the application reported before the migration. A wrong or empty value is accepted and reported like any other: the identity your applications report changes without anything failing.
 
 ### Prepare the Java agent image \{#prepare-the-java-agent-image}
 
@@ -119,7 +137,7 @@ export JAVA_AGENT_IMAGE=<java-auto-instrumentation-image>
 
 ### Create the `Instrumentation` resource
 
-Recreate the Mesh v1 configuration with the values from `${BACKUP_DIR}/instrumentations.yaml`, translated for the v2 agent:
+Recreate the Mesh v1 configuration with the values from `${BACKUP_DIR}/instrumentations.yaml`, translated for the v2 agent. One resource per namespace serves every instrumented workload in it:
 
 ```bash {name=migrate-observability:create-instrumentation}
 cat <<EOF | kubectl apply -f -
@@ -160,35 +178,56 @@ EOF
 
 Mesh v1 built the reported service name from the microservice name and the namespace, `<microservice>.<namespace>`, using variables that a Mesh v1 webhook injected. Without that webhook, the OpenTelemetry Operator falls back to the name of the workload, which changes how your applications appear in Jaeger, in dashboards and in alerts.
 
-Set the name explicitly on each workload, using the value recorded in `${BACKUP_DIR}/v1-instrumented-pods.txt`:
+Set the name explicitly on the application container, with the `SERVICE_NAME` of the workload:
 
 ```bash {name=migrate-observability:set-service-name}
-IDX=$(kubectl -n "${MESH_NAMESPACE}" get deploy "${WORKLOAD}" -o json \
-  | jq -r --arg c "${APP_CONTAINER}" '[.spec.template.spec.containers[].name] | index($c) // "none"')
-if [ "${IDX}" = "none" ]; then
-  echo "${WORKLOAD} has no container named ${APP_CONTAINER}"
-else
-  kubectl -n "${MESH_NAMESPACE}" patch deploy "${WORKLOAD}" --type=json \
-    -p="[{\"op\":\"add\",\"path\":\"/spec/template/spec/containers/${IDX}/env/-\",\"value\":{\"name\":\"OTEL_SERVICE_NAME\",\"value\":\"${SERVICE_NAME}\"}}]"
-fi
+kubectl -n "${MESH_NAMESPACE}" patch deploy "${WORKLOAD}" -p "$(cat <<EOF
+{"spec":{"template":{"spec":{"containers":[
+  {"name":"${APP_CONTAINER}","env":[{"name":"OTEL_SERVICE_NAME","value":"${SERVICE_NAME}"}]}
+]}}}}
+EOF
+)"
 ```
 
-The variable belongs to the application container, so the command looks up its index rather than writing to the first container of the pod. If that container has no `env` list yet, add one with `kubectl edit`. Setting the variable on the application container keeps the name stable no matter which component injects the agent.
+This is a strategic merge patch: it matches the container by its name and the variable by its name. Only that one variable is written, the `env` list is created if the container has none, and running the step again updates the value instead of appending a second definition of the same variable. Setting the variable on the application container keeps the name stable no matter which component injects the agent.
 
 ### Restore the variables your applications read \{#restore-the-variables-your-applications-read}
 
 `OTEL_SERVICE_NAME` is not the only variable the Mesh v1 webhook added to the application container. `${BACKUP_DIR}/v1-injected-env.txt` from [Phase 0](./preparing-for-migration.mdx#record-the-variables-the-mesh-v1-webhooks-add-to-pods) lists the rest — `ASM_MS_NAME`, `ASM_POD_NAMESPACE`, `ASM_CLUSTER_NAME` and `ASM_CONTAINER_NAME`. An application that reads one of them keeps running after the migration, reads an empty value, and reports nothing: a field that used to hold `frontend.app-all` holds `null.null` instead.
 
-Add the ones your applications depend on to the workload template, as literal values. Replace `<microservice-name>` with your own value:
+Add the ones your applications depend on to the workload template, as literal values, with the `MS_NAME` of the workload:
 
 ```bash {name=migrate-observability:restore-injected-env}
-export MS_NAME=<microservice-name>
-kubectl -n "${MESH_NAMESPACE}" patch deploy "${WORKLOAD}" --type=json \
-  -p="[{\"op\":\"add\",\"path\":\"/spec/template/spec/containers/${IDX}/env/-\",\"value\":{\"name\":\"ASM_MS_NAME\",\"value\":\"${MS_NAME}\"}},
-       {\"op\":\"add\",\"path\":\"/spec/template/spec/containers/${IDX}/env/-\",\"value\":{\"name\":\"ASM_POD_NAMESPACE\",\"valueFrom\":{\"fieldRef\":{\"fieldPath\":\"metadata.namespace\"}}}}]"
+kubectl -n "${MESH_NAMESPACE}" patch deploy "${WORKLOAD}" -p "$(cat <<EOF
+{"spec":{"template":{"spec":{"containers":[
+  {"name":"${APP_CONTAINER}","env":[
+    {"name":"ASM_MS_NAME","value":"${MS_NAME}"},
+    {"name":"ASM_POD_NAMESPACE","valueFrom":{"fieldRef":{"fieldPath":"metadata.namespace"}}}
+  ]}
+]}}}}
+EOF
+)"
 ```
 
-`IDX` is the index of the application container, from the command above. `MS_NAME` is the microservice the workload belonged to in Mesh v1, which is not always the name of the workload — `${BACKUP_DIR}/v1-instrumented-pods.txt` holds it as the first part of the reported service name, `<microservice>.<namespace>`. A workload name written here is accepted and reported like any other value, and the identity your applications report changes without anything failing.
+Then check what the application container is left with:
+
+```bash {name=migrate-observability:check-app-env}
+kubectl -n "${MESH_NAMESPACE}" get deploy "${WORKLOAD}" -o json \
+  | jq -r --arg c "${APP_CONTAINER}" '[.spec.template.spec.containers[] | select(.name == $c) | (.env // [])[]
+      | select(.name | test("^(OTEL_|ASM_)"))]
+    | group_by(.name)[]
+    | "\(.[0].name) \(length)x \([.[] | .value // .valueFrom.fieldRef.fieldPath // ""] | join(" | "))"'
+```
+
+**Example output**
+
+```text
+ASM_MS_NAME 1x frontend-ms
+ASM_POD_NAMESPACE 1x metadata.namespace
+OTEL_SERVICE_NAME 1x frontend-ms.app-all
+```
+
+Every variable is listed once and with a value. A variable listed `2x` has a second definition that an earlier run appended: the container reads the last one, the API server warns `hides previous definition of "..."` on every later change to the workload, and a later `apply` may drop it. Remove the extra entries with `kubectl -n "${MESH_NAMESPACE}" edit deploy "${WORKLOAD}"`, keeping the definition that holds the value you want. An empty value means the step ran before its variable was set.
 
 Skipping this step is safe as long as no application reads these variables. Confirm that with the application owners rather than assuming it: nothing in the cluster reports a variable that resolves to an empty string.
 
