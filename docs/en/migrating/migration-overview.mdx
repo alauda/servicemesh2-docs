@@ -101,6 +101,7 @@ Environment-specific values are shell variables. Every page that uses a variable
 | `V1_TRACE_SAMPLING` | Trace sampling percentage of Mesh v1 | [Preparing for the migration](./preparing-for-migration.mdx) |
 | `V2_REVISION` | Active Mesh v2 revision, for example `default-v1-30-4` | [Installing the Mesh v2 control plane](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#get-the-mesh-v2-revision) |
 | `MESH_NAMESPACE`, `WORKLOAD`, `APP_CONTAINER` | Namespace, workload and application container a step acts on | You set them per step |
+| `MS_NAME`, `SERVICE_NAME` | Mesh v1 microservice name and reported service name of an instrumented workload | [Migrating the observability stack](./migrating-observability.mdx#set-the-variables-of-the-workload) |
 | `CTX_CLUSTER1`, `CTX_CLUSTER2` | `kubectl` contexts of the two clusters of a multi-cluster mesh | [Migrating a multi-cluster mesh](./migrating-a-multi-cluster-mesh/index.mdx#determine-the-network-topology) |
 | `CTX` | Context of the cluster the current multi-cluster step acts on | [Address one cluster at a time](./migrating-a-multi-cluster-mesh/index.mdx#address-one-cluster-at-a-time) |
 | `CLIENT`, `TARGET_APP`, `TARGET_SERVICE`, `APP_PORT` | Workload and service the cross-cluster checks call | [The cross-cluster probe](./migrating-a-multi-cluster-mesh/index.mdx#the-cross-cluster-probe) |
