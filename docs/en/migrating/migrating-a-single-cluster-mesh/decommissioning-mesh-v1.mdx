@@ -125,13 +125,17 @@ Expected: `NotFound` for every resource of this mesh, and `istio-system Active` 
 
 ### Uninstall the Alauda Service Mesh Essentials plugin \{#uninstall-the-service-mesh-essentials-plugin}
 
-The plugin serves every Mesh v1 mesh of the platform. Uninstall it only when the mesh you migrated was the last one:
+The plugin serves every Mesh v1 mesh of the platform, so what you do here depends on whether any mesh is left. List them — the mesh you migrated is already gone, its resources were deleted in the previous step:
 
 ```bash title="Meshes-still-on-Mesh-v1" {name=migrate-decommission:check-remaining-meshes}
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshs.asm.alauda.io
 ```
 
-Remove the plugin from the web console: **Marketplace** → **Cluster Plugins** on the `global` cluster → **Alauda Service Mesh Essentials** → **Uninstall**.
+Then follow the case that matches the output.
+
+**Case 1 — the listing is empty: this was the last Mesh v1 mesh of the platform. Uninstall the plugin.**
+
+Remove it from the web console: **Marketplace** → **Cluster Plugins** on the `global` cluster → **Alauda Service Mesh Essentials** → **Uninstall**.
 
 On the command line, a cluster plugin is uninstalled by deleting the `ModuleInfo` that records it as installed. List it first — the `CLUSTER` column shows which cluster the entry targets, `global` for this plugin:
 
@@ -149,7 +153,9 @@ The components of the plugin are removed asynchronously, about a minute after th
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get deploy | grep -E 'asm|hermes' || echo "no Mesh v1 components left"
 ```
 
-If **Meshes-still-on-Mesh-v1** at the start of this step listed other meshes, do not uninstall the plugin. Put the `global` cluster back the way it was instead:
+**Case 2 — the listing shows other meshes: they are still served by the plugin. Keep it, and put the `global` cluster back the way it was.**
+
+Skip the commands of case 1 and undo the first two steps of this section, the admission webhooks and the orchestration controller that those meshes are managed by:
 
 ```bash {name=migrate-decommission:restore-global-controller}
 kubectl --context "${GLOBAL_CONTEXT}" apply -f "${BACKUP_DIR}/global-webhooks.yaml"
@@ -158,7 +164,7 @@ kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system scale deploy global-asm-co
 
 The other meshes keep being managed. For the clusters you migrated the controller finds no `ServiceMesh` resource behind their plugin records, and logs an error for each of them every few seconds until the records are cleared.
 
-Either way, the plugin records of the migrated clusters stay on the `global` cluster. [Clear the Mesh v1 plugin records](#clear-the-mesh-v1-plugin-records) removes them at the end of this phase.
+In both cases the plugin records of the migrated clusters stay on the `global` cluster. [Clear the Mesh v1 plugin records](#clear-the-mesh-v1-plugin-records) removes them at the end of this phase.
 
 </Steps>
 
