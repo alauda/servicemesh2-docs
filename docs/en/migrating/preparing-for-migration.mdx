@@ -15,7 +15,7 @@ Complete every section before you install the Mesh v2 control plane.
 - The Alauda Service Mesh v2 Operator, the Alauda Build of Kiali Operator and the Alauda Build of OpenTelemetry v2 Operator are available in the cluster catalog. Do not install them yet.
 - If applications use OpenTelemetry Java auto-instrumentation, an OpenTelemetry Java agent 2.x image in a registry the cluster can pull from. Mesh v1 shipped its own agent image and Mesh v2 does not, see [Prepare the Java agent image](./migrating-observability.mdx#prepare-the-java-agent-image).
 - The **ACP Networking for Multus** plugin is installed. `IstioCNI` writes its configuration to the Multus configuration directory.
-- `cluster-admin` on the cluster that runs the mesh and on the `global` cluster.
+- `cluster-admin` on the cluster that runs the mesh and on the `global` cluster, in one kubeconfig that has a context for each of them. A mesh that spans several clusters needs a context per cluster, see [Address one cluster at a time](./migrating-a-multi-cluster-mesh/index.mdx#address-one-cluster-at-a-time).
 - The following tools on the machine you run the migration from:
 
   | Tool | Version | Purpose |
