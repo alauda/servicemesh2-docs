@@ -193,7 +193,7 @@ This is a strategic merge patch: it matches the container by its name and the va
 
 ### Restore the variables your applications read \{#restore-the-variables-your-applications-read}
 
-`OTEL_SERVICE_NAME` is not the only variable the Mesh v1 webhook added to the application container. `${BACKUP_DIR}/v1-injected-env.txt` from [Phase 0](./preparing-for-migration.mdx#record-the-variables-the-mesh-v1-webhooks-add-to-pods) lists the rest — `ASM_MS_NAME`, `ASM_POD_NAMESPACE`, `ASM_CLUSTER_NAME` and `ASM_CONTAINER_NAME`. An application that reads one of them keeps running after the migration, reads an empty value, and reports nothing: a field that used to hold `frontend.app-all` holds `null.null` instead.
+`OTEL_SERVICE_NAME` is not the only variable the Mesh v1 webhook added to the application container. `${BACKUP_DIR}/v1-injected-env.txt` from [Phase 0](./preparing-for-migration.mdx#record-the-variables-the-mesh-v1-webhooks-add-to-pods) lists the rest — `ASM_MS_NAME`, `ASM_POD_NAMESPACE`, `ASM_CLUSTER_NAME` and `ASM_CONTAINER_NAME`. An application that reads one of them keeps running after the migration, reads an empty value, and reports nothing: a field that used to hold a name such as `frontend-ms.app-all` holds `null.null` instead.
 
 Add the ones your applications depend on to the workload template, as literal values, with the `MS_NAME` of the workload:
 
