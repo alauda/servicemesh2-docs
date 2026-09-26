@@ -110,6 +110,6 @@ kubectl config use-context "${CTX}"
 kubectl config current-context
 ```
 
-The selected context is stored in the kubeconfig file, so every shell that reads that file shares it — a traffic probe or a call matrix that keeps running while you work on the other cluster follows the switch and reports on the wrong cluster. Where steps of both clusters run at the same time, give each cluster its own copy of the kubeconfig, `kubectl config view --flatten --raw > "${HOME}/.kube/${CTX}"` with the context of that cluster selected in it, and point `KUBECONFIG` at the copy of the cluster the shell works on.
+The selected context is stored in the kubeconfig file, so every shell that reads that file shares it — a traffic probe or a check that keeps running while you work on the other cluster follows the switch and reports on the wrong cluster. Where steps of both clusters run at the same time, give each cluster its own copy of the kubeconfig, `kubectl config view --flatten --raw > "${HOME}/.kube/${CTX}"` with the context of that cluster selected in it, and point `KUBECONFIG` at the copy of the cluster the shell works on.
 
 <Overview overviewHeaders={[]} />
