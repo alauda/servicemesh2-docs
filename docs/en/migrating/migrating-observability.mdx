@@ -227,7 +227,7 @@ ASM_POD_NAMESPACE 1x metadata.namespace
 OTEL_SERVICE_NAME 1x frontend-ms.app-all
 ```
 
-Every variable is listed once and with a value. A variable listed `2x` has a second definition that an earlier run appended: the container reads the last one, the API server warns `hides previous definition of "..."` on every later change to the workload, and a later `apply` may drop it. Remove the extra entries with `kubectl -n "${MESH_NAMESPACE}" edit deploy "${WORKLOAD}"`, keeping the definition that holds the value you want. An empty value means the step ran before its variable was set.
+Every variable is listed once and with a value. The patches above update a variable in place, so an empty value only means the step ran before its variables were set: set them and run the step again. A variable listed `2x` was already defined twice in the workload template before this step — the container reads the last definition, the API server warns `hides previous definition of "..."` on every later change to the workload, and a later `apply` may drop it. Remove the extra entries with `kubectl -n "${MESH_NAMESPACE}" edit deploy "${WORKLOAD}"`, keeping the definition that holds the value you want.
 
 Skipping this step is safe as long as no application reads these variables. Confirm that with the application owners rather than assuming it: nothing in the cluster reports a variable that resolves to an empty string.
 
