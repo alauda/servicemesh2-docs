@@ -83,7 +83,7 @@ The command compares a running pod with its template and writes only what is mis
 <Callouts>
 1. `sidecar.istio.io/inject` is written as an annotation, the same form Mesh v1 uses. Writing it as a label instead changes the pod template hash that the Mesh v1 controller tracks, and the controller then restarts the workload a second time.
 2. Do not add the `msname` and `asm.cpaas.io/msname` labels to the template. A template that carries `app`, `msname` and `asm.cpaas.io/msname` together is treated as a legacy workload by the Mesh v1 controller, which then removes the annotations you just wrote.
-3. Ingress and egress gateways are skipped, so no patch exists that could restart one. Their pods carry the same Mesh v1 annotations as an application pod, which is why they have to be excluded explicitly, and they are injected with the Mesh v1 template `asm-gateway`, which a restart after the namespace switch cannot repeat. See the warning in [Migrate a namespace](#migrate-a-namespace); gateways are migrated in [Phase 4](./migrating-gateways.mdx).
+3. Ingress and egress gateways are skipped, so no patch exists that could restart one. Their pods carry the same Mesh v1 annotations as an application pod, which is why they have to be excluded explicitly. They must not be restarted in this phase, see the warning in [Migrate a namespace](#migrate-a-namespace), and are migrated in [Phase 4](./migrating-gateways.mdx).
 </Callouts>
 
 Every command on this page acts on deployments. A Mesh v1 microservice is always a `Deployment`, so a mesh namespace holds no other injected workload kind.
@@ -130,9 +130,9 @@ kubectl label ns "${MESH_NAMESPACE}" istio.io/rev="${V2_REVISION}" --overwrite
 Running pods keep their Mesh v1 proxy. Only pods created from now on are injected by Mesh v2.
 
 :::warning A namespace that also holds a gateway
-Mesh v1 injects its gateway pods with the template `asm-gateway`, which does not exist in Mesh v2. From the moment the namespace points at the Mesh v2 revision, a Mesh v1 gateway pod can no longer be created: restarting the gateway leaves its replica set reporting `failed to run injection template: requested template "asm-gateway" not found` and the gateway drops to zero replicas, while `Gateway` and `VirtualService` resources still look healthy.
+From the moment the namespace points at the Mesh v2 revision, a Mesh v1 gateway pod can no longer be created, see [Switching the namespace label is a one-way step](./migrating-gateways.mdx#choose-how-the-mesh-v2-gateway-is-injected). A gateway restarted after the switch drops to zero replicas while its `Gateway` and `VirtualService` resources still look healthy.
 
-The gateway pods that are already running keep serving traffic, so never restart an ingress or egress gateway in this phase — the commands on this page skip gateway deployments for that reason. Migrate the gateway itself in [Phase 4](./migrating-gateways.mdx) directly after the workloads of its namespace: for this namespace the label switch above is the one-way step that page describes.
+The gateway pods that are already running keep serving traffic, so never restart an ingress or egress gateway in this phase — the commands on this page skip gateway deployments for that reason. Migrate the gateway itself in [Phase 4](./migrating-gateways.mdx) directly after the workloads of its namespace; the label switch above is that one-way step.
 :::
 
 ### Migrate the workloads
