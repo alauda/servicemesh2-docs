@@ -80,11 +80,11 @@ Symptoms reported during a Mesh v1 to Mesh v2 migration, with the cause and what
 
 ## A Mesh v1 gateway pod cannot be created
 
-**Symptom.** Scaling a Mesh v1 gateway up produces no pods. The replica set reports that the injection template `asm-gateway` does not exist.
+**Symptom.** Scaling or restarting a Mesh v1 gateway produces no pods, and the gateway ends up with zero replicas. The replica set reports that the injection template `asm-gateway` does not exist.
 
-**Cause.** The gateway namespace now points at the Mesh v2 revision, and that template only exists in Mesh v1.
+**Cause.** The gateway namespace now points at the Mesh v2 revision, and that template only exists in Mesh v1. A gateway that shares its namespace with mesh workloads reaches this state as soon as it is restarted after [Phase 3](./migrating-a-single-cluster-mesh/migrating-workloads.mdx#migrate-a-namespace) switched the label of that namespace.
 
-**Resolution.** Switch the namespace label back to the Mesh v1 revision before scaling, or fix the Mesh v2 gateway instead. See [Rolling back the migration](./rollback.mdx).
+**Resolution.** Switch the namespace label back to the Mesh v1 revision before scaling, or deploy the Mesh v2 gateway instead, see [Migrating gateways](./migrating-a-single-cluster-mesh/migrating-gateways.mdx#deploy-the-mesh-v2-gateway). Never restart a Mesh v1 gateway in Phase 3. See also [Rolling back the migration](./rollback.mdx).
 
 ## A gateway service disappears
 
