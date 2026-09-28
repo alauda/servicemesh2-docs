@@ -37,7 +37,7 @@ Write them into the workload template while you migrate the workload. The same r
 
 ### Generate the patches
 
-Replace `<namespace>` with your own value.
+Take the namespace from a line of `${BACKUP_DIR}/v1-mesh-namespaces.txt`, recorded in [Phase 0](../preparing-for-migration.mdx#list-the-mesh-namespaces) as `<namespace> injected=<count> pods=<count>`. Work through the lines where `injected` is not zero — a line with `injected=0` carries the revision label but has no mesh workload and is left to [Phase 5](./decommissioning-mesh-v1.mdx). Replace `<namespace>` with your own value.
 
 ```bash {name=migrate-workloads:build-metadata-patches}
 export MESH_NAMESPACE=<namespace>
