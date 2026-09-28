@@ -22,6 +22,9 @@ Replace `<gateway-namespace>` and `<gateway-name>` with one of the gateways the 
 
 ```bash {name=migrate-gateways:list-gateways}
 kubectl get gatewaydeploys.asm.alauda.io -A -o json | jq -r '.items[] | "\(.metadata.namespace)/\(.metadata.name)"'
+```
+
+```bash {name=migrate-gateways:set-gateway-env}
 export GATEWAY_NAMESPACE=<gateway-namespace>
 export GATEWAY_NAME=<gateway-name>
 ```
