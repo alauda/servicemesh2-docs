@@ -197,10 +197,11 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
   Run the script by using the following command:
 
   ```bash {name=install-kiali-mc:run-prepare-script}
+  # <remote-cluster-name> example: cluster2
   ./kiali-prepare-remote-cluster.sh \
     --kiali-cluster-context "${CTX_CLUSTER1}" \
     --remote-cluster-context "${CTX_CLUSTER2_PROXY}" \
-    --remote-cluster-name cluster2 \
+    --remote-cluster-name <remote-cluster-name> \
     --remote-cluster-namespace istio-system \
     --kiali-resource-name kiali-service-account \
     --process-remote-resources false \

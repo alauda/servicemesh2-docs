@@ -325,6 +325,7 @@ _mc_test_impl() {
 
     log_info "步骤 5.1: 执行 kiali-prepare-remote-cluster.sh"
     cmd=$(runme print install-kiali-mc:run-prepare-script) || return 1
+    cmd="${cmd//<remote-cluster-name>/$_MC_ISTIO_CLUSTER2}"
     output=$( cd "$work" && eval "$cmd" 2>&1 ) || {
         log_error "kiali-prepare-remote-cluster.sh 执行失败"
         log_error "实际输出: $output"
