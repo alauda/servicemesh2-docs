@@ -122,14 +122,14 @@ These settings change how every proxy in the mesh behaves — DNS capture for `S
 
 `traceSampling` is the percentage of requests the mesh traces, `100` in a default Mesh v1 installation. Istio itself defaults to `1`, so every phase that configures tracing uses `${V1_TRACE_SAMPLING}` rather than a fixed value.
 
-### List the mesh namespaces and the injected workloads
+### List the mesh namespaces and the injected workloads \{#list-the-mesh-namespaces}
 
 ```bash {name=migrate-prep:list-mesh-namespaces}
 for ns in $(kubectl get ns -l "istio.io/rev=${V1_REVISION}" -o jsonpath='{.items[*].metadata.name}'); do
   kubectl -n "${ns}" get pod -o json | jq -r --arg ns "${ns}" '
     ([.items[] | select(.metadata.annotations["sidecar.istio.io/status"] != null)] | length) as $injected
     | "\($ns) injected=\($injected) pods=\(.items | length)"'
-done
+done | tee "${BACKUP_DIR}/v1-mesh-namespaces.txt"
 ```
 
 **Example output**
@@ -143,6 +143,8 @@ java-apps    injected=0 pods=4
 - `injected` equals `pods`: every workload in the namespace is in the mesh.
 - `injected` is lower but not zero: a mixed namespace. Migrate these workloads one at a time, see [Migrating workloads](./migrating-a-single-cluster-mesh/migrating-workloads.mdx#migrate-individual-workloads).
 - `injected` is zero: the namespace carries the revision label but has no mesh workloads, typically a namespace that only uses OpenTelemetry auto-instrumentation. Do not switch its label; [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) removes it.
+
+`${BACKUP_DIR}/v1-mesh-namespaces.txt` holds these lines. [Phase 3](./migrating-a-single-cluster-mesh/migrating-workloads.mdx) takes one namespace at a time from it, and the `injected` count decides how: a namespace is migrated as a whole, workload by workload, or not at all. Keep the file: it is the list as it was before anything changed, while in the cluster the revision label of a namespace changes the moment it is migrated, and the label selector above then no longer returns it.
 
 Gateways run in their own namespace, which may not carry the revision label. [Migrating gateways](./migrating-a-single-cluster-mesh/migrating-gateways.mdx) lists them.
 
@@ -571,6 +573,7 @@ An egress probe must be checked against the gateway, not only against its status
 
 - `echo "${MESH_ID} ${NETWORK} ${MESH_CLUSTER_NAME} ${TRUST_DOMAIN} ${V1_AUTO_INJECT}"` prints the mesh identity and the injection policy.
 - `cat "${BACKUP_DIR}/vars.env"` shows every variable the later phases need, with no empty value.
+- `cat "${BACKUP_DIR}/v1-mesh-namespaces.txt"` lists every namespace of the mesh with its injected pod count.
 - `ls "${BACKUP_DIR}"` lists the backup of the Istio resources, the Mesh v1 resources, the gateway services and certificates, the `cacerts` secret and the `global` cluster resources.
 - `cat "${BACKUP_DIR}/v1-jaeger.txt"` shows the index prefix, the retention and the credentials secret of the tracing backend, and `${BACKUP_DIR}/v1-jaeger-es-credentials.yaml` holds that secret.
 - The probes report `OK` for every target, with no `PROBE-ERROR` line.
