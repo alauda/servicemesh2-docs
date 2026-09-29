@@ -23,7 +23,15 @@ Roll back when one of these is true and you cannot explain it within your change
 | [Phase 3](./migrating-a-single-cluster-mesh/migrating-workloads.mdx) — workloads | Move the namespace label back and restart the workloads | Mesh v1 still runs |
 | [Phase 4](./migrating-a-single-cluster-mesh/migrating-gateways.mdx) — gateways | Scale the Mesh v1 gateway back up and the Mesh v2 gateway down | The Mesh v1 gateway deployment still exists, see the note below |
 | [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) — decommissioning | Reinstall Mesh v1 from the backups | Disaster recovery, see below |
-| [Phase 6](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx) — finalization | Re-create the previous `cacerts` from the backup; delete the `default` revision tag | Mesh v2 keeps running |
+| [Phase 6](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx) — finalization | Restore the previous `cacerts` from the backup; delete the `default` revision tag, see [below](#phase-6) | Mesh v2 keeps running, and no namespace uses `istio-injection=enabled` |
+
+The observability part of [Phase 6](./migrating-observability.mdx) has no rollback path of its own. The Mesh v1 tracing components were deleted in [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx), so returning to them means the recovery procedure below; everything up to that point — the new collector, the `Telemetry` provider, the `Instrumentation` resources, the Kiali tracing configuration — is reconfigured forward rather than rolled back.
+
+### Phase 1
+
+Deleting the `Kiali` resource removes what the operator created for it: the deployment, the service, the ingress, the service account and the configuration.
+
+The Kiali Operator, the `kiali` and `kiali-monitoring-basic-auth` secrets in `istio-system` and the `cpaas.io/project` label on that namespace stay behind. Nothing depends on them and they cost one small deployment. Redoing [Phase 1](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-1-prepare-observability) reuses them: the two `kubectl create secret` commands then report `already exists`, which is expected and does not have to be corrected.
 
 ### Phase 2
 
@@ -50,8 +58,11 @@ A namespace label applies to the whole namespace. Rolling back one workload also
 
 ```bash {name=migrate-rollback:roll-back-gateway}
 kubectl -n "${GATEWAY_NAMESPACE}" scale deploy "${GATEWAY_NAME}" --replicas="${GATEWAY_REPLICAS}"
+kubectl -n "${GATEWAY_NAMESPACE}" rollout status "deploy/${GATEWAY_NAME}" --timeout=300s
 kubectl -n "${GATEWAY_NAMESPACE}" scale deploy "${GATEWAY_NAME}-v2" --replicas=0
 ```
+
+Wait for the Mesh v1 gateway before you scale the Mesh v2 gateway down. Both deployments sit behind the same service, and scaling both in one go leaves that service without a ready endpoint for as long as the Mesh v1 pod needs to start — about nine seconds in a test cluster, which a probe that runs every few seconds does not see and a client does.
 
 `GATEWAY_REPLICAS` is the replica count the Mesh v1 gateway had, recorded when the Mesh v2 gateway was scaled up, see [Migrating gateways](./migrating-a-single-cluster-mesh/migrating-gateways.mdx#shift-traffic). The Mesh v1 deployment has been at zero since then, so the value cannot be read back from the cluster; if the shell is gone, take it from `${BACKUP_DIR}/gateway-replicas.txt`.
 
@@ -59,17 +70,112 @@ kubectl -n "${GATEWAY_NAMESPACE}" scale deploy "${GATEWAY_NAME}-v2" --replicas=0
 If the gateway namespace had an `istio.io/rev` label and you switched it to the Mesh v2 revision, a Mesh v1 gateway pod can no longer be created: its injection template does not exist in Mesh v2. Scaling the old deployment up then produces pods that are rejected. Roll back by switching the namespace label back first, and only then scaling. Gateways in a namespace without a revision label are not affected.
 :::
 
+### Phase 6 \{#phase-6}
+
+Restore the certificate authority with the function from [Preparing for the migration](./preparing-for-migration.mdx#restore-a-resource-from-the-backup), which applies the secret in place:
+
+```bash {name=migrate-rollback:restore-cacerts}
+restore_from_backup "${BACKUP_DIR}/cacerts.yaml"
+```
+
+Do not delete the secret and create it again. `istiod` would briefly run without a configured certificate authority, which is what [Hand over the certificate authority](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx#hand-over-the-certificate-authority) warns about. `istiod` reports the certificate it picked up about a minute later, no pod is restarted, and workload certificates are reissued from the restored intermediate certificate within their normal lifetime. Both certificates are signed by the same root, so a pod that still holds one issued by the other keeps being trusted.
+
+Deleting the `default` revision tag is safe only while no namespace uses it:
+
+```bash {name=migrate-rollback:check-default-tag-users}
+kubectl get ns -l istio-injection=enabled
+```
+
+Expected output: none. A namespace that [Adopt the default revision tag](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx#adopt-the-default-revision-tag) moved from `istio.io/rev` to `istio-injection=enabled` is claimed by no webhook once the tag is gone. Its pods keep running and nothing reports an error; the next restart silently produces pods without a sidecar. Label such a namespace back first:
+
+```bash {name=migrate-rollback:restore-revision-label}
+kubectl label ns "${MESH_NAMESPACE}" istio.io/rev="${V2_REVISION}" istio-injection- --overwrite
+kubectl delete istiorevisiontag default
+```
+
 ### Phase 5 and later
 
 Mesh v1 is gone. Recovery means installing it again. Restore every resource with the function from [Preparing for the migration](./preparing-for-migration.mdx#restore-a-resource-from-the-backup): a backup holds the object as the cluster had it, and applying it unchanged recreates owner references to resources that no longer exist, which makes the garbage collector delete what you just restored.
 
-1. Install the Service Mesh Essentials plugin on the `global` cluster from **Marketplace** → **Cluster Plugins**, and the Mesh v1 operators on the mesh cluster, at the versions recorded in `${BACKUP_DIR}/olm.yaml`. [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx#uninstall-the-service-mesh-essentials-plugin) uninstalls the plugin without touching its catalog entry, so it is normally still listed. If it is not, apply `${BACKUP_DIR}/global-asm-moduleplugin.yaml` first: that resource is the catalog entry, and installing is then recreating `${BACKUP_DIR}/global-asm-moduleinfo.yaml`.
+1. Install the Service Mesh Essentials plugin on the `global` cluster from **Marketplace** → **Cluster Plugins**. [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx#uninstall-the-service-mesh-essentials-plugin) uninstalls the plugin without touching its catalog entry, so it is normally still listed. If it is not, apply `${BACKUP_DIR}/global-asm-moduleplugin.yaml` first: that resource is the catalog entry, and installing is then recreating `${BACKUP_DIR}/global-asm-moduleinfo.yaml`.
+
 2. Restore the `ServiceMesh` and `ServiceMeshGroup` resources from `${BACKUP_DIR}/global-servicemeshes.yaml` and `${BACKUP_DIR}/global-servicemeshgroups.yaml`, and wait for the Mesh v1 control plane to be running.
+
+   `global-asm-controller` recreates the plugin records of the mesh clusters from these resources — the `asm` and `istio` `ModuleInfo` resources that [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx#clear-the-mesh-v1-plugin-records) cleared, which are not part of the backup — and installs the Mesh v1 operators recorded in them. If an operator does not come back this way, restore its subscription from `${BACKUP_DIR}/olm.yaml`, at the version recorded there. Do not apply that file as a whole: it holds every subscription and every cluster service version of the cluster, including the ones that have nothing to do with the mesh. Select the Mesh v1 packages, the same four that [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) removed:
+
+   ```bash {name=migrate-rollback:restore-v1-operators}
+   kubectl create -f "${BACKUP_DIR}/olm.yaml" --dry-run=client -o json \
+     | jq 'select(.kind == "Subscription"
+           and (.spec.name | test("^(asm-operator|flagger-operator|jaeger-operator|opentelemetry-operator)$")))' \
+     > "${BACKUP_DIR}/v1-operator-subscriptions.json"
+   restore_from_backup "${BACKUP_DIR}/v1-operator-subscriptions.json"
+   ```
+
+   A subscription with `installPlanApproval: Manual` waits for its install plan to be approved before anything is installed:
+
+   ```bash {name=migrate-rollback:approve-install-plans}
+   kubectl -n istio-system get installplans.operators.coreos.com -o json \
+     | jq -r '.items[] | select(.spec.approved | not) | .metadata.name' \
+     | while read -r plan; do
+         kubectl -n istio-system patch installplans.operators.coreos.com "${plan}" \
+           --type=merge -p '{"spec":{"approved":true}}'
+       done
+   ```
+
 3. Restore the platform resources — microservices, gateways, policies — from the `${BACKUP_DIR}/asm-*.yaml` files. Leave out what Mesh v1 generates for itself; it is recreated by its controllers.
+
+   The gateway services stand in the way of the `GatewayDeploy` resources. [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx#keep-the-resources-that-mesh-v1-owns) kept them because deleting them interrupts traffic, and the Mesh v1 webhook refuses to create a gateway whose service exists already: `admission webhook "vgatewaydeploys.kb.io" denied the request: Service "<gateway>" already exists`. Delete the service and let Mesh v1 recreate it together with the deployment:
+
+   ```bash {name=migrate-rollback:recreate-gateway}
+   kubectl -n "${GATEWAY_NAMESPACE}" delete svc "${GATEWAY_NAME}"
+   restore_from_backup "${BACKUP_DIR}/asm-gatewaydeploys.asm.alauda.io.yaml"
+   kubectl -n "${GATEWAY_NAMESPACE}" get svc "${GATEWAY_NAME}" -o wide
+   ```
+
+   The node ports are part of the `GatewayDeploy`, so the addresses the gateway is reached at do not change. The cluster IP does: this is a new service. The window is short — about 20 seconds in a test cluster — but the node ports are free during it and another service can claim one. Compare the recreated service with `${BACKUP_DIR}/gateway-svc-${GATEWAY_NAMESPACE}-${GATEWAY_NAME}.yaml` before you continue.
+
 4. Restore the namespace labels from `${BACKUP_DIR}/namespaces.yaml` and restart the workloads.
-5. Remove the Mesh v2 resources — `Istio`, `IstioCNI`, `IstioRevisionTag`, and the `PodMonitor` and `ServiceMonitor` created for it — and, if Mesh v2 is not to be reinstalled later, its operator. The reinstalled Mesh v1 brings its own monitors, and keeping both sets scrapes every proxy twice.
-6. Restore `cacerts` from `${BACKUP_DIR}/cacerts.yaml` if [Phase 6](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx) already replaced it.
-7. Verify with the probes, and check that every pod reports the Mesh v1 revision in its `sidecar.istio.io/status` annotation.
+
+5. Remove the Mesh v2 resources. Check first that the Mesh v1 gateways are ready: the two generations share one service, and deleting the Mesh v2 gateway while the Mesh v1 one is not running interrupts traffic.
+
+   | What to remove | Created in |
+   |---|---|
+   | `Istio`, `IstioCNI` and the `istio-cni` namespace | [Phase 2](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane) |
+   | The Mesh v2 operator, if Mesh v2 is not to be reinstalled later | [Phase 2](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane) |
+   | The `PodMonitor` and the `ServiceMonitor` created for Mesh v2 | [Phase 1](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#create-the-metrics-resources) and [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx#take-over-the-metrics-collection) |
+   | The `access-logging` `Telemetry` of each migrated namespace | [Phase 3](./migrating-a-single-cluster-mesh/migrating-workloads.mdx#check-the-access-logging-configuration) |
+   | Per gateway: the `<gateway>-v2` deployment, its service account, and the `<gateway>-v2-sds` role and role binding; the `<gateway>-access-logging` `Telemetry` | [Phase 4](./migrating-a-single-cluster-mesh/migrating-gateways.mdx#deploy-the-mesh-v2-gateway) |
+   | The `asm-default` `Telemetry` in `istio-system` | [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx#replace-the-mesh-wide-telemetry-configuration) |
+   | The `IstioRevisionTag` named `default` | [Phase 6](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx#adopt-the-default-revision-tag) |
+
+   The reinstalled Mesh v1 brings its own monitors and its own mesh-wide `Telemetry` back. Keeping both sets of monitors scrapes every proxy twice. Of two mesh-wide `Telemetry` resources only one is ever in effect — the oldest one in `istio-system` that has no selector — so `asm-default` keeps winning over the resource Mesh v1 recreates, and keeps the mesh pointed at providers that no longer exist.
+
+   A Mesh v2 gateway left behind is the hardest of these to notice. Its pod is still selected by the restored gateway service, and it goes on serving the configuration it received last, answering `200` long after its control plane is gone. It stops following any change from that moment on. Step 7 is what reveals it.
+
+6. Restore `cacerts` from `${BACKUP_DIR}/cacerts.yaml` if [Phase 6](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx) already replaced it, as described under [Phase 6](#phase-6) above.
+
+7. Verify with the probes, and check which control plane injected each pod:
+
+   ```bash {name=migrate-rollback:check-revisions}
+   kubectl get pod -A -o json | jq -r '[.items[]
+     | (.metadata.annotations["sidecar.istio.io/status"] // "") | fromjson? | .revision // empty]
+     | group_by(.) | map({revision: .[0], pods: length})'
+   ```
+
+   Only the Mesh v1 revision may be left. A pod that still reports the Mesh v2 revision is a workload that was not restarted in step 4, or one of the Mesh v2 gateways of step 5.
+
+8. Remove the `asm.cpaas.io/user-managed` annotation from the resources generated for external services. [Phase 4](./migrating-a-single-cluster-mesh/migrating-gateways.mdx#protect-the-resources-generated-for-external-services) set it to stop the Mesh v1 controllers from managing them; while it is set, the restored Mesh v1 does not manage them either, and a change made to an external service in the web console is never applied to the mesh.
+
+   ```bash {name=migrate-rollback:release-generated-resources}
+   kubectl get gateways.networking.istio.io,virtualservices.networking.istio.io,destinationrules.networking.istio.io \
+     -A -o json | jq -r '.items[]
+       | select(.metadata.annotations["asm.cpaas.io/user-managed"] == "true")
+       | "\(.kind) \(.metadata.namespace) \(.metadata.name)"' \
+     | while read -r kind ns name; do
+         kubectl -n "${ns}" annotate "$(echo "${kind}" | tr '[:upper:]' '[:lower:]').networking.istio.io" "${name}" \
+           asm.cpaas.io/user-managed-
+       done
+   ```
 
 Traces and metrics collected by Mesh v2 stay in their own indices and are not restored by this procedure.
 
