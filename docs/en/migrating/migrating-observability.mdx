@@ -48,10 +48,10 @@ Apply a delete-only index lifecycle policy to the existing index family, followi
 
 Follow the **Prerequisites** of [Configuring distributed tracing platform with Service Mesh](../integration/observability/distributed-tracing/config-tracing-with-service-mesh.mdx) to install the Alauda Build of Jaeger v2 cluster plugin, the Alauda Build of OpenTelemetry v2 Operator, a Jaeger v2 instance and the v2 collector in the `jaeger-system` namespace.
 
-Two choices matter for a migrated mesh:
+Three choices matter for a migrated mesh:
 
 - **Use the same Elasticsearch cluster** as the Mesh v1 backend, otherwise the existing traces cannot be served by the new one.
-- **Choose the index prefix per mesh, not per cluster.** A mesh that spans several clusters writes into one index family so that a trace which crosses clusters is assembled from one place. The steps that act on Elasticsearch — the lifecycle policy and the index initialization — then belong to the mesh, not to a cluster: run them once, with the prefix of the mesh, and skip them on every other cluster. The Jaeger instance of any cluster serves the traces of the whole mesh afterwards.
+- **Choose the index prefix per mesh, not per cluster.** A mesh that spans several clusters writes into one index family so that a trace which crosses clusters is assembled from one place. The steps that act on Elasticsearch — the lifecycle policy and the index initialization — then belong to the mesh, not to a cluster: run them once, with the prefix of the mesh, and skip them on every other cluster. The Jaeger instance of any cluster serves the traces of the whole mesh afterwards. Keep the default prefix and never reuse the Mesh v1 one: the steps that take over the retention of the Mesh v1 indices and later retire them select indices by `<prefix>-jaeger-*`, so a shared prefix applies them to the new index family as well.
 - **Give every cluster its own collector.** The collectors of all clusters share one service name, and the step that repoints the mesh declares that service cluster-local, so each proxy exports to the collector of its own cluster, see [Keep trace reporting inside each cluster](./migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx#keep-trace-reporting-inside-each-cluster).
 
 Stop after the prerequisites. The mesh-side configuration already exists from the migration, and the next step updates it.
@@ -98,6 +98,8 @@ kubectl -n istio-system patch telemetry asm-default --type=merge \
 </Callouts>
 
 If the `Istio` resource restricts discovery with `discoverySelectors`, label the `jaeger-system` namespace so that the control plane can resolve the collector service.
+
+If a `Sidecar` resource restricts `egress.hosts`, add `jaeger-system/*` to it, otherwise its proxies drop every span without an error, see [Using `Sidecar` import](../installing/installing-service-mesh/scoping-the-service-mesh/using-sidecar-import.mdx).
 
 Mesh spans now reach the new backend. Check the Jaeger UI before you continue.
 

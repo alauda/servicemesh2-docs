@@ -337,7 +337,7 @@ The filter matches the Mesh v1 packages only. The Mesh v2 packages — `servicem
 
 ### Delete the Mesh v1 control plane \{#delete-the-mesh-v1-control-plane}
 
-Delete the gateway resources first, then the control plane, then the operator itself.
+Delete the gateway resources first, then the control plane, then the operator itself. Deleting the gateway and control plane resources waits until the Mesh v1 operator has removed what they manage, so the command can take several minutes to return. Let it finish: the operator must process those deletions before the last lines of the command remove it.
 
 ```bash {name=migrate-decommission:delete-istiooperators}
 kubectl -n istio-system get istiooperators.install.istio.io -l 'asm.cpaas.io/component=gateway' -o name \
