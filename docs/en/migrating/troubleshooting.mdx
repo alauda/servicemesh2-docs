@@ -1,0 +1,220 @@
+---
+weight: 70
+---
+
+# Troubleshooting the migration
+
+Symptoms reported during a Mesh v1 to Mesh v2 migration, with the cause and what to do about it.
+
+## The Mesh v2 `istiod` pod stays `Pending`
+
+**Symptom.** After the `Istio` resource is created, its `istiod` pod is never scheduled. Its events mention pod anti-affinity.
+
+**Cause.** The Mesh v1 `istiod` has a required anti-affinity rule against other `istiod` pods, and the cluster has no other node to place the Mesh v2 pod on.
+
+**Resolution.** Relax the rule on the Mesh v1 control plane, see [Installing the Mesh v2 control plane](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#relax-the-anti-affinity-rule-of-the-mesh-v1-control-plane).
+
+## Requests to Mesh v1 resources fail with an internal error
+
+**Symptom.** `kubectl` reports `Internal error occurred: failed calling webhook ...: connect: connection refused` when you patch or delete a Mesh v1 resource.
+
+**Cause.** The Mesh v1 controller that backs the webhook is not running, and the webhook uses `failurePolicy: Fail`.
+
+**Resolution.** Delete the webhook configuration before scaling the controller down. This is the order used in [Decommissioning Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx). Do not start the controller again to unblock a deletion that is already in progress.
+
+## New pods are rejected in mesh namespaces
+
+**Symptom.** Deployments cannot create pods. The error names a webhook of the Mesh v1 controller.
+
+**Cause.** `asm-controller` was scaled down while its pod webhook was still installed. The webhook matches every pod in namespaces labeled `cpaas.io/serviceMesh=enabled` and fails closed.
+
+**Resolution.** Scale `asm-controller` back to its original replica count. Do not stop the Mesh v1 controllers before [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx).
+
+## A restarted workload comes back without a sidecar
+
+**Symptom.** After [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx), a workload that had a sidecar restarts and its pods have no `istio-proxy` container.
+
+**Cause.** The injection setting was on the pod, added by the Mesh v1 webhook, and never written into the workload template. With the injection policy inherited from Mesh v1 (`autoInject: disabled`), a pod without `sidecar.istio.io/inject: "true"` is not injected.
+
+**Resolution.** Add the annotation and the other Mesh v1 pod settings to the workload template, see [Migrating workloads](./migrating-a-single-cluster-mesh/migrating-workloads.mdx#persist-the-mesh-v1-pod-settings). Run the same check for every other workload before decommissioning Mesh v1.
+
+## A workload that was never in the mesh is now injected
+
+**Symptom.** A workload that ran without a sidecar under Mesh v1 gets one after its namespace is migrated.
+
+**Cause.** The Mesh v2 `Istio` resource does not use the injection policy of Mesh v1. With the default policy, every pod in a labeled namespace is injected.
+
+**Resolution.** Set `spec.values.global.proxy.autoInject` to the Mesh v1 value, see [Installing the Mesh v2 control plane](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#create-the-istio-resource). To keep a single workload out of an otherwise injected namespace, label its pod template `sidecar.istio.io/inject: "false"`.
+
+## Calls between Mesh v1 and Mesh v2 workloads fail
+
+**Symptom.** After the first namespace is migrated, calls between migrated and not yet migrated workloads time out, while calls within each generation work.
+
+**Cause.** The `network` value of the two control planes differs. A proxy treats an endpoint in another network as reachable only through an east-west gateway, which does not exist in a single-cluster mesh.
+
+**Resolution.** Set `spec.values.global.network` of the `Istio` resource to the value recorded from Mesh v1, and check `spec.values.global.meshID` and `spec.values.global.multiCluster.clusterName` at the same time. Verify with `istioctl proxy-config endpoints <pod> -n <namespace>`: the remote endpoints must be pod addresses.
+
+## A `ServiceEntry` host cannot be resolved
+
+**Symptom.** After a workload is migrated, requests to a host that only exists as a `ServiceEntry` fail with a DNS error, while the same call worked before.
+
+**Cause.** The Mesh v1 mesh configuration enables DNS capture in the proxy (`ISTIO_META_DNS_CAPTURE`), and that setting was not copied to Mesh v2.
+
+**Resolution.** Copy the mesh configuration of Mesh v1 into the `Istio` resource, see [Installing the Mesh v2 control plane](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#build-the-mesh-configuration-of-mesh-v2).
+
+## The new gateway returns 404 for every request
+
+**Symptom.** The Mesh v2 gateway pod is running and receives requests, but every request returns 404.
+
+**Cause.** The pod labels do not match the selector of the `Gateway` resources, so the control plane programs no listeners for it. Matching only the selector of the gateway `Service` is enough to receive traffic but not to serve it.
+
+**Resolution.** Give the pod template the union of both selectors, see [Migrating gateways](./migrating-a-single-cluster-mesh/migrating-gateways.mdx#deploy-the-mesh-v2-gateway). Check with `istioctl proxy-config listener <pod> -n <namespace>`.
+
+## HTTPS through the new gateway fails while HTTP works
+
+**Symptom.** The Mesh v2 gateway answers its HTTP routes, and TLS handshakes on its HTTPS port are reset. `istioctl proxy-config secret` shows the certificate in `WARMING` state.
+
+**Cause.** Either the certificate secret is not in the gateway namespace, or the service account of the gateway may not read secrets there. Mesh v1 could fall back to a certificate stored in `istio-system`; Mesh v2 cannot.
+
+**Resolution.** Copy the secret into the gateway namespace and create the role that allows the gateway to read it, see [Migrating gateways](./migrating-a-single-cluster-mesh/migrating-gateways.mdx#deploy-the-mesh-v2-gateway).
+
+## A Mesh v1 gateway pod cannot be created
+
+**Symptom.** Scaling a Mesh v1 gateway up produces no pods. The replica set reports that the injection template `asm-gateway` does not exist.
+
+**Cause.** The gateway namespace now points at the Mesh v2 revision, and that template only exists in Mesh v1.
+
+**Resolution.** Switch the namespace label back to the Mesh v1 revision before scaling, or fix the Mesh v2 gateway instead. See [Rolling back the migration](./rollback.mdx).
+
+## A gateway service disappears
+
+**Symptom.** During [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx), a gateway stops receiving traffic and its `Service` no longer exists.
+
+**Cause.** The service was owned by a Mesh v1 resource, and Kubernetes deleted it together with its owner.
+
+**Resolution.** Recreate it from `${BACKUP_DIR}/gateway-svc-<namespace>-<name>.yaml` with the function from [Preparing for the migration](./preparing-for-migration.mdx#restore-a-resource-from-the-backup). The backup still carries the owner reference, and a service applied unchanged is deleted again within seconds for the same reason. Endpoints are repopulated immediately because the Mesh v2 gateway pods carry the selector labels. Remove the owner reference from every resource you keep before deleting the Mesh v1 resources, see [Decommissioning Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx#keep-the-resources-that-mesh-v1-owns).
+
+## Access logs stop being produced
+
+**Symptom.** After [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx), or after a workload restarts, access logs are no longer written.
+
+**Cause.** The `Telemetry` resources of Mesh v1 select pods by labels that its webhook added. The labels are gone, and the resources themselves were deleted with their owners.
+
+**Resolution.** Create `Telemetry` resources whose selector matches labels present in the workload template, or one resource per namespace without a selector, see [Migrating workloads](./migrating-a-single-cluster-mesh/migrating-workloads.mdx#check-the-access-logging-configuration).
+
+## An `EnvoyFilter` no longer applies
+
+**Symptom.** A filter that worked under Mesh v1 has no effect on migrated workloads.
+
+**Cause.** The filter is restricted to a proxy version (`proxyVersion: ^1\.22.*`), and migrated proxies run Istio 1.30.
+
+**Resolution.** Rebuild the filter for the new version, or drop it if it belongs to a Mesh v1 feature that is being retired. The audit in [Preparing for the migration](./preparing-for-migration.mdx#audit-envoyfilter-resources) lists every affected filter.
+
+## The Mesh v1 installation resource cannot be deleted
+
+**Symptom.** `kubectl delete asms.operator.alauda.io asm` never finishes, and the operator log repeats that proxies are still pointing at the control plane.
+
+**Cause.** The pre-uninstall check counts pods that have a sidecar, no matter which control plane injected them. After the migration those pods belong to Mesh v2, so the count never reaches zero.
+
+**Resolution.** Remove the finalizer, see [Decommissioning Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx#delete-the-mesh-v1-installation-resource).
+
+## The `default` revision tag reports a Helm ownership error
+
+**Symptom.** The `IstioRevisionTag` named `default` stays in an error state and mentions an existing resource that is not managed by Helm.
+
+**Cause.** The `istio-reader-service-account` service account was created by Mesh v1 without Helm metadata.
+
+**Resolution.** Add the Helm labels and annotations, see [Installing the Mesh v2 control plane](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#prepare-the-istio-reader-service-account).
+
+## Applications produce no traces after Phase 5
+
+**Symptom.** Mesh spans are missing, and instrumented applications report nothing.
+
+**Cause.** Expected until the observability stack is migrated: the Mesh v1 collector and backend were removed with Mesh v1, and the injection annotations were added by a Mesh v1 webhook that no longer exists.
+
+**Resolution.** Complete [Migrating the observability stack](./migrating-observability.mdx). If traces are still missing afterwards, check that the injection annotations are in the workload template, that the agent image is reachable, and that the exporter protocol matches the port: the 2.x agent uses `http/protobuf` and port `4318` by default.
+
+## Applications appear under a different name in Jaeger
+
+**Symptom.** After the migration, services show up with the workload name instead of the name they used before.
+
+**Cause.** Mesh v1 built the service name from variables injected by its webhook.
+
+**Resolution.** Set `OTEL_SERVICE_NAME` explicitly on the application container, see [Migrating the observability stack](./migrating-observability.mdx#keep-the-service-names-of-your-applications).
+
+## `IstioCNI` reports that `NetworkAttachmentDefinition` is not a known kind
+
+**Symptom.** The `IstioCNI` resource stays not ready and its status reports `no matches for kind "NetworkAttachmentDefinition" in version "k8s.cni.cncf.io/v1"`, although Multus is installed on the cluster.
+
+**Cause.** The Mesh v2 operator caches the API types of the cluster when it starts. A cluster where Multus was installed after the operator does not have that type in the cache.
+
+**Resolution.** Restart the operator and reconcile again:
+
+```bash {name=migrate-troubleshooting:restart-operator}
+kubectl -n sail-operator delete pod -l control-plane=servicemesh-operator2
+kubectl wait --for condition=Ready istiocni/default --timeout=5m
+```
+
+## A part of the cross-cluster requests fail with 503 \{#cross-cluster-503}
+
+**Symptom.** In a multi-network mesh, requests that reach a workload in another cluster fail from time to time, a few percent of them. The gateway logs `503 UC upstream_reset_before_response_started{connection_termination}`, and the upstream host is the east-west gateway address of the other cluster.
+
+**Cause.** The Mesh v2 east-west gateway has no network view. It is then given the endpoints of every network, including the east-west gateway of the cluster the request came from, and sends part of the traffic back there.
+
+**Resolution.** Set `ISTIO_META_REQUESTED_NETWORK_VIEW` on the gateway container to the network of its cluster, see [Migrating a multi-network mesh](./migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx#deploy-the-mesh-v2-east-west-gateway). Check the result on the gateway pod:
+
+```bash {name=migrate-troubleshooting:check-eastwest-endpoints}
+kubectl -n istio-system exec "${POD}" -c istio-proxy -- \
+  pilot-agent request GET clusters | grep "${TARGET_SERVICE}" | grep cx_total
+```
+
+Every endpoint must be a pod address of the local cluster.
+
+## Traces of a multi-cluster mesh are incomplete
+
+**Symptom.** After the observability stack is migrated, traces contain the spans of one cluster only, or spans are missing at random. Each cluster runs its own collector and both are healthy.
+
+**Cause.** The `Istio` resource of that cluster carries no `serviceSettings` entry that declares the collector service cluster-local, so the control plane merges the collectors of all clusters into one set of endpoints and the proxies export to all of them. Spans sent to the collector of another network never arrive. The entry is as easily lost as it is set: `serviceSettings` is a list, and a merge patch on `meshConfig` replaces it as a whole.
+
+**Resolution.** Check the entry and the endpoints on every cluster:
+
+```bash {name=migrate-troubleshooting:check-collector-settings}
+kubectl --context "${CTX}" get istio default -o jsonpath='{.spec.values.meshConfig.serviceSettings}{"\n"}'
+istioctl --context "${CTX}" proxy-config endpoint "deploy/${WORKLOAD}.${MESH_NAMESPACE}" \
+  --cluster "outbound|4317||otel-collector.jaeger-system.svc.cluster.local"
+```
+
+A proxy must be given one endpoint, the collector of its own cluster. [Repoint the mesh at the new collector](./migrating-observability.mdx#repoint-the-mesh-at-the-new-collector) writes the entry back, and [Configuring distributed tracing platform with Service Mesh](../integration/observability/distributed-tracing/config-tracing-with-service-mesh.mdx) explains when it applies.
+
+## Kiali shows no data
+
+**Symptom.** The Kiali graph is empty although traffic is flowing.
+
+**Cause.** The monitoring data source of the `Kiali` resource is wrong, the metrics resources are missing, or — in a multi-cluster mesh — the metrics are not filtered by the mesh identifier.
+
+**Resolution.** Check the data source against [Configuring Monitoring with Kiali](../integration/observability/kiali.mdx#configuring-monitoring-with-kiali) and confirm that the `ServiceMonitor` and `PodMonitor` resources exist in every mesh namespace.
+
+## `istioctl` reports that no Istio pods are running
+
+**Symptom.** `istioctl proxy-status` returns `no running Istio pods`.
+
+**Cause.** Mesh v2 uses the `RevisionBased` strategy, so there is no control plane without a revision suffix.
+
+**Resolution.** Add `--revision "${V2_REVISION}"` to the command.
+
+## Frequently asked questions
+
+**Do the Mesh v1 controllers have to be stopped before workloads are migrated?**
+No. They do not change a revision label that already has a value. Stopping them early breaks pod creation in mesh namespaces.
+
+**When is the `cpaas.io/serviceMesh` label removed from namespaces?**
+In [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx), together with the other Mesh v1 leftovers. Keeping it until then lets the Mesh v1 webhook keep configuring pods that have not been migrated yet.
+
+**Does upgrading the Istio custom resource definitions to 1.30 affect Mesh v1?**
+No. The definitions keep serving the API versions that Istio 1.22 uses.
+
+**How long is tracing interrupted?**
+From the moment the Mesh v1 collector is deleted in [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) until the mesh is repointed at the new collector in [Phase 6](./migrating-observability.mdx). Metrics and access logs are not interrupted.
+
+**What happens to workloads with a single replica?**
+They are unavailable for the duration of their rolling restart. Scale them to two replicas and add a `PodDisruptionBudget` before the migration if that is not acceptable.

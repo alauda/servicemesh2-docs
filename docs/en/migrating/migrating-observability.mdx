@@ -1,0 +1,218 @@
+---
+weight: 50
+---
+
+# Migrating the observability stack
+
+Part of [Phase 6](./migration-overview.mdx#migration-phases). Mesh v1 shipped its own tracing pipeline — an OpenTelemetry v1 collector and a Jaeger 1.x backend — and both were removed with it in [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx). This document installs the current stack, keeps the traces that were collected before the migration queryable, and restores the telemetry behavior of your applications.
+
+:::warning Tracing is interrupted until this document is finished
+Spans are dropped between the moment the Mesh v1 collector is deleted in [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) and the moment the mesh is repointed at the new collector here. Metrics and access logs are not affected. Plan this part for a window where a gap in traces is acceptable.
+:::
+
+The OpenTelemetry v1 and v2 Operators own the same custom resource definitions, so v2 can only be installed after Mesh v1 — which brought v1 — is gone.
+
+## Before you begin
+
+Collect what [Phase 0](./preparing-for-migration.mdx) recorded:
+
+- `${BACKUP_DIR}/v1-jaeger.txt` — the Elasticsearch index prefix and the retention of the Mesh v1 tracing backend.
+- `${BACKUP_DIR}/instrumentations.yaml` — the Mesh v1 `Instrumentation` resource, which holds the exporter endpoint, the sampler and the service name pattern your applications report.
+- `${BACKUP_DIR}/v1-instrumented-pods.txt` — the workloads that use Java auto-instrumentation.
+
+Keep one trace from before the migration at hand — its trace ID, its service name and its span count. It is the reference for the verification at the end.
+
+## Take over the retention of the existing indices
+
+The Mesh v1 tracing backend ran a cron job that deleted its indices once they were older than the configured retention. That job was owned by the Mesh v1 tracing resource and was deleted with it, so nothing expires those indices now.
+
+Apply a delete-only index lifecycle policy to the existing index family, following <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#take-over-retention-of-the-legacy-indices" children="Take over retention of the legacy indices" />, with the values from `${BACKUP_DIR}/v1-jaeger.txt`:
+
+- `LEGACY_ES_INDEX_PREFIX` — the `es.index-prefix` of the Mesh v1 tracing backend, `asm-mesh-<meshID>` by default.
+- The age at which indices are deleted — the `numberOfDays` of its index cleaner, 7 by default.
+
+## Install the new tracing stack
+
+Follow the **Prerequisites** of [Configuring distributed tracing platform with Service Mesh](../integration/observability/distributed-tracing/config-tracing-with-service-mesh.mdx) to install the Alauda Build of OpenTelemetry v2 Operator, a Jaeger v2 instance and the v2 collector in the `jaeger-system` namespace.
+
+Two choices matter for a migrated mesh:
+
+- **Use the same Elasticsearch cluster** as the Mesh v1 backend, otherwise the existing traces cannot be served by the new one.
+- **Choose the index prefix per mesh, not per cluster.** A mesh that spans several clusters writes into one index family so that a trace which crosses clusters is assembled from one place. The steps that act on Elasticsearch — the lifecycle policy and the index initialization — then belong to the mesh, not to a cluster: run them once, with the prefix of the mesh, and skip them on every other cluster. The Jaeger instance of any cluster serves the traces of the whole mesh afterwards.
+- **Give every cluster its own collector.** The collectors of all clusters share one service name, and the step that repoints the mesh declares that service cluster-local, so each proxy exports to the collector of its own cluster, see [Keep trace reporting inside each cluster](./migrating-a-multi-cluster-mesh/migrating-a-multi-network-mesh.mdx#keep-trace-reporting-inside-each-cluster).
+
+Stop after the prerequisites. The mesh-side configuration already exists from the migration, and the next step updates it.
+
+## Attach the existing indices to the new read aliases
+
+Attaching the Mesh v1 indices to the read aliases of the new index family makes traces from before the migration queryable in the new Jaeger UI. Nothing is copied or reindexed, and the old indices stay read-only.
+
+Follow <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#attach-the-legacy-indices" children="Attach the legacy indices to the new read aliases" />, with `LEGACY_ES_INDEX_PREFIX` set to the Mesh v1 prefix and `JAEGER_ES_INDEX_PREFIX` to the prefix of the new instance. In a multi-cluster mesh, attach them once for the whole mesh.
+
+:::note
+The Mesh v1 backend writes only span and service indices. The attach step also covers dependency and sampling indices, and reports `index_not_found_exception` for those two. That is expected and does not affect the result.
+:::
+
+## Repoint the mesh at the new collector \{#repoint-the-mesh-at-the-new-collector}
+
+The mesh sends spans to a provider defined in the `Istio` resource. Replace the Mesh v1 provider with one that points at the new collector, and update the mesh-wide `Telemetry` resource to use it.
+
+```bash {name=migrate-observability:repoint-istio}
+SETTINGS=$(kubectl get istio default -o json \
+  | jq -c '[(.spec.values.meshConfig.serviceSettings // [])[]
+            | select((.hosts // []) | index("otel-collector.jaeger-system.svc.cluster.local") | not)]
+           + [{settings: {clusterLocal: true}, hosts: ["otel-collector.jaeger-system.svc.cluster.local"]}]')
+kubectl patch istio default --type=merge -p "$(cat <<EOF
+{"spec":{"values":{"meshConfig":{
+  "extensionProviders":[
+    {"name":"otel","opentelemetry":{"port":4317,"service":"otel-collector.jaeger-system.svc.cluster.local"}}
+  ],
+  "serviceSettings":${SETTINGS}}}}}
+EOF
+)"
+kubectl wait --for condition=Ready istio/default --timeout=5m
+```
+
+```bash {name=migrate-observability:repoint-telemetry}
+kubectl -n istio-system patch telemetry asm-default --type=merge \
+  -p "{\"spec\":{\"tracing\":[{\"providers\":[{\"name\":\"otel\"}],\"randomSamplingPercentage\":${V1_TRACE_SAMPLING}}]}}"
+```
+
+<Callouts>
+1. `serviceSettings` declares the collector service cluster-local, which keeps every proxy exporting to the collector of its own cluster, see [Configuring distributed tracing platform with Service Mesh](../integration/observability/distributed-tracing/config-tracing-with-service-mesh.mdx). The setting changes nothing in a single-cluster mesh. A merge patch replaces both lists as a whole, so the command reads the service settings the mesh already has — Phase 2 copied them from Mesh v1 — and writes them back with the collector entry appended. The `extensionProviders` list is replaced: if your mesh defines other providers, edit the resource with `kubectl edit istio default` instead.
+2. `V1_TRACE_SAMPLING` is the sampling percentage the mesh used before the migration, recorded in `${BACKUP_DIR}/v1-mesh-settings.json`. Only the provider changes here; how much the mesh traces stays what it was.
+</Callouts>
+
+If the `Istio` resource restricts discovery with `discoverySelectors`, label the `jaeger-system` namespace so that the control plane can resolve the collector service.
+
+Mesh spans now reach the new backend. Check the Jaeger UI before you continue.
+
+## Migrate Java auto-instrumentation
+
+Applications that are instrumented by the OpenTelemetry Operator need three things restored: the injection annotations, an `Instrumentation` resource, and the environment they reported before the migration.
+
+In Mesh v1, a platform webhook added the injection annotations and the identity variables to each pod, and the `Instrumentation` resource in `cpaas-system` referenced them. Neither exists now, so both the annotations and the values must be written where they survive on their own.
+
+<Steps>
+
+### Prepare the Java agent image \{#prepare-the-java-agent-image}
+
+Mesh v1 shipped its own Java agent image. Mesh v2 does not, so choose an image and make it reachable from the cluster, as described in <ExternalSiteLink name="opentelemetry" href="/migrating/migrating-to-v2.html#preparing-the-java-agent-image" children="Preparing the Java agent image" />.
+
+```bash {name=migrate-observability:set-java-agent-image}
+export JAVA_AGENT_IMAGE=<java-auto-instrumentation-image>
+```
+
+### Create the `Instrumentation` resource
+
+Recreate the Mesh v1 configuration with the values from `${BACKUP_DIR}/instrumentations.yaml`, translated for the v2 agent:
+
+```bash {name=migrate-observability:create-instrumentation}
+cat <<EOF | kubectl apply -f -
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: java
+  namespace: ${MESH_NAMESPACE}
+spec:
+  exporter:
+    endpoint: http://otel-collector.jaeger-system.svc.cluster.local:4318
+  propagators:
+    - tracecontext
+    - baggage
+  sampler:
+    type: parentbased_traceidratio
+    argument: "1.0"
+  env:
+    - name: OTEL_TRACES_EXPORTER
+      value: otlp
+    - name: OTEL_METRICS_EXPORTER
+      value: otlp
+    - name: OTEL_LOGS_EXPORTER
+      value: none
+  java:
+    image: ${JAVA_AGENT_IMAGE}
+EOF
+```
+
+<Callouts>
+1. The Java agent 2.x exports with `http/protobuf` by default, where 1.x used gRPC. Either point the endpoint at the HTTP port `4318`, as above, or keep port `4317` and add `OTEL_EXPORTER_OTLP_PROTOCOL: grpc` to `spec.env`.
+2. Mesh v1 used a sampler of its own that sampled every root span and followed the decision of the caller for the rest. `parentbased_traceidratio` with `argument: "1.0"` is the equivalent built into the agent. Lower the argument if you sampled less than 100 percent.
+3. Mesh v1 also exported metrics in the Prometheus format from the agent. The v2 agent reports them through OTLP; scrape them from the collector instead of from the application pods.
+4. The 2.x agent exports logs by default, which Mesh v1 did not. A collector without a logs pipeline answers those requests with `404` and the agent logs a warning on every export. `OTEL_LOGS_EXPORTER: none` keeps the behavior your applications had. Set it to `otlp` only after you add a logs pipeline to the collector.
+</Callouts>
+
+### Keep the service names of your applications \{#keep-the-service-names-of-your-applications}
+
+Mesh v1 built the reported service name from the microservice name and the namespace, `<microservice>.<namespace>`, using variables that a Mesh v1 webhook injected. Without that webhook, the OpenTelemetry Operator falls back to the name of the workload, which changes how your applications appear in Jaeger, in dashboards and in alerts.
+
+Set the name explicitly on each workload, using the value recorded in `${BACKUP_DIR}/v1-instrumented-pods.txt`:
+
+```bash {name=migrate-observability:set-service-name}
+IDX=$(kubectl -n "${MESH_NAMESPACE}" get deploy "${WORKLOAD}" -o json \
+  | jq -r --arg c "${APP_CONTAINER}" '[.spec.template.spec.containers[].name] | index($c) // "none"')
+if [ "${IDX}" = "none" ]; then
+  echo "${WORKLOAD} has no container named ${APP_CONTAINER}"
+else
+  kubectl -n "${MESH_NAMESPACE}" patch deploy "${WORKLOAD}" --type=json \
+    -p="[{\"op\":\"add\",\"path\":\"/spec/template/spec/containers/${IDX}/env/-\",\"value\":{\"name\":\"OTEL_SERVICE_NAME\",\"value\":\"${SERVICE_NAME}\"}}]"
+fi
+```
+
+The variable belongs to the application container, so the command looks up its index rather than writing to the first container of the pod. If that container has no `env` list yet, add one with `kubectl edit`. Setting the variable on the application container keeps the name stable no matter which component injects the agent.
+
+### Turn injection back on
+
+Mesh v1 added the injection annotations to the pod. Write them into the workload template instead:
+
+```bash {name=migrate-observability:annotate-workload}
+kubectl -n "${MESH_NAMESPACE}" patch deploy "${WORKLOAD}" --type=merge -p "$(cat <<EOF
+{"spec":{"template":{"metadata":{"annotations":{
+  "instrumentation.opentelemetry.io/inject-java": "java",
+  "instrumentation.opentelemetry.io/java-container-names": "${APP_CONTAINER}"
+}}}}}
+EOF
+)"
+kubectl -n "${MESH_NAMESPACE}" rollout status "deploy/${WORKLOAD}" --timeout=300s
+```
+
+For a namespace where every workload is a Java application, annotate the namespace instead of each workload:
+
+```bash {name=migrate-observability:annotate-namespace}
+kubectl annotate ns "${MESH_NAMESPACE}" instrumentation.opentelemetry.io/inject-java=java --overwrite
+kubectl -n "${MESH_NAMESPACE}" rollout restart deploy
+```
+
+<Directive type="warning" title="Name the container that is instrumented">
+Without `java-container-names`, the agent is injected into the first container of the pod — which in a mesh workload can be the proxy rather than your application. Name the container explicitly on every instrumented workload, with `instrumentation.opentelemetry.io/java-container-names` as above, or with `instrumentation.opentelemetry.io/container-names` when the pod runs applications in more than one language. An agent injected into the proxy container instruments nothing and the workload disappears from the traces.
+</Directive>
+
+</Steps>
+
+## Repoint Kiali
+
+Update the tracing configuration of the `Kiali` resource to the new Jaeger query service, as described in [Integrating distributed tracing platform with Alauda Build of Kiali](../integration/observability/kiali.mdx#integrating-distributed-tracing-platform-with-alauda-build-of-kiali).
+
+In a multi-cluster mesh, point Kiali at the Jaeger instance of its own cluster and set the query scope of the tracing section to the mesh, `istio.mesh_id: <mesh-id>`, as the monitoring query scope already is. One index family holds the whole mesh, so that instance answers for every cluster.
+
+## Verification
+
+```bash {name=migrate-observability:verify-tracing}
+kubectl -n jaeger-system get pod
+kubectl -n "${MESH_NAMESPACE}" get pod -o json | jq -r '.items[]
+  | select(any(.spec.initContainers[]?; .name == "opentelemetry-auto-instrumentation-java"))
+  | .metadata.name as $pod
+  | .spec.containers[]
+  | select(any(.env[]?; .name == "JAVA_TOOL_OPTIONS"))
+  | "\($pod) \(.name) \([.env[]? | select(.name=="OTEL_SERVICE_NAME") | .value] | join(","))"'
+```
+
+The second command lists, for every pod the agent was injected into, the container it landed in and the name that container reports.
+
+- Traces produced after the migration appear in the Jaeger v2 UI, for the mesh proxies and for the instrumented applications.
+- The trace you kept from before the migration is still found by its trace ID, with the same span count and the same service name.
+- The service names of the instrumented applications are the ones they reported before the migration, and the container the agent landed in is the application container, never `istio-proxy`.
+- Kiali shows traces on the service detail pages.
+- Application metrics that were collected from the Java agent are available again, now through the collector.
+
+Return to [Finalizing the migration](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx) for the final acceptance of the migration.
