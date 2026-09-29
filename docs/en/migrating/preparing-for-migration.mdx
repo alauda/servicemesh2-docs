@@ -285,7 +285,7 @@ done
 
 Every resource counted here stops working when Mesh v1 is removed. Finish running canary releases, release isolated pods, and agree with the application owners on what replaces global rate limiting and API metrics before you start [Phase 2](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane).
 
-### Check the lifetime of the intermediate certificate
+### Check the lifetime of the intermediate certificate \{#check-the-lifetime-of-the-intermediate-certificate}
 
 Mesh v1 renews the intermediate certificate of the mesh automatically, and stops doing so when its controllers are removed in [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx). [Phase 6](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx) replaces the certificate with a long-lived one.
 

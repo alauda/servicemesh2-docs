@@ -103,7 +103,7 @@ istioctl --context "${CTX_CLUSTER2}" remote-clusters --revision "${V2_REVISION}"
 
 Each control plane lists the other cluster with status `synced`.
 
-## Deploy the Mesh v2 east-west gateways
+## Deploy the Mesh v2 east-west gateways \{#deploy-the-mesh-v2-east-west-gateways}
 
 Cross-cluster traffic reaches a workload through the east-west gateway of its cluster. A Mesh v2 proxy sends that traffic to the gateway address the control plane gives it, so every cluster needs a Mesh v2 east-west gateway before workloads are migrated.
 

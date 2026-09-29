@@ -94,7 +94,7 @@ The output must be `0` before you continue.
 The controller is what deletes the `istio-system` namespace when a `ServiceMesh` resource is being deleted. Once the resource carries a deletion timestamp, starting the controller again runs that flow. If you need the platform resources back, restore them from the backup instead.
 </Directive>
 
-### Delete the mesh resources
+### Delete the mesh resources \{#delete-the-mesh-resources}
 
 ```bash {name=migrate-decommission:delete-servicemesh}
 for cn in ${CLUSTER_NAMES}; do
