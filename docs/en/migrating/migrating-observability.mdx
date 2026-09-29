@@ -99,6 +99,8 @@ kubectl -n istio-system patch telemetry asm-default --type=merge \
 
 If the `Istio` resource restricts discovery with `discoverySelectors`, label the `jaeger-system` namespace so that the control plane can resolve the collector service.
 
+If a `Sidecar` resource restricts `egress.hosts`, add `jaeger-system/*` to it, otherwise its proxies drop every span without an error, see [Using `Sidecar` import](../installing/installing-service-mesh/scoping-the-service-mesh/using-sidecar-import.mdx).
+
 Mesh spans now reach the new backend. Check the Jaeger UI before you continue.
 
 ## Migrate Java auto-instrumentation \{#migrate-java-auto-instrumentation}
