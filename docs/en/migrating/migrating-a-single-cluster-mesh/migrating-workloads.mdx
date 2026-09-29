@@ -8,6 +8,10 @@ weight: 20
 
 Before you start, complete [Installing the Mesh v2 control plane](./installing-the-v2-control-plane.mdx) and keep the shell variables set by that page and by [Preparing for the migration](../preparing-for-migration.mdx).
 
+:::note Migrate one namespace at a time
+Everything on this page is scoped to `MESH_NAMESPACE`. Run the whole page for one namespace — generate its patches, switch its revision label, migrate its workloads, check the result — before you set `MESH_NAMESPACE` to the next namespace and start again.
+:::
+
 ## How injection is decided
 
 A namespace carries the label `istio.io/rev`, and the value selects the control plane that injects its pods. Mesh v1 is itself a revisioned deployment (`1-22`), so changing the label from `${V1_REVISION}` to `${V2_REVISION}` moves the namespace to Mesh v2. Running pods are not affected; the change applies to pods created after it.
@@ -32,6 +36,8 @@ Write them into the workload template while you migrate the workload. The same r
 <Steps>
 
 ### Generate the patches
+
+Replace `<namespace>` with your own value.
 
 ```bash {name=migrate-workloads:build-metadata-patches}
 export MESH_NAMESPACE=<namespace>
@@ -117,7 +123,7 @@ Running pods keep their Mesh v1 proxy. Only pods created from now on are injecte
 
 ### Migrate the workloads
 
-Apply the patch of each workload. The patch also sets the restart annotation, so one rollout both persists the settings and moves the workload to Mesh v2.
+Apply the patch of each workload. The patch also sets the restart annotation, so one rollout both persists the settings and moves the workload to Mesh v2. Replace `<workload>` with your own value.
 
 ```bash {name=migrate-workloads:migrate-workload}
 export WORKLOAD=<workload>
