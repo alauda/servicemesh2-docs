@@ -242,7 +242,7 @@ kubectl get pod -A -o json | jq -r '.items[]
 app-all  frontend-7d9c6b8f2-abcde  frontend  ASM_MS_NAME,ASM_CLUSTER_NAME,ASM_CONTAINER_NAME,ASM_POD_NAMESPACE
 ```
 
-`OTEL_SERVICE_NAME` is built from `ASM_MS_NAME` and `ASM_POD_NAMESPACE`, and [Migrating the observability stack](./migrating-observability.mdx#keep-the-service-names-of-your-applications) restores it as a literal value. Ask the application owners whether the applications themselves read any of these variables. An application that does keeps running after the migration but reads an empty value — a name that used to read `frontend.app-all` becomes `null.null` — and nothing reports an error.
+`OTEL_SERVICE_NAME` is built from `ASM_MS_NAME` and `ASM_POD_NAMESPACE`, and [Migrating the observability stack](./migrating-observability.mdx#keep-the-service-names-of-your-applications) restores it as a literal value. Ask the application owners whether the applications themselves read any of these variables. An application that does keeps running after the migration but reads an empty value — a name such as `frontend-ms.app-all` becomes `null.null` — and nothing reports an error.
 
 ### Save the variables \{#save-the-variables}
 

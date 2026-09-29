@@ -193,7 +193,7 @@ This is a strategic merge patch: it matches the container by its name and the va
 
 ### Restore the variables your applications read \{#restore-the-variables-your-applications-read}
 
-`OTEL_SERVICE_NAME` is not the only variable the Mesh v1 webhook added to the application container. `${BACKUP_DIR}/v1-injected-env.txt` from [Phase 0](./preparing-for-migration.mdx#record-the-variables-the-mesh-v1-webhooks-add-to-pods) lists the rest — `ASM_MS_NAME`, `ASM_POD_NAMESPACE`, `ASM_CLUSTER_NAME` and `ASM_CONTAINER_NAME`. An application that reads one of them keeps running after the migration, reads an empty value, and reports nothing: a field that used to hold `frontend.app-all` holds `null.null` instead.
+`OTEL_SERVICE_NAME` is not the only variable the Mesh v1 webhook added to the application container. `${BACKUP_DIR}/v1-injected-env.txt` from [Phase 0](./preparing-for-migration.mdx#record-the-variables-the-mesh-v1-webhooks-add-to-pods) lists the rest — `ASM_MS_NAME`, `ASM_POD_NAMESPACE`, `ASM_CLUSTER_NAME` and `ASM_CONTAINER_NAME`. An application that reads one of them keeps running after the migration, reads an empty value, and reports nothing: a field that used to hold a name such as `frontend-ms.app-all` holds `null.null` instead.
 
 Add the ones your applications depend on to the workload template, as literal values, with the `MS_NAME` of the workload:
 
@@ -227,7 +227,7 @@ ASM_POD_NAMESPACE 1x metadata.namespace
 OTEL_SERVICE_NAME 1x frontend-ms.app-all
 ```
 
-Every variable is listed once and with a value. A variable listed `2x` has a second definition that an earlier run appended: the container reads the last one, the API server warns `hides previous definition of "..."` on every later change to the workload, and a later `apply` may drop it. Remove the extra entries with `kubectl -n "${MESH_NAMESPACE}" edit deploy "${WORKLOAD}"`, keeping the definition that holds the value you want. An empty value means the step ran before its variable was set.
+Every variable is listed once and with a value. The patches above update a variable in place, so an empty value only means the step ran before its variables were set: set them and run the step again. A variable listed `2x` was already defined twice in the workload template before this step — the container reads the last definition, the API server warns `hides previous definition of "..."` on every later change to the workload, and a later `apply` may drop it. Remove the extra entries with `kubectl -n "${MESH_NAMESPACE}" edit deploy "${WORKLOAD}"`, keeping the definition that holds the value you want.
 
 Skipping this step is safe as long as no application reads these variables. Confirm that with the application owners rather than assuming it: nothing in the cluster reports a variable that resolves to an empty string.
 
