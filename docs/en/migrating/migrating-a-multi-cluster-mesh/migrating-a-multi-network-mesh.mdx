@@ -18,11 +18,11 @@ export CTX="${CTX_CLUSTER1}"
 
 | Phase | Addition |
 |---|---|
-| [Phase 0](../preparing-for-migration.mdx) | Record the mesh identity of every cluster, back up every cluster, and probe the cross-cluster call matrix |
+| [Phase 0](../preparing-for-migration.mdx) | Record the mesh identity and the cross-cluster endpoints of every cluster, back up every cluster, and probe the cross-cluster path |
 | [Phase 1](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-1-prepare-observability) | Install Kiali for a multi-cluster mesh |
 | [Phase 2](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane) | Create the `Istio` resource per cluster, each with its own `network` and cluster name |
 | [Phase 2](../migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane) (after) | Deploy a Mesh v2 east-west gateway per cluster before any workload moves |
-| [Phase 3](../migrating-a-single-cluster-mesh/migrating-workloads.mdx) | Migrate cluster by cluster, and check the call matrix after each namespace |
+| [Phase 3](../migrating-a-single-cluster-mesh/migrating-workloads.mdx) | Migrate cluster by cluster, and check the cross-cluster endpoints after each namespace |
 | [Phase 5](../migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) | Detach the east-west gateway service before the Mesh v1 control plane is deleted; the `global` steps cover the whole mesh at once |
 | [Phase 6](../migrating-a-single-cluster-mesh/finalizing-the-migration.mdx) | One intermediate certificate per cluster, and one tracing index family for the mesh |
 
@@ -40,32 +40,13 @@ done
 
 `meshID` is the same on every cluster; `network` and `clusterName` differ. Mesh v2 must reproduce all three per cluster.
 
-Extend the traffic probes to cover the cross-cluster matrix: a call that stays in the first cluster, a call that stays in the second, and a call from each cluster to a service backed by workloads in both. A service that exists in both clusters is load-balanced across them, so repeated calls exercise both paths unless a traffic policy keeps them in the local cluster. The workload and the service are the ones named in [The cross-cluster probe](./index.mdx#the-cross-cluster-probe).
+Extend the traffic probes of [Set up traffic probes](../preparing-for-migration.mdx#set-up-traffic-probes) to cover the cross-cluster path: give each cluster an in-mesh probe that calls a service backed by workloads in both clusters, the one named in [The cross-cluster probe](./index.mdx#the-cross-cluster-probe). Both directions are probed, because a migration step on one cluster changes what the other one reaches.
 
-Record that matrix before anything changes. It is the baseline every later phase is compared against:
+Record what that path resolves to before anything changes, with [the endpoint check of Phase 3 and Phase 4](#phase-3-and-phase-4-migrate-cluster-by-cluster) run against each cluster: the endpoints of the other cluster, and `rq_success` on them, are the baseline the later phases are compared against. Keep the records with your migration notes rather than in `BACKUP_DIR`, which is a different directory on every cluster.
 
-```bash {name=migrate-multi-network:record-baseline-matrix}
-export MESH_BACKUP_DIR="${HOME}/mesh-v1-migration-backup-${MESH_GROUP}"
-mkdir -p "${MESH_BACKUP_DIR}"
-export REPLY_ID='"ServerName":"[^"]*"'
-for ctx in "${CTX_CLUSTER1}" "${CTX_CLUSTER2}"; do
-  echo "== from ${ctx}"
-  for i in $(seq 1 30); do
-    kubectl --context "${ctx}" -n "${MESH_NAMESPACE}" exec "deploy/${CLIENT}" -c "${APP_CONTAINER}" -- \
-      curl -s --max-time 5 "http://${TARGET_SERVICE}/" | grep -oE "${REPLY_ID}"
-  done | sort | uniq -c
-done | tee "${MESH_BACKUP_DIR}/v1-cross-cluster-matrix.txt"
-```
+Compare against what you recorded, not against an even split: the traffic policies of the mesh decide the distribution, and a weighted locality distribution, locality failover and a mesh with neither all look different. The endpoints are the part that always tells you something — they are there whether traffic uses them or not, so a mesh where locality keeps every call inside its own cluster still shows whether the cross-cluster path is programmed.
 
-`REPLY_ID` is what tells the replying instances apart in the response of **your** application; the value above matches a demo that returns its own name as `ServerName`. Any field that differs per pod works. Check one response by hand first: a pattern that matches nothing produces an empty matrix, which looks exactly like every call failing.
-
-The matrix describes the mesh, not one of its clusters, and it is recorded once. `BACKUP_DIR` is a different directory on every cluster, so a file written there is out of reach from the next cluster you work on; `MESH_BACKUP_DIR` is where the records of the mesh go, and the later phases read this one from whichever cluster they run on. It is derived from `MESH_GROUP`, so the first line above gives the same path in any shell.
-
-Thirty calls per direction record the distribution the mesh has today, whatever it is. The traffic policies of the mesh decide it: a weighted locality distribution makes both clusters answer in a fixed proportion, locality failover keeps every call in the local cluster for as long as it is healthy, and a mesh with neither spreads calls over all endpoints. It is the recorded result that the later phases are compared against, not an expectation of what it should be.
-
-Record the endpoints as well, with [the endpoint check of Phase 3 and Phase 4](#phase-3-and-phase-4-migrate-cluster-by-cluster). In a mesh where no call leaves its cluster, the matrix cannot show that the cross-cluster path broke; the endpoints of the other cluster are there whether traffic uses them or not.
-
-## Phase 1: Kiali for a multi-cluster mesh
+## Phase 1: Kiali for a multi-cluster mesh \{#phase-1-kiali-for-a-multi-cluster-mesh}
 
 Kiali reads the metrics of every cluster from one store and needs read access to each cluster. Follow [Installing Kiali in a multi-cluster mesh](../../installing/multi-cluster/install-kiali-multi-cluster/install-kiali-in-multi-cluster-mesh.mdx) instead of the single-cluster instructions: the Kiali server runs on one cluster of the mesh, and every other cluster gets a `Kiali` resource that produces the remote cluster resources only.
 
@@ -200,21 +181,7 @@ The last command lists the endpoints the gateway resolves a mesh service to. The
 
 ## Phase 3 and Phase 4: migrate cluster by cluster \{#phase-3-and-phase-4-migrate-cluster-by-cluster}
 
-Migrate the workloads and gateways of one cluster as described for a single-cluster mesh, then move to the next cluster. After each namespace, check the call matrix:
-
-```bash {name=migrate-multi-network:check-cross-cluster-matrix}
-for ctx in "${CTX_CLUSTER1}" "${CTX_CLUSTER2}"; do
-  echo "== from ${ctx}"
-  for i in $(seq 1 10); do
-    kubectl --context "${ctx}" -n "${MESH_NAMESPACE}" exec "deploy/${CLIENT}" -c "${APP_CONTAINER}" -- \
-      curl -s --max-time 5 "http://${TARGET_SERVICE}/" | grep -oE "${REPLY_ID}"
-  done | sort | uniq -c
-done
-```
-
-The replies come from workloads in both clusters, in both directions, whichever generation of proxy is in use. Both directions are probed, as in Phase 0, because a migration step on one cluster changes what the other one reaches.
-
-Compare the result with `${MESH_BACKUP_DIR}/v1-cross-cluster-matrix.txt` from [Phase 0](#phase-0-record-and-probe-every-cluster), not with an even split: a mesh that uses locality load balancing sends most calls to the local cluster by design, and a `DestinationRule` that distributes traffic from one locality only makes the two directions look different. When a direction that reached the other cluster before the migration no longer does, check the remote endpoint instead of the sample:
+Migrate the workloads and gateways of one cluster as described for a single-cluster mesh, then move to the next cluster. The probes report whether the cross-cluster path keeps serving traffic. After each namespace, check that it is still programmed, on both clusters — a migration step on one cluster changes what the other one reaches:
 
 ```bash {name=migrate-multi-network:check-remote-endpoint}
 istioctl --context "${CTX}" proxy-config endpoint "deploy/${CLIENT}.${MESH_NAMESPACE}" \
@@ -222,7 +189,7 @@ istioctl --context "${CTX}" proxy-config endpoint "deploy/${CLIENT}.${MESH_NAMES
   | jq -r '.[0].hostStatuses[] | "\(.address.socketAddress.address):\(.address.socketAddress.portValue) \(.healthStatus.edsHealthStatus) rq_success=\(.stats[]? | select(.name=="rq_success") | .value // 0)"'
 ```
 
-The endpoint of the other cluster is the address of its east-west gateway on port 15443, and it is healthy. An endpoint that is a raw pod address of the other cluster means the `network` value of that control plane is wrong. No output at all beyond the header means `TARGET_SERVICE` is not the fully qualified name of the service, see [The cross-cluster probe](./index.mdx#the-cross-cluster-probe).
+The endpoint of the other cluster is the address of its east-west gateway on port 15443, and it is healthy. Its `rq_success` keeps growing while the probes run, in the proportion recorded in [Phase 0](#phase-0-record-and-probe-every-cluster); a counter that stops while the local one grows means the calls no longer leave the cluster. An endpoint that is a raw pod address of the other cluster means the `network` value of that control plane is wrong. No output at all beyond the header means `TARGET_SERVICE` is not the fully qualified name of the service, see [The cross-cluster probe](./index.mdx#the-cross-cluster-probe).
 
 ## Phase 5: decommission cluster by cluster
 
@@ -266,7 +233,13 @@ The entry affects only that host. Cross-cluster load balancing of application se
 ## Verification
 
 - `istioctl --context "${CTX}" remote-clusters --revision "${V2_REVISION}"` reports `synced` on every cluster.
-- The cross-cluster call matrix passes in both directions, and replies come from workloads in both clusters.
+- The cross-cluster endpoint of every cluster is the east-west gateway of the other one, healthy, and its `rq_success` grows in the proportion recorded in Phase 0.
 - Traffic policies that depend on the topology — locality load balancing and outlier detection, for example — behave as they did before the migration. They are Istio resources and are not changed by the migration.
 - Kiali shows the workloads of every cluster, and traces that cross clusters contain the spans of both sides. A span carries the cluster it was produced in as `istio.cluster_id`, which is what a trace of a cross-cluster call is read by.
 - The east-west gateway service on each cluster keeps its address, and its endpoints are the Mesh v2 gateway pods.
+
+## After the migration \{#after-the-migration}
+
+The traffic graph of Kiali is the view of the whole migrated mesh, and the checks above only cover the service the probes call. Open **Traffic Graph**, select the namespaces of the mesh and enable **Display** > **Cluster Boxes**: the workloads are grouped per cluster, and every call that crosses clusters is an edge between the boxes. Confirm that the edges are drawn in both directions and that no service lost the cross-cluster half of its traffic, see [Verification](../../installing/multi-cluster/install-kiali-multi-cluster/install-kiali-in-multi-cluster-mesh.mdx#verification) of Installing Kiali in a multi-cluster mesh.
+
+A graph that draws no edge between the clusters while the endpoint checks pass is usually Kiali, not the mesh: it reads the metrics of both clusters from one store, filtered by `mesh_id`, and a cluster whose metrics are missing or labelled `mesh_id="unknown"` is invisible to it, see [Phase 1: Kiali for a multi-cluster mesh](#phase-1-kiali-for-a-multi-cluster-mesh).
