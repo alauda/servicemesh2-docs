@@ -182,12 +182,13 @@ The variable belongs to the application container, so the command looks up its i
 Add the ones your applications depend on to the workload template, as literal values:
 
 ```bash {name=migrate-observability:restore-injected-env}
+export MS_NAME=<microservice-name>
 kubectl -n "${MESH_NAMESPACE}" patch deploy "${WORKLOAD}" --type=json \
-  -p="[{\"op\":\"add\",\"path\":\"/spec/template/spec/containers/${IDX}/env/-\",\"value\":{\"name\":\"ASM_MS_NAME\",\"value\":\"${WORKLOAD}\"}},
+  -p="[{\"op\":\"add\",\"path\":\"/spec/template/spec/containers/${IDX}/env/-\",\"value\":{\"name\":\"ASM_MS_NAME\",\"value\":\"${MS_NAME}\"}},
        {\"op\":\"add\",\"path\":\"/spec/template/spec/containers/${IDX}/env/-\",\"value\":{\"name\":\"ASM_POD_NAMESPACE\",\"valueFrom\":{\"fieldRef\":{\"fieldPath\":\"metadata.namespace\"}}}}]"
 ```
 
-`IDX` is the index of the application container, from the command above. The microservice name is the value of the `asm.cpaas.io/msname` label recorded in `${BACKUP_DIR}/v1-instrumented-pods.txt`, which is the workload name unless the microservice was named differently.
+`IDX` is the index of the application container, from the command above. `MS_NAME` is the microservice the workload belonged to in Mesh v1, which is not always the name of the workload — `${BACKUP_DIR}/v1-instrumented-pods.txt` holds it as the first part of the reported service name, `<microservice>.<namespace>`. A workload name written here is accepted and reported like any other value, and the identity your applications report changes without anything failing.
 
 Skipping this step is safe as long as no application reads these variables. Confirm that with the application owners rather than assuming it: nothing in the cluster reports a variable that resolves to an empty string.
 
@@ -219,9 +220,9 @@ Without `java-container-names`, the agent is injected into the first container o
 
 </Steps>
 
-## Repoint Kiali
+## Connect Kiali to Jaeger v2 \{#connect-kiali-to-jaeger-v2}
 
-Update the tracing configuration of the `Kiali` resource to the new Jaeger query service, as described in [Integrating distributed tracing platform with Alauda Build of Kiali](../integration/observability/kiali.mdx#integrating-distributed-tracing-platform-with-alauda-build-of-kiali).
+Set the tracing configuration of the `Kiali` resource to the new Jaeger query service, as described in [Integrating distributed tracing platform with Alauda Build of Kiali](../integration/observability/kiali.mdx#integrating-distributed-tracing-platform-with-alauda-build-of-kiali). [Phase 1](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-1-prepare-observability) installed Kiali without one.
 
 In a multi-cluster mesh, point Kiali at the Jaeger instance of its own cluster and set the query scope of the tracing section to the mesh, `istio.mesh_id: <mesh-id>`, as the monitoring query scope already is. One index family holds the whole mesh, so that instance answers for every cluster.
 
