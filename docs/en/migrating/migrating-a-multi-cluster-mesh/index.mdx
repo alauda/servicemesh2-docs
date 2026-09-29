@@ -103,4 +103,13 @@ kubectl config get-contexts "${CTX}"
 
 A command without `--context` runs against whatever context your kubeconfig has selected, which is rarely the cluster you mean during a multi-cluster migration. Every command in this section passes it explicitly.
 
+The commands of [Migrating a single-cluster mesh](../migrating-a-single-cluster-mesh/index.mdx) do not: they act on the cluster your kubeconfig has selected. Select `${CTX}` before you run one of those pages for a cluster, and again when you move to the next one:
+
+```bash {name=migrate-mc:select-context}
+kubectl config use-context "${CTX}"
+kubectl config current-context
+```
+
+The selected context is stored in the kubeconfig file, so every shell that reads that file shares it — a traffic probe or a call matrix that keeps running while you work on the other cluster follows the switch and reports on the wrong cluster. Where steps of both clusters run at the same time, give each cluster its own copy of the kubeconfig, `kubectl config view --flatten --raw > "${HOME}/.kube/${CTX}"` with the context of that cluster selected in it, and point `KUBECONFIG` at the copy of the cluster the shell works on.
+
 <Overview overviewHeaders={[]} />
