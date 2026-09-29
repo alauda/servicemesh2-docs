@@ -41,7 +41,9 @@ kubectl -n istio-system get podmonitor istio-proxies-monitor -o json \
 A proxy that both monitors scrape reports every request twice, and Kiali shows twice the traffic it carries. For the same reason, do not create the `ServiceMonitor` resource yet. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx#take-over-the-metrics-collection) lifts the restriction and creates it once the Mesh v1 monitors are gone.
 
 :::note Do not create the asm-default telemetry resource yet
-Mesh v1 already owns a mesh-wide `Telemetry` resource in `istio-system`, and both control planes read it. Only one mesh-wide resource is ever in effect — the oldest one in `istio-system` that has no selector — so a second one created now would be ignored without any error, and the Mesh v1 one would keep configuring both generations. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx) creates `asm-default` in its place in [Phase 5](../migration-overview.mdx#migration-phases).
+Mesh v1 already owns a mesh-wide `Telemetry` resource in `istio-system`, and both control planes read it. Only one mesh-wide resource is ever in effect — the oldest one in `istio-system` that has no selector — so a second one created now would be ignored without any error, and the Mesh v1 one would keep configuring both generations. [Decommissioning Mesh v1](./decommissioning-mesh-v1.mdx#replace-the-mesh-wide-telemetry-configuration) creates `asm-default` in its place in [Phase 5](../migration-overview.mdx#migration-phases).
+
+Nothing is lost by waiting. The Mesh v1 resource carries the `mesh_id` tag override that Kiali filters the metrics of a mesh by, and applies it to the proxies of both generations, so a workload stays visible in Kiali from before the migration until `asm-default` takes over.
 :::
 
 ### Verification

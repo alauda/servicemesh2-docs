@@ -17,6 +17,23 @@ Read [Migrating a single-cluster mesh](../migrating-a-single-cluster-mesh/index.
 - The remote secrets that let each control plane read the other clusters are reused as they are. Mesh v2 discovers them by label, exactly as Mesh v1 did.
 - The custom configuration of the mesh is collected per cluster and expressed the Mesh v2 way per cluster, see [Collect the custom Istio configuration](../preparing-for-migration.mdx#collect-the-custom-istio-configuration). Clusters of one mesh rarely have identical control plane settings.
 
+## The cross-cluster probe \{#the-cross-cluster-probe}
+
+The checks on this page and on the two pages below all call one service of the mesh from one workload, and they name it with the same variables. Set them on a service that has pods in both clusters, and keep the values for the whole migration:
+
+```bash {name=migrate-mc:set-probe-variables}
+export MESH_NAMESPACE=<namespace-they-run-in>
+export CLIENT=<deployment-that-makes-the-call>
+export APP_CONTAINER=<its-application-container>
+export TARGET_APP=<service-it-calls>
+export TARGET_SERVICE="${TARGET_APP}.${MESH_NAMESPACE}.svc.cluster.local"
+export APP_PORT=<port-of-that-service>
+```
+
+The service is named twice on purpose. `TARGET_APP` is its short name, which is what its `EndpointSlice` is labelled with; `TARGET_SERVICE` is its fully qualified name, which is what the Envoy cluster of the service is named after. A `proxy-config endpoint --cluster "outbound|${APP_PORT}||${TARGET_SERVICE}"` given the short name prints its header and no rows — the same output as a service whose cross-cluster endpoints are gone. A request is addressed by either form.
+
+`APP_PORT` is the port of the service, not the port its pods listen on.
+
 ## Determine the network topology \{#determine-the-network-topology}
 
 The migration steps differ depending on whether the clusters share one network or use one network each. Determine this before you start.
@@ -60,11 +77,11 @@ If pods of one cluster can reach pods of the other directly, the mesh is single 
 PEER=$(kubectl --context "${CTX_CLUSTER2}" -n "${MESH_NAMESPACE}" get endpointslices \
   -l "kubernetes.io/service-name=${TARGET_APP}" \
   -o jsonpath='{.items[0].endpoints[0].addresses[0]}:{.items[0].ports[0].port}')
-kubectl --context "${CTX_CLUSTER1}" -n "${MESH_NAMESPACE}" exec "deploy/${WORKLOAD}" -c "${APP_CONTAINER}" -- \
+kubectl --context "${CTX_CLUSTER1}" -n "${MESH_NAMESPACE}" exec "deploy/${CLIENT}" -c "${APP_CONTAINER}" -- \
   curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 "http://${PEER}/"
 ```
 
-`TARGET_APP` is a service of the other cluster. The address and the port come from its endpoints: the address of a pod and the port that pod listens on. Use that port, not the service port — a request to a pod address on the **service** port is answered by the sidecar with `503` in either topology and tells you nothing.
+The address and the port come from the endpoints of `TARGET_APP` in the other cluster: the address of a pod and the port that pod listens on. This is the one check that uses the pod port rather than `APP_PORT` — a request to a pod address on the **service** port is answered by the sidecar with `503` in either topology and tells you nothing.
 
 | Result | Topology |
 |---|---|
