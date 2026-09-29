@@ -146,15 +146,44 @@ java-apps    injected=0 pods=4
 
 Gateways run in their own namespace, which may not carry the revision label. [Migrating gateways](./migrating-a-single-cluster-mesh/migrating-gateways.mdx) lists them.
 
+Count every pod that Mesh v1 injected, whatever namespace it runs in. This is the baseline that [Phase 2](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane) compares against:
+
+```bash {name=migrate-prep:count-injected-pods}
+kubectl get pod -A -o json | jq -r --arg rev "${V1_REVISION}" '[.items[]
+  | select((.metadata.annotations["sidecar.istio.io/status"] // "") | test("\"revision\":\"" + $rev + "\""))] | length' \
+  | tee "${BACKUP_DIR}/v1-injected-pod-count.txt"
+```
+
+The number is higher than the sum of the namespace listing above whenever gateways run in a namespace without the revision label, which is the usual layout: two gateways add two pods.
+
 ### Record the tracing backend
 
 The Mesh v1 `Jaeger` resource is deleted in [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx). Record the index prefix and the retention of its Elasticsearch indices now; [Phase 6](./migrating-observability.mdx) needs both to keep the existing traces queryable.
 
 ```bash {name=migrate-prep:record-jaeger}
 kubectl -n istio-system get jaegers.jaegertracing.io -o json | jq -r '.items[]
-  | "name=\(.metadata.name) prefix=\(.spec.storage.options["es.index-prefix"] // "") days=\(.spec.storage.esIndexCleaner.numberOfDays // "") url=\(.spec.storage.options["es.server-urls"] // "")"' \
+  | "name=\(.metadata.name) prefix=\(.spec.storage.options["es.index-prefix"] // "") days=\(.spec.storage.esIndexCleaner.numberOfDays // "") url=\(.spec.storage.options["es.server-urls"] // "") credentials=\(.spec.storage.options["es.asm.cnamespace"] // "istio-system")/\(.spec.storage.options["es.asm.cname"] // "")"' \
   | tee "${BACKUP_DIR}/v1-jaeger.txt"
 ```
+
+**Example output**
+
+```text
+name=jaeger-prod prefix=asm-mesh-mesh-1 days=7 url=https://elasticsearch.example.com/es_proxy credentials=istio-system/system-elasticsearch-basic-auth
+```
+
+The `Jaeger` resource does not hold the Elasticsearch user and password: it names a secret that does. [Phase 6](./migrating-observability.mdx) needs those credentials to deploy the new backend against the same Elasticsearch cluster, and the secret lives in `istio-system` next to the Mesh v1 components that [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) removes. Back it up:
+
+```bash {name=migrate-prep:back-up-es-credentials}
+sed -n 's|.*credentials=\([^/ ]*\)/\([^ ]*\).*|\1 \2|p' "${BACKUP_DIR}/v1-jaeger.txt" \
+  | while read -r ns name; do
+      [ -z "${name}" ] && continue
+      kubectl -n "${ns}" get secret "${name}" -o yaml > "${BACKUP_DIR}/v1-jaeger-es-credentials.yaml"
+      echo "${ns}/${name} keys: $(kubectl -n "${ns}" get secret "${name}" -o jsonpath='{.data}' | jq -r 'keys | join(",")')"
+    done
+```
+
+The keys are `ES_USERNAME` and `ES_PASSWORD`, not `username` and `password`.
 
 Also record how applications are instrumented today, so that the telemetry of your applications does not change when Mesh v1 is gone:
 
@@ -172,6 +201,48 @@ kubectl get pod -A -o json | jq -r '.items[]
 ```
 
 The service name of a Mesh v1 application is built from variables that a Mesh v1 webhook adds to the pod, so the environment of the pod shows `$(ASM_MS_NAME).$(ASM_POD_NAMESPACE)` rather than a value. The command resolves it to the name the application actually reports, `<microservice>.<namespace>`. [Migrating the observability stack](./migrating-observability.mdx) restores the same names without that webhook.
+
+### Record the variables the Mesh v1 webhooks add to pods \{#record-the-variables-the-mesh-v1-webhooks-add-to-pods}
+
+The same webhooks add the identity of the microservice to the **application** containers of every pod they handle. The variables are not in the workload template, so they disappear with the webhooks in [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx):
+
+```bash {name=migrate-prep:record-injected-env}
+kubectl get pod -A -o json | jq -r '.items[]
+  | select(.metadata.annotations["sidecar.istio.io/status"] != null
+           or .metadata.annotations["instrumentation.opentelemetry.io/inject-java"] != null)
+  | . as $p | .spec.containers[] | select(.name != "istio-proxy")
+  | [(.env // [])[] | select(.name | startswith("ASM_")) | .name] as $asm
+  | select($asm | length > 0)
+  | "\($p.metadata.namespace) \($p.metadata.name) \(.name) \($asm | join(","))"' \
+  | tee "${BACKUP_DIR}/v1-injected-env.txt"
+```
+
+**Example output**
+
+```text
+app-all  frontend-7d9c6b8f2-abcde  frontend  ASM_MS_NAME,ASM_CLUSTER_NAME,ASM_CONTAINER_NAME,ASM_POD_NAMESPACE
+```
+
+`OTEL_SERVICE_NAME` is built from `ASM_MS_NAME` and `ASM_POD_NAMESPACE`, and [Migrating the observability stack](./migrating-observability.mdx#keep-the-service-names-of-your-applications) restores it as a literal value. Ask the application owners whether the applications themselves read any of these variables. An application that does keeps running after the migration but reads an empty value — a name that used to read `frontend.app-all` becomes `null.null` — and nothing reports an error.
+
+### Save the variables \{#save-the-variables}
+
+The resources these values come from are deleted during [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx), while later steps of the same phase still use them. Write them down now:
+
+```bash {name=migrate-prep:save-variables}
+cat > "${BACKUP_DIR}/vars.env" <<EOF
+export GLOBAL_CONTEXT='${GLOBAL_CONTEXT}' CLUSTER_NAME='${CLUSTER_NAME}' BACKUP_DIR='${BACKUP_DIR}'
+export MESH_GROUP='${MESH_GROUP}' CLUSTER_NAMES='${CLUSTER_NAMES}'
+export V1_CONTROL_PLANE_IOP='${V1_CONTROL_PLANE_IOP}' V1_REVISION='${V1_REVISION}'
+export MESH_ID='${MESH_ID}' NETWORK='${NETWORK}' MESH_CLUSTER_NAME='${MESH_CLUSTER_NAME}'
+export TRUST_DOMAIN='${TRUST_DOMAIN}' V1_AUTO_INJECT='${V1_AUTO_INJECT}' V1_TRACE_SAMPLING='${V1_TRACE_SAMPLING}'
+EOF
+cat "${BACKUP_DIR}/vars.env"
+```
+
+<Directive type="warning" title="Load the file in every new shell">
+In a new shell, run `source "${BACKUP_DIR}/vars.env"` rather than deriving the values again. From the middle of [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) on, the `ServiceMesh` resources and the Mesh v1 control plane are gone and the commands above return empty values. Nothing fails then: a `kubectl delete` with an empty name deletes an object that does not exist, a label selector with an empty value matches no namespace, and the cleanup steps silently skip the work they were supposed to do.
+</Directive>
 
 </Steps>
 
@@ -287,7 +358,9 @@ Actual usage grows far less. A three-node cluster running a small mesh — three
 
 ## Back up the mesh \{#back-up-the-mesh}
 
-[Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) deletes the Mesh v1 resources. Some of them — gateway services, gateway certificates and the telemetry resources of the mesh — are owned by Mesh v1 resources and are garbage collected with them. The backup is what you restore from if a phase has to be rolled back.
+[Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) deletes the Mesh v1 resources. Some of the resources you depend on are owned by them and are garbage collected with them — typically the gateway services and the per-microservice and per-gateway telemetry resources. [Record which resources Mesh v1 owns](#record-which-resources-mesh-v1-owns) below produces the list that holds for your cluster; do not assume a resource is owned, or that it is not, before you have read that list. The gateway certificates are usually not owned, but they are stored in `istio-system` next to the Mesh v1 components, so they are backed up here as well.
+
+The backup is what you restore from if a phase has to be rolled back.
 
 <Steps>
 
@@ -329,7 +402,7 @@ kubectl get gateways.networking.istio.io -A -o json \
 The private key of a gateway certificate exists only in its secret. If the secret is lost, the certificate has to be reissued. Keep this backup until the migration is finished and verified.
 :::
 
-### Record which resources Mesh v1 owns
+### Record which resources Mesh v1 owns \{#record-which-resources-mesh-v1-owns}
 
 ```bash {name=migrate-prep:audit-owner-references}
 for kind in $(kubectl get crd -o name | sed 's|.*/||' | grep -E '\.istio\.io$') secrets services; do
@@ -342,7 +415,25 @@ while read -r kind ns name owner; do
 done < "${BACKUP_DIR}/asm-owned-resources.txt"
 ```
 
-Every resource in this list is deleted by Kubernetes when its owner is deleted in [Phase 5](./migration-overview.mdx#migration-phases). [Decommissioning Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) removes the owner reference from the resources you keep.
+**Example output**
+
+```text
+envoyfilters.networking.istio.io  app-all  frontend-1.22  ApiAttribute/frontend
+telemetries.telemetry.istio.io    app-all  frontend       MicroService/frontend
+telemetries.telemetry.istio.io    gw       ingress-1      GatewayDeploy/ingress-1
+services                          gw       ingress-1      GatewayDeploy/ingress-1
+```
+
+Every resource in this list is deleted by Kubernetes when its owner is deleted in [Phase 5](./migration-overview.mdx#migration-phases). [Decommissioning Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx) removes the owner reference from the resources you keep — and only from those: most of what is listed here is Mesh v1 configuration that [Phase 3](./migrating-a-single-cluster-mesh/migrating-workloads.mdx) and [Phase 4](./migrating-a-single-cluster-mesh/migrating-gateways.mdx) replace with equivalents of their own.
+
+Resources that Mesh v1 generated but that are owned by something else — a `DestinationRule` owned by the `ServiceEntry` of an external service, for example — are not in this list and are not deleted in [Phase 5](./migration-overview.mdx#migration-phases). List them too, so that you know what stays behind without an owner to maintain it:
+
+```bash {name=migrate-prep:audit-generated-resources}
+for crd in $(kubectl get crd -o name | sed 's|.*/||' | grep -E '\.istio\.io$'); do
+  kubectl get "${crd}" -A -l 'asm.cpaas.io/creator=asm-controller' -o json 2>/dev/null | jq -r --arg k "${crd}" '.items[]
+    | "\($k) \(.metadata.namespace) \(.metadata.name) \(.metadata.ownerReferences[0].kind // "-")/\(.metadata.ownerReferences[0].name // "-")"'
+done | tee "${BACKUP_DIR}/asm-generated-resources.txt"
+```
 
 ### Back up the `global` cluster resources
 
@@ -350,6 +441,10 @@ Every resource in this list is deleted by Kubernetes when its owner is deleted i
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshs.asm.alauda.io -o yaml > "${BACKUP_DIR}/global-servicemeshes.yaml"
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get servicemeshgroups.asm.alauda.io -o yaml > "${BACKUP_DIR}/global-servicemeshgroups.yaml"
 kubectl --context "${GLOBAL_CONTEXT}" -n cpaas-system get secret asm-istio-rootca -o yaml > "${BACKUP_DIR}/global-asm-istio-rootca.yaml"
+kubectl --context "${GLOBAL_CONTEXT}" get moduleplugins.cluster.alauda.io asm-global -o yaml \
+  > "${BACKUP_DIR}/global-asm-moduleplugin.yaml"
+kubectl --context "${GLOBAL_CONTEXT}" get moduleinfoes.cluster.alauda.io -l cpaas.io/module-name=asm-global -o yaml \
+  > "${BACKUP_DIR}/global-asm-moduleinfo.yaml"
 kubectl --context "${GLOBAL_CONTEXT}" get \
   mutatingwebhookconfiguration/servicemesh-v1alpha1-mutation \
   mutatingwebhookconfiguration/servicemeshgroup-v1alpha1-mutation \
@@ -358,6 +453,8 @@ kubectl --context "${GLOBAL_CONTEXT}" get \
 ```
 
 The webhook configurations are needed again only if the `global` cluster keeps serving another Mesh v1 mesh, see [Decommissioning Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx#uninstall-the-service-mesh-essentials-plugin).
+
+`asm-global` is the Alauda Service Mesh Essentials cluster plugin. `ModulePlugin` is its entry in the plugin catalog of the platform and `ModuleInfo` the record that it is installed on the `global` cluster. [Rolling back the migration](./rollback.mdx) reinstalls the plugin from these two files.
 
 :::warning The root certificate authority is in this backup
 `asm-istio-rootca` contains the private key of the root certificate authority of the mesh. [Phase 6](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx) signs a new intermediate certificate with it. Store the backup where you keep private keys, not on the cluster.
@@ -421,21 +518,37 @@ Set `PROBE_TARGETS` to your own URLs, for example:
 export PROBE_TARGETS=(
   "http://<ingress-gateway-host>/<path>"
   "https://<ingress-gateway-tls-host>/<path>"
-  "http://<external-service-host>/<path>"
 )
+```
+
+The ingress routes are reachable from your machine. The other two paths — a call between two workloads and an egress route — are not: they only exist inside the mesh and have to be probed from a pod. Use a workload you migrate last, so that its own restart does not show up as an outage:
+
+```bash {name=migrate-prep:run-in-mesh-probe}
+export PROBE_NAMESPACE=<namespace> PROBE_WORKLOAD=<workload> PROBE_CONTAINER=<application-container>
+export IN_MESH_TARGET=http://<service>.<namespace>:<port>/<path>
+while true; do
+  ts=$(date -u +%FT%TZ)
+  code=$(kubectl -n "${PROBE_NAMESPACE}" exec "deploy/${PROBE_WORKLOAD}" -c "${PROBE_CONTAINER}" -- \
+    curl -s -o /dev/null -w '%{http_code}' --max-time 5 "${IN_MESH_TARGET}" 2>/dev/null || echo "000")
+  case "${code}" in 2*|3*) echo "${ts} ${IN_MESH_TARGET} ${code} OK" ;; *) echo "${ts} ${IN_MESH_TARGET} ${code} FAIL" ;; esac
+  sleep 1
+done
 ```
 
 :::note Where to run the probes from
 Run the probes from outside the mesh, or from the namespace you migrate last. A probe that runs inside a workload being restarted reports its own restart as an outage.
 
 HTTPS routes must be probed as HTTPS. A gateway that cannot load its certificate keeps answering its HTTP routes and only resets the TLS handshakes on its HTTPS port, so an HTTP-only probe does not detect the failure.
+
+An egress probe must be checked against the gateway, not only against its status code. With the default `outboundTrafficPolicy: ALLOW_ANY`, a request to a host that resolves outside the cluster leaves through the passthrough cluster when the egress route is broken, and still answers `200`. Confirm once, before the migration and again after each phase that touches the gateways, that the request really traverses the egress gateway — the access log of the gateway pod names the route, and `istioctl proxy-config` shows which cluster the proxy picked. Forcing the hostname to the address of its `ServiceEntry` with `curl --resolve <host>:<port>:<address>` keeps the probe on the intended path.
 :::
 
 ## Verification
 
 - `echo "${MESH_ID} ${NETWORK} ${MESH_CLUSTER_NAME} ${TRUST_DOMAIN} ${V1_AUTO_INJECT}"` prints the mesh identity and the injection policy.
+- `cat "${BACKUP_DIR}/vars.env"` shows every variable the later phases need, with no empty value.
 - `ls "${BACKUP_DIR}"` lists the backup of the Istio resources, the Mesh v1 resources, the gateway services and certificates, the `cacerts` secret and the `global` cluster resources.
-- `cat "${BACKUP_DIR}/v1-jaeger.txt"` shows the index prefix and the retention of the tracing backend.
+- `cat "${BACKUP_DIR}/v1-jaeger.txt"` shows the index prefix, the retention and the credentials secret of the tracing backend, and `${BACKUP_DIR}/v1-jaeger-es-credentials.yaml` holds that secret.
 - The probes report `OK` for every target.
 - The compatibility audits return no unexpected resources.
 
