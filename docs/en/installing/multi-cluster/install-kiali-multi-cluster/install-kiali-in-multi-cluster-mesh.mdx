@@ -14,7 +14,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
 ## Prerequisites \{#prerequisites}
 
-- You have deployed a multi-cluster mesh by following either [Installing a multi-primary multi-network mesh](../install-multi-primary-multi-network.mdx) or [Installing a primary-remote multi-network mesh](../install-primary-remote-multi-network.mdx).
+- You have a multi-cluster mesh spanning the **East** and **West** clusters, in either the multi-primary or the primary-remote control plane topology. For example, you can install one by following [Installing a multi-primary multi-network mesh](../install-multi-primary-multi-network.mdx) or [Installing a primary-remote multi-network mesh](../install-primary-remote-multi-network.mdx).
 - You have installed the Alauda Build of Kiali Operator on **every** cluster in the mesh, including the clusters where no Kiali server is deployed. See [Installing Alauda Build of Kiali](../../../integration/observability/kiali.mdx).
 - Every cluster in the mesh collects metrics with **ACP Monitoring with VictoriaMetrics**, and all of them report to the same VictoriaMetrics Center. See <ExternalSiteLink name="acp" href="/observability/monitor/install_monitor.html#acp-monitoring-with-victoriametrics" children="ACP Monitoring with VictoriaMetrics" />.
 
@@ -197,10 +197,11 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
   Run the script by using the following command:
 
   ```bash {name=install-kiali-mc:run-prepare-script}
+  # <remote-cluster-name> example: cluster2
   ./kiali-prepare-remote-cluster.sh \
     --kiali-cluster-context "${CTX_CLUSTER1}" \
     --remote-cluster-context "${CTX_CLUSTER2_PROXY}" \
-    --remote-cluster-name cluster2 \
+    --remote-cluster-name <remote-cluster-name> \
     --remote-cluster-namespace istio-system \
     --kiali-resource-name kiali-service-account \
     --process-remote-resources false \
@@ -252,7 +253,7 @@ You can adapt these instructions for a mesh spanning more than two clusters by r
 
 </Steps>
 
-## Verification
+## Verification \{#verification}
 
 1. Confirm that the Kiali server discovered every cluster by running the following command:
 
