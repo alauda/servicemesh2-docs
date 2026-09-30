@@ -70,13 +70,15 @@ _check_cacerts_prerequisite() {
 # LoadBalancer）未必已通，一次性采样会踩中这个窗口。RET-1036（2026-09-29 dailybuild，
 # ctyun MicroOS）多主多网络用例：East istiod 23:04:45.6 推下 v2 端点，随即采样失败；那是 West
 # 东西向网关 VIP 的首次宣告，两分钟后主-远用例同样的验证即通过。始终不通时重试耗尽仍如实失败。
+# 窗口 24 次 × 5 秒（每次另含 10 次 exec，合计约 3.5 分钟）：那次从首次采样到主-远用例验证
+# 通过约 3 分钟，这是已知的收敛上界；默认 12 次只覆盖不到 2 分钟。
 _verify_cross_cluster_traffic() {
     local block="$1" side="$2"
     if ! retry_runme_verify "$block" __cmp_lines "$(cat <<'EOF'
 + Hello version: v1
 + Hello version: v2
 EOF
-)"; then
+)" 24 5; then
         log_error "${side} 端流量验证失败：重试耗尽仍未同时观察到 v1 与 v2"
         log_error "最后一次输出: ${RETRY_RUNME_OUTPUT:-}"
         return 1
