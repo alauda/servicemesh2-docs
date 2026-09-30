@@ -46,6 +46,27 @@ _check_cacerts_prerequisite() {
     return 0
 }
 
+# 跨集群流量验证：要求 10 次调用里同时出现 v1（East）与 v2（West），带重试
+# 用法: _verify_cross_cluster_traffic <runme 块名> <发起端名称>
+# 重试原因：helloworld 就绪、istiod 推下对端端点后，跨网络数据面（本集群 → 对端东西向网关
+# LoadBalancer）未必已通，一次性采样会踩中这个窗口。RET-1036（2026-09-29 dailybuild，
+# ctyun MicroOS）多主多网络用例：East istiod 23:04:45.6 推下 v2 端点，随即采样失败；那是 West
+# 东西向网关 VIP 的首次宣告，两分钟后主-远用例同样的验证即通过。始终不通时重试耗尽仍如实失败。
+_verify_cross_cluster_traffic() {
+    local block="$1" side="$2"
+    if ! retry_runme_verify "$block" __cmp_lines "$(cat <<'EOF'
++ Hello version: v1
++ Hello version: v2
+EOF
+)"; then
+        log_error "${side} 端流量验证失败：重试耗尽仍未同时观察到 v1 与 v2"
+        log_error "最后一次输出: ${RETRY_RUNME_OUTPUT:-}"
+        return 1
+    fi
+    log_success "${side} 端流量验证通过 (v1+v2 均出现)"
+    return 0
+}
+
 test_install_multi_primary_multi_network() {
     log_info "=========================================="
     log_info "开始多主多网络网格测试"
@@ -194,40 +215,10 @@ test_install_multi_primary_multi_network() {
     log_info "=== Phase 3: 验证跨集群流量 ==="
 
     log_info "步骤 3.1: 从 East 验证流量负载均衡 (期望同时观察到 v1 与 v2)"
-    local output_east
-    output_east=$(runme run multi-primary-multi-network:test-traffic-east 2>&1) || {
-        log_error "East 端 curl 调用失败"
-        log_error "实际输出: $output_east"
-        return 1
-    }
-    if ! __cmp_lines "$output_east" "$(cat <<'EOF'
-+ Hello version: v1
-+ Hello version: v2
-EOF
-)"; then
-        log_error "East 端流量验证失败,缺少 v1 或 v2 响应"
-        log_error "实际输出: $output_east"
-        return 1
-    fi
-    log_success "East 端流量验证通过 (v1+v2 均出现)"
+    _verify_cross_cluster_traffic multi-primary-multi-network:test-traffic-east East || return 1
 
     log_info "步骤 3.2: 从 West 验证流量负载均衡"
-    local output_west
-    output_west=$(runme run multi-primary-multi-network:test-traffic-west 2>&1) || {
-        log_error "West 端 curl 调用失败"
-        log_error "实际输出: $output_west"
-        return 1
-    }
-    if ! __cmp_lines "$output_west" "$(cat <<'EOF'
-+ Hello version: v1
-+ Hello version: v2
-EOF
-)"; then
-        log_error "West 端流量验证失败,缺少 v1 或 v2 响应"
-        log_error "实际输出: $output_west"
-        return 1
-    fi
-    log_success "West 端流量验证通过 (v1+v2 均出现)"
+    _verify_cross_cluster_traffic multi-primary-multi-network:test-traffic-west West || return 1
 
     # 文档示例输出 (-output 块) 仅用于覆盖率,通过 print 触发,不做精确比对
     runme print multi-primary-multi-network:test-traffic-east-output >/dev/null 2>&1 || true
