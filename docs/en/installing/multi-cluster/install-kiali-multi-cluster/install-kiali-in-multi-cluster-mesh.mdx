@@ -12,11 +12,15 @@ In this procedure, `CLUSTER1` is the **East** cluster and hosts the Kiali server
 You can adapt these instructions for a mesh spanning more than two clusters by repeating the **West** steps on each additional cluster.
 :::
 
+:::note
+Starting in ACP 4.5, **ACP Monitoring for VictoriaMetrics** is named **ACP Advanced Monitoring**. Search for **ACP Advanced Monitoring** when you download the plugin from the Customer Portal. A plugin package published before the rename still shows **ACP Monitoring for VictoriaMetrics** in the platform after you upload it.
+:::
+
 ## Prerequisites \{#prerequisites}
 
 - You have a multi-cluster mesh spanning the **East** and **West** clusters, in either the multi-primary or the primary-remote control plane topology. For example, you can install one by following [Installing a multi-primary multi-network mesh](../install-multi-primary-multi-network.mdx) or [Installing a primary-remote multi-network mesh](../install-primary-remote-multi-network.mdx).
 - You have installed the Alauda Build of Kiali Operator on **every** cluster in the mesh, including the clusters where no Kiali server is deployed. See [Installing Alauda Build of Kiali](../../../integration/observability/kiali.mdx).
-- Every cluster in the mesh collects metrics with **ACP Monitoring with VictoriaMetrics**, and all of them report to the same VictoriaMetrics Center. See <ExternalSiteLink name="acp" href="/observability/monitor/install_monitor.html#acp-monitoring-with-victoriametrics" children="ACP Monitoring with VictoriaMetrics" />.
+- Every cluster in the mesh collects metrics with **ACP Advanced Monitoring** (previously **ACP Monitoring for VictoriaMetrics**), and all of them report to the same VictoriaMetrics Center. See <ExternalSiteLink name="acp" href="/observability/monitor/install_monitor.html#acp-monitoring-with-victoriametrics" children="ACP Monitoring with VictoriaMetrics" />.
 
   Kiali reads the metrics of the whole mesh from a single endpoint. Read the address of the shared endpoint by running the following command:
 
