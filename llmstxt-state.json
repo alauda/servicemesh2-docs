@@ -486,7 +486,7 @@
     "docs/en/integration/observability/kiali.mdx": {
       "sha256": "10ed4c4aa18499dc3e3ebaa6623cd3c9ead0007427eb378ed3857259b9d3f52b",
       "size": 17475,
-      "description": "Installs and configures Alauda Build of Kiali (Kiali Operator v2.17.1-r1) as the mesh management console, covering OperatorHub and CLI install via Subscription/InstallPlan, then creating a `Kiali` CR with OpenID auth backed by Dex, ingress through the platform's ALB class, and Prometheus/VictoriaMetrics access via the `kiali-monitoring-basic-auth` Secret and optional Thanos proxy. Also shows how to enable distributed tracing in Kiali by setting `external_services.tracing` to a Jaeger or Tempo backend so traces appear under the Workload Traces tab.",
+      "description": "Installs and configures Alauda Service Mesh Console, previously Alauda Build of Kiali (Kiali Operator v2.17.1-r1), as the mesh management console, covering OperatorHub and CLI install via Subscription/InstallPlan, then creating a `Kiali` CR with OpenID auth backed by Dex, ingress through the platform's ALB class, and Prometheus/VictoriaMetrics access via the `kiali-monitoring-basic-auth` Secret and optional Thanos proxy. Also shows how to enable distributed tracing in Kiali by setting `external_services.tracing` to a Jaeger or Tempo backend so traces appear under the Workload Traces tab.",
       "generation_method": "ai_agent_reading",
       "updated_at": "2026-05-16T09:39:26Z"
     },
@@ -514,7 +514,7 @@
     "docs/en/uninstalling/uninstalling-alauda-build-of-kiali.mdx": {
       "sha256": "f61cf2f4b94c24afbcb680f24f7188e84deac140ecb48b0f4182a1e813a2c983",
       "size": 3746,
-      "description": "Removes Alauda Build of Kiali from ACP by deleting the `Kiali` custom resource (via web console All Instances or `kubectl delete kiali/<name> -n <namespace>`) and then the `kiali-operator` Subscription, with an optional final step that deletes all `kiali.io` CRDs using `kubectl get crds -oname | grep -e kiali.io | xargs kubectl delete`.",
+      "description": "Removes Alauda Service Mesh Console (previously Alauda Build of Kiali) from ACP by deleting the `Kiali` custom resource (via web console All Instances or `kubectl delete kiali/<name> -n <namespace>`) and then the `kiali-operator` Subscription, with an optional final step that deletes all `kiali.io` CRDs using `kubectl get crds -oname | grep -e kiali.io | xargs kubectl delete`.",
       "generation_method": "ai_agent_reading",
       "updated_at": "2026-05-16T09:39:26Z"
     },
