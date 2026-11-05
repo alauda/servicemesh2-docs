@@ -402,6 +402,15 @@ The following steps show how to integrate the Alauda Build of Kiali with monitor
     1. Replace `<platform-ca>` with the real base64-encoded CA certificate saved previously.
   </Callouts>
 
+  Verify that `PLATFORM_CA` holds a complete base64-encoded certificate:
+
+  ```bash {name=config-kiali:verify-platform-ca}
+  printf '%s' "$PLATFORM_CA" | base64 -d > /dev/null && \
+    printf '%s' "$PLATFORM_CA" | base64 -d | openssl x509 -noout -subject -enddate
+  ```
+
+  The command prints the subject and expiration date of the certificate. If it reports `base64: invalid input` or `Unable to load certificate` instead, the value is incomplete or contains extra characters, such as a shell prompt copied together with the certificate. Copy the certificate again and re-export `PLATFORM_CA`. Otherwise, Kiali starts, but OpenID login fails with `illegal base64 data at input byte <N>`.
+
   ```bash {name=config-kiali:apply-kiali}
   envsubst < kiali.yaml | kubectl apply -f -
   ```
