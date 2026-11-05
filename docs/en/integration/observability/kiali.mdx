@@ -397,6 +397,8 @@ The following steps show how to integrate the Alauda Build of Kiali with monitor
     printf '%s' "$PLATFORM_CA" | base64 -d | openssl x509 -noout -subject -enddate
   ```
 
+  Render `kiali.yaml` and apply the `Kiali` resource:
+
   ```bash {name=config-kiali:apply-kiali}
   envsubst < kiali.yaml | kubectl apply -f -
   ```
