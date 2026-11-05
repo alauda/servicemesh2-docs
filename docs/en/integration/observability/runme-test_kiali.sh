@@ -40,6 +40,14 @@ test_kiali() {
     fi
     log_success "PLATFORM_CA 已就绪"
 
+    # 按文档校验 PLATFORM_CA 是完整的 base64 证书
+    log_info "校验 PLATFORM_CA"
+    runme run config-kiali:verify-platform-ca || {
+        log_error "PLATFORM_CA 不是完整的 base64 证书"
+        return 1
+    }
+    log_success "PLATFORM_CA 校验通过"
+
     # 1. 获取平台配置
     log_info "步骤 1: 获取平台配置"
     # 使用 eval 执行 runme print 的内容，以便在当前 shell 中设置环境变量
