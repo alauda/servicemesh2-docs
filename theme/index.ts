@@ -1,14 +1,12 @@
-import { DocFooter as OriginalDocFooter } from '@rspress/core/theme-original'
+import { jsx } from 'react/jsx-runtime'
+import { Layout as DoomLayout } from '@alauda/doom/theme'
 import { TrademarkNotices } from './TrademarkNotices'
 import './trademark-notices.css'
 
 export * from '@alauda/doom/theme'
 
-export function DocFooter() {
-  return (
-    <>
-      <OriginalDocFooter />
-      <TrademarkNotices />
-    </>
-  )
+export function Layout() {
+  return jsx(DoomLayout, {
+    bottom: jsx(TrademarkNotices, {}),
+  })
 }
