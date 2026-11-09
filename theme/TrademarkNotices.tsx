@@ -19,7 +19,7 @@ export function TrademarkNotices() {
   return (
     <footer className="alauda-trademark-notices">
       <details>
-        <summary>Trademark notices / 商标声明</summary>
+        <summary>Trademark notices</summary>
         <NoticeContent />
       </details>
       <div className="alauda-trademark-notices__print">
