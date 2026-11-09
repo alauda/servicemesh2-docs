@@ -25,16 +25,16 @@
   margin: 0.5rem 0 0;
 }
 
+.alauda-trademark-notices__print {
+  display: none;
+}
+
 @media print {
   .alauda-trademark-notices details {
-    display: block;
-  }
-
-  .alauda-trademark-notices summary {
     display: none;
   }
 
-  .alauda-trademark-notices__content {
+  .alauda-trademark-notices__print {
     display: block;
   }
 }
