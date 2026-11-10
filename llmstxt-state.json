@@ -38,7 +38,7 @@
     "docs/en/about/about/understanding-service-mesh.mdx": {
       "sha256": "73632214f4b264eda6c6775315b41edfc67665a37c2eab00f47f5da1844baf78",
       "size": 9863,
-      "description": "Catalogs the components shipped by Alauda Service Mesh and Alauda Build of Kiali, then explains each CRD exposed by the v2 Operator (`Istio`, `IstioRevision`, `IstioRevisionTag`, `IstioCNI`) with example YAML, the `InPlace` vs `RevisionBased` update strategies, the `spec.values` passthrough to Istio Helm chart options, and the Kiali architecture plus integrations with Prometheus/VictoriaMetrics, Alauda Build of Jaeger, Alauda Build of OpenTelemetry, cert-manager, Flagger, and ArgoCD.",
+      "description": "Catalogs the components shipped by Alauda Service Mesh and Alauda Service Mesh Console, then explains each CRD exposed by the v2 Operator (`Istio`, `IstioRevision`, `IstioRevisionTag`, `IstioCNI`) with example YAML, the `InPlace` vs `RevisionBased` update strategies, the `spec.values` passthrough to Istio Helm chart options, and the Kiali architecture plus integrations with Prometheus/VictoriaMetrics, Alauda Build of Jaeger, Alauda Build of OpenTelemetry, cert-manager, Flagger, and ArgoCD.",
       "generation_method": "ai_agent_reading",
       "updated_at": "2026-05-16T09:39:26Z"
     },
@@ -52,7 +52,7 @@
     "docs/en/about/lifecycle-policy/alauda-build-of-kiali.mdx": {
       "sha256": "a89b12549f42563653caa5e6ba4c6e0b730c0cdc53b3a80f6d99a1c7e92677bb",
       "size": 999,
-      "description": "Tabulates release dates and end-of-support windows for the Alauda Build of Kiali operator (v2.11.z, v2.17.z, v2.22.z), and states the 4-month release cadence plus the 18-month maintenance commitment covering patches, security updates, and upgrade assistance.",
+      "description": "Tabulates release dates and end-of-support windows for the Alauda Service Mesh Console operator (v2.11.z, v2.17.z, v2.22.z), and states the 4-month release cadence plus the 18-month maintenance commitment covering patches, security updates, and upgrade assistance.",
       "generation_method": "ai_agent_reading",
       "updated_at": "2026-05-16T09:39:26Z"
     },
@@ -66,7 +66,7 @@
     "docs/en/about/lifecycle-policy/index.mdx": {
       "sha256": "b5b8cb22343ad480b4cea3f329e7d1c78c1f6f7bfb73a2c3b3dd72d1a1ce485d",
       "size": 139,
-      "description": "Section landing page for lifecycle policies, surfacing entries that document support windows and release cadence for the Alauda Service Mesh and Alauda Build of Kiali operators.",
+      "description": "Section landing page for lifecycle policies, surfacing entries that document support windows and release cadence for the Alauda Service Mesh and Alauda Service Mesh Console operators.",
       "generation_method": "ai_agent_reading",
       "updated_at": "2026-05-16T09:39:26Z"
     },
@@ -484,9 +484,9 @@
       "updated_at": "2026-05-16T09:39:26Z"
     },
     "docs/en/integration/observability/kiali.mdx": {
-      "sha256": "10ed4c4aa18499dc3e3ebaa6623cd3c9ead0007427eb378ed3857259b9d3f52b",
-      "size": 17475,
-      "description": "Installs and configures Alauda Service Mesh Console, previously Alauda Build of Kiali (Kiali Operator v2.17.1-r1), as the mesh management console, covering OperatorHub and CLI install via Subscription/InstallPlan, then creating a `Kiali` CR with OpenID auth backed by Dex, ingress through the platform's ALB class, and Prometheus/VictoriaMetrics access via the `kiali-monitoring-basic-auth` Secret and optional Thanos proxy. Also shows how to enable distributed tracing in Kiali by setting `external_services.tracing` to a Jaeger or Tempo backend so traces appear under the Workload Traces tab.",
+      "sha256": "66b948d2ca280901525c086a56db415cebe718ab614c56dec66461dd3a45bdd4",
+      "size": 20665,
+      "description": "Installs and configures Alauda Service Mesh Console (Kiali Operator v2.17.1-r1), as the mesh management console, covering OperatorHub and CLI install via Subscription/InstallPlan, then creating a `Kiali` CR with OpenID auth backed by Dex, ingress through the platform's ALB class, and Prometheus/VictoriaMetrics access via the `kiali-monitoring-basic-auth` Secret and optional Thanos proxy. Also shows how to enable distributed tracing in Kiali by setting `external_services.tracing` to a Jaeger or Tempo backend so traces appear under the Workload Traces tab.",
       "generation_method": "ai_agent_reading",
       "updated_at": "2026-05-16T09:39:26Z"
     },
@@ -500,21 +500,21 @@
     "docs/en/integration/observability/observability-and-mesh.mdx": {
       "sha256": "d2bb3ddaa60f5d04cd2052f93b1fdff0699016d69b250c56e7513f653856b249",
       "size": 1082,
-      "description": "Outlines how Alauda Service Mesh combines monitoring (Prometheus or VictoriaMetrics with Alertmanager), distributed tracing (Jaeger and OpenTelemetry), and Alauda Build of Kiali to deliver a unified telemetry view of mesh topology, traffic, and request flow.",
+      "description": "Outlines how Alauda Service Mesh combines monitoring (Prometheus or VictoriaMetrics with Alertmanager), distributed tracing (Jaeger and OpenTelemetry), and Alauda Service Mesh Console to deliver a unified telemetry view of mesh topology, traffic, and request flow.",
       "generation_method": "ai_agent_reading",
       "updated_at": "2026-05-16T09:39:26Z"
     },
     "docs/en/uninstalling/index.mdx": {
       "sha256": "74b9de679c87a0fbdcb03be62a3b81e0c2b3edb461229d8f36361e2fa2bf05a2",
       "size": 155,
-      "description": "Landing page for the Uninstalling section, which links to the procedures for removing Alauda Service Mesh, its ambient-mode resources, and Alauda Build of Kiali.",
+      "description": "Landing page for the Uninstalling section, which links to the procedures for removing Alauda Service Mesh, its ambient-mode resources, and Alauda Service Mesh Console.",
       "generation_method": "ai_agent_reading",
       "updated_at": "2026-05-16T09:39:26Z"
     },
     "docs/en/uninstalling/uninstalling-alauda-build-of-kiali.mdx": {
-      "sha256": "f61cf2f4b94c24afbcb680f24f7188e84deac140ecb48b0f4182a1e813a2c983",
-      "size": 3746,
-      "description": "Removes Alauda Service Mesh Console (previously Alauda Build of Kiali) from ACP by deleting the `Kiali` custom resource (via web console All Instances or `kubectl delete kiali/<name> -n <namespace>`) and then the `kiali-operator` Subscription, with an optional final step that deletes all `kiali.io` CRDs using `kubectl get crds -oname | grep -e kiali.io | xargs kubectl delete`.",
+      "sha256": "16d1d0ce3e611ab2113f80f2c186a2e0be5eff7d9e03ac1c31ed4fc575820d9a",
+      "size": 3975,
+      "description": "Removes Alauda Service Mesh Console  from ACP by deleting the `Kiali` custom resource (via web console All Instances or `kubectl delete kiali/<name> -n <namespace>`) and then the `kiali-operator` Subscription, with an optional final step that deletes all `kiali.io` CRDs using `kubectl get crds -oname | grep -e kiali.io | xargs kubectl delete`.",
       "generation_method": "ai_agent_reading",
       "updated_at": "2026-05-16T09:39:26Z"
     },
@@ -591,7 +591,7 @@
     "docs/en/updating/upgrade-kiali/index.mdx": {
       "sha256": "5ca08a9c220f555a1d683b08c4fc8af57a7bd9a157b394dbb8fa1d3296216320",
       "size": 2415,
-      "description": "Documents the sequential Kiali Operator upgrade path 2.11.z to 2.17.z to 2.22.z for Alauda Build of Kiali, noting that the Operator automatically upgrades the matching Kiali Server. Post-upgrade verification uses `kubectl get pods -l app.kubernetes.io/name=kiali`, log inspection for the `Version:` line, and the Kiali UI About dialog to confirm the new release.",
+      "description": "Documents the sequential Kiali Operator upgrade path 2.11.z to 2.17.z to 2.22.z for Alauda Service Mesh Console, noting that the Operator automatically upgrades the matching Kiali Server. Post-upgrade verification uses `kubectl get pods -l app.kubernetes.io/name=kiali`, log inspection for the `Version:` line, and the Kiali UI About dialog to confirm the new release.",
       "generation_method": "ai_agent_reading",
       "updated_at": "2026-05-16T09:39:26Z"
     }
