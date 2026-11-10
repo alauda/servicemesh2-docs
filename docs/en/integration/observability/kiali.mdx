@@ -2,19 +2,19 @@
 weight: 80
 ---
 
-# Alauda Build of Kiali
+# Alauda Service Mesh Console
 
 :::note
-Starting in ACP 4.5, **Alauda Build of Kiali** is named **Alauda Service Mesh Console**. Search for **Alauda Service Mesh Console** when you download the plugin from the Customer Portal. A plugin package published before the rename still shows **Alauda Build of Kiali** in the platform after you upload it.
+Starting in ACP 4.5, the plugin is named **Alauda Service Mesh Console**. Search for **Alauda Service Mesh Console** when you download the plugin from the Customer Portal.
 :::
 
-## Using Alauda Build of Kiali
+## Using Alauda Service Mesh Console
 
-The **Alauda Build of Kiali** provides observability and visualization capabilities for applications deployed within the service mesh. After adding an application to the mesh, the Alauda Build of Kiali can be used to inspect traffic flow and monitor mesh behavior.
+The **Alauda Service Mesh Console** provides observability and visualization capabilities for applications deployed within the service mesh. After adding an application to the mesh, the Alauda Service Mesh Console can be used to inspect traffic flow and monitor mesh behavior.
 
 ### About Kiali
 
-The Alauda Build of Kiali is derived from the open source [Kiali project](https://github.com/kiali/kiali) and serves as the management console for Alauda Service Mesh.
+The Alauda Service Mesh Console is derived from the open source [Kiali project](https://github.com/kiali/kiali) and serves as the management console for Alauda Service Mesh.
 
 It provides:
 
@@ -28,23 +28,23 @@ These capabilities enable users to diagnose service behavior, identify potential
 
 A single Kiali instance can observe a mesh that spans several clusters. See [Installing Kiali in a multi-cluster mesh](../../installing/multi-cluster/install-kiali-multi-cluster/install-kiali-in-multi-cluster-mesh.mdx).
 
-## Installing Alauda Build of Kiali
+## Installing Alauda Service Mesh Console
 
-The following steps show how to install Alauda Build of Kiali.
+The following steps show how to install Alauda Service Mesh Console.
 
 ### Installing via the web console
 
 **Prerequisites**
 
-- The **Alauda Service Mesh Console** (previously **Alauda Build of Kiali**) must be uploaded.
+- The **Alauda Service Mesh Console** must be uploaded.
 - You are logged in to the Alauda Container Platform web console as **cluster-admin**.
 
 **Procedure**
 
 1. In the Alauda Container Platform web console, navigate to **Administrator**.
 2. Select **Marketplace** > **OperatorHub**.
-3. Search for **Alauda Service Mesh Console** (shown as **Alauda Build of Kiali** for a package published before the rename).
-4. Locate **Alauda Service Mesh Console** (previously **Alauda Build of Kiali**), and click to select it.
+3. Search for **Alauda Service Mesh Console**.
+4. Locate **Alauda Service Mesh Console**, and click to select it.
 5. Click **Install**.
 6. Click **Install** and **Confirm** to install the Operator.
 
@@ -56,7 +56,7 @@ Verify that the Operator installation status is reported as `Succeeded` in the *
 
 **Prerequisites**
 
-- The **Alauda Service Mesh Console** (previously **Alauda Build of Kiali**) must be uploaded.
+- The **Alauda Service Mesh Console** must be uploaded.
 - An active ACP CLI (`kubectl`) session by a cluster administrator with the `cluster-admin` role.
 
 **Procedure**
@@ -202,7 +202,7 @@ kubectl -n kiali-operator get csv
 
 ```bash {name=install-kiali:check-csv-status-output}
 NAME                        DISPLAY                 VERSION       REPLACES   PHASE
-kiali-operator.v2.27.1-r0   Alauda Build of Kiali   2.27.1-r0                Succeeded
+kiali-operator.v2.27.1-r0   Alauda Service Mesh Console   2.27.1-r0                Succeeded
 ```
 
 **Fields**
@@ -215,13 +215,13 @@ kiali-operator.v2.27.1-r0   Alauda Build of Kiali   2.27.1-r0                Suc
 
 ## Configuring Monitoring with Kiali \{#configuring-monitoring-with-kiali}
 
-The following steps show how to integrate the Alauda Build of Kiali with monitoring.
+The following steps show how to integrate the Alauda Service Mesh Console with monitoring.
 
 **Prerequisites**
 
 - Alauda Service Mesh is installed.
 - Monitoring has been configured with Service Mesh. See [Configuring Monitoring with Service Mesh](./metrics-and-mesh.mdx).
-- **Alauda Service Mesh Console** (previously **Alauda Build of Kiali**) is installed.
+- **Alauda Service Mesh Console** is installed.
 
 **Procedure**
 
@@ -381,7 +381,7 @@ The following steps show how to integrate the Alauda Build of Kiali with monitor
     6. `api_proxy_ca_data` is the base64‑encoded CA certificate used by **erebus**.
     7. `issuer_uri` is the OIDC issuer URL for **dex**.
     8. `client_id` is the OIDC client ID for **dex**.
-    9. `replicas` specifies the number of replicas for the Kiali deployment, should be at least `2` in production environments. In that case, also uncomment `pod_disruption_budget` (available since Alauda Build of Kiali v2.27) so that voluntary node drains keep at least one Kiali pod running.
+    9. `replicas` specifies the number of replicas for the Kiali deployment, should be at least `2` in production environments. In that case, also uncomment `pod_disruption_budget` (available since Alauda Service Mesh Console v2.27) so that voluntary node drains keep at least one Kiali pod running.
     10. `class_name` is the ingress class name for the Kiali ingress.
     11. Required in multi cluster mesh. `<mesh_id>` should be the same as the `.spec.values.global.meshId` in `Istio` resource. See [Installing Kiali in a multi-cluster mesh](../../installing/multi-cluster/install-kiali-multi-cluster/install-kiali-in-multi-cluster-mesh.mdx).
     12. `username` references the monitoring basic‑auth username stored in the `kiali-monitoring-basic-auth` Secret.
@@ -420,9 +420,9 @@ The following steps show how to integrate the Alauda Build of Kiali with monitor
   When the `Kiali` resource is ready, access the Kiali dashboard at `<platform-url>/clusters/<cluster>/kiali`.
 </Steps>
 
-## Integrating distributed tracing platform with Alauda Build of Kiali \{#integrating-distributed-tracing-platform-with-alauda-build-of-kiali}
+## Integrating distributed tracing platform with Alauda Service Mesh Console \{#integrating-distributed-tracing-platform-with-alauda-build-of-kiali}
 
-After integration with a distributed tracing platform, the Alauda Build of Kiali enables visualization of request traces directly in the Kiali console. These traces provide insight into inter-service communication within the service mesh and can help identify latency, failures, or bottlenecks in request paths.
+After integration with a distributed tracing platform, the Alauda Service Mesh Console enables visualization of request traces directly in the Kiali console. These traces provide insight into inter-service communication within the service mesh and can help identify latency, failures, or bottlenecks in request paths.
 
 This capability supports the analysis of request flow behavior, aiding in root cause identification and performance optimization across services in the mesh.
 

@@ -263,7 +263,7 @@ Without `java-container-names`, the agent is injected into the first container o
 
 ## Connect Kiali to Jaeger v2 \{#connect-kiali-to-jaeger-v2}
 
-Set the tracing configuration of the `Kiali` resource to the new Jaeger query service, as described in [Integrating distributed tracing platform with Alauda Build of Kiali](../integration/observability/kiali.mdx#integrating-distributed-tracing-platform-with-alauda-build-of-kiali). [Phase 1](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-1-prepare-observability) installed Kiali without one.
+Set the tracing configuration of the `Kiali` resource to the new Jaeger query service, as described in [Integrating distributed tracing platform with Alauda Service Mesh Console](../integration/observability/kiali.mdx#integrating-distributed-tracing-platform-with-alauda-build-of-kiali). [Phase 1](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-1-prepare-observability) installed Kiali without one.
 
 In a multi-cluster mesh, point Kiali at the Jaeger instance of its own cluster and set the query scope of the tracing section to the mesh, `istio.mesh_id: <mesh-id>`, as the monitoring query scope already is. One index family holds the whole mesh, so that instance answers for every cluster.
 
