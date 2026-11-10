@@ -1,14 +1,14 @@
 .alauda-trademark-notices {
   width: 100%;
   margin: 0;
-  padding: 0 0 1.5rem;
+  padding: 0 1.5rem 1.5rem;
+  border-top: 1px solid var(--rp-c-divider-light);
   color: var(--rp-c-text-2);
   font-size: 0.75rem;
   line-height: 1.5;
 }
 
 .alauda-trademark-notices details {
-  border-top: 1px solid var(--rp-c-divider-light);
   padding-top: 0.75rem;
 }
 
