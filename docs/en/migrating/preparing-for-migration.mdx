@@ -370,7 +370,7 @@ The migration changes the requests as follows. The values are the defaults measu
 | 4 | Mesh v2 gateway, until the Mesh v1 gateway is scaled to zero | Namespace of the gateway | +100m | +128Mi |
 | 5 | Mesh v1 control plane, operators and controller removed | `istio-system`, `cpaas-system` | About −1050m | About −2.6Gi |
 | 5 | Mesh v1 tracing removed: OpenTelemetry v1 Operator and collectors, Jaeger 1.x Operator, collector and query | `istio-system`, `cpaas-system` | About −700m | About −2.3Gi |
-| 6 | Alauda Build of OpenTelemetry v2 Operator added | `opentelemetry-operator2` | +100m | +64Mi |
+| 6 | Alauda Container Platform Application Observability Operator added | `opentelemetry-operator2` | +100m | +64Mi |
 | 6 | OpenTelemetry collector and Jaeger v2 added | `jaeger-system` | +250m | +576Mi |
 
 The requests peak between [Phase 2](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane) and [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx): about 620m of CPU and 2.2Gi of memory on top of Mesh v1, plus 100m and 100Mi on every node. The Mesh v2 `istiod` alone asks for 2Gi — four times the Mesh v1 `istiod` — and stays `Pending` when no node has that much memory left unrequested. If your nodes are that full, set `spec.values.pilot.resources` of the `Istio` resource in [Phase 2](./migrating-a-single-cluster-mesh/installing-the-v2-control-plane.mdx#phase-2-install-the-mesh-v2-control-plane).

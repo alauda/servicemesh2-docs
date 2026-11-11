@@ -4,7 +4,7 @@ weight: 30
 
 # Migrating to Jaeger v2
 
-This document describes how to migrate an existing Service Mesh distributed tracing stack — the legacy `Alauda Build of Jaeger` (Jaeger 1.60.0) plus `Alauda Build of OpenTelemetry` integration described in [Configuring distributed tracing platform with Service Mesh (Deprecated)](./config-with-service-mesh-deprecated.mdx) — to the current <ExternalSiteLink name="distributed-tracing" href="/" children="Alauda Distributed Tracing" /> integration based on `Jaeger v2` (2.20.0) plus `Alauda Build of OpenTelemetry v2`.
+This document describes how to migrate an existing Service Mesh distributed tracing stack — the legacy `Alauda Build of Jaeger` (Jaeger 1.60.0) plus `Alauda Build of OpenTelemetry` integration described in [Configuring distributed tracing platform with Service Mesh (Deprecated)](./config-with-service-mesh-deprecated.mdx) — to the current <ExternalSiteLink name="distributed-tracing" href="/" children="Alauda Container Platform Distributed Tracing" /> integration based on `Jaeger v2` (2.20.0) plus `Alauda Container Platform Application Observability`.
 
 After the migration:
 
@@ -30,7 +30,7 @@ Trace ingestion is interrupted between the time the legacy `OpenTelemetryCollect
 
 ### Uninstall the legacy OpenTelemetry Collector and Operator
 
-The v1 and v2 `Alauda Build of OpenTelemetry` Operators share the same CRDs, so the v1 Operator must be removed before the v2 Operator is installed. The legacy `Alauda Build of Jaeger` Operator owns a separate CRD (`jaegertracing.io/v1.Jaeger`) and is left running so that the legacy Jaeger continues to serve historical traces during the observation window.
+The v1 `Alauda Build of OpenTelemetry` Operator and the `Alauda Container Platform Application Observability` Operator share the same CRDs, so the v1 Operator must be removed before the v2 Operator is installed. The legacy `Alauda Build of Jaeger` Operator owns a separate CRD (`jaegertracing.io/v1.Jaeger`) and is left running so that the legacy Jaeger continues to serve historical traces during the observation window.
 
 1. Delete the legacy `OpenTelemetryCollector` instance in the `istio-system` namespace:
 
@@ -45,7 +45,7 @@ The v1 and v2 `Alauda Build of OpenTelemetry` Operators share the same CRDs, so 
     - On the **Alauda build of OpenTelemetry** details page, click the **Uninstall** button in the upper right corner.
     - In the **Uninstall "opentelemetry-operator"?** window, click **Uninstall**.
 
-For background on why the v1 Operator must be removed before the v2 Operator is installed, and on the resulting outage characteristics, see <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#migrate-alauda-build-of-opentelemetry-to-v2" children="Migrate Alauda Build of OpenTelemetry to v2" /> in the Alauda Distributed Tracing migration guide.
+For background on why the v1 Operator must be removed before the v2 Operator is installed, and on the resulting outage characteristics, see <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#migrate-alauda-build-of-opentelemetry-to-v2" children="Migrate Alauda Build of OpenTelemetry to v2" /> in the Alauda Container Platform Distributed Tracing migration guide.
 
 ### Deploy the new distributed tracing stack
 
@@ -67,7 +67,7 @@ Traces produced before the cutover live in the index family that the legacy `Jae
 
 Perform this step before repointing the mesh, so that the new Jaeger UI is already complete when it starts receiving spans.
 
-Follow <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#attach-the-legacy-indices" children="Attach the legacy indices to the new read aliases" /> in the Alauda Distributed Tracing migration guide, with these two values:
+Follow <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#attach-the-legacy-indices" children="Attach the legacy indices to the new read aliases" /> in the Alauda Container Platform Distributed Tracing migration guide, with these two values:
 
 - `LEGACY_ES_INDEX_PREFIX` — the `--jaeger-es-index-prefix` value used when the legacy Jaeger was installed (for example `istio-tracing-<cluster>`). Read it back from the legacy instance rather than relying on memory:
 
@@ -139,6 +139,6 @@ Deleting the `Jaeger` resource does not delete its Elasticsearch indices, so pre
     - On the **Alauda build of Jaeger** details page, click the **Uninstall** button in the upper right corner.
     - In the **Uninstall "jaeger-operator"?** window, click **Uninstall**.
 
-Once the legacy indices have expired under the policy applied above, remove the leftover index templates and the delete-only policy as described in <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#disable-the-legacy-feature-switch-and-clean-up-legacy-indices" children="Disable the legacy feature switch and retire the legacy index family" /> in the Alauda Distributed Tracing migration guide. The `acp-tracing-ui` feature switch mentioned there belongs to the platform tracing stack and does not apply to a Service Mesh deployment.
+Once the legacy indices have expired under the policy applied above, remove the leftover index templates and the delete-only policy as described in <ExternalSiteLink name="distributed-tracing" href="/migrating/migrating-from-acp-tracing.html#disable-the-legacy-feature-switch-and-clean-up-legacy-indices" children="Disable the legacy feature switch and retire the legacy index family" /> in the Alauda Container Platform Distributed Tracing migration guide. The `acp-tracing-ui` feature switch mentioned there belongs to the platform tracing stack and does not apply to a Service Mesh deployment.
 
 </Steps>
