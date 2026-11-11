@@ -34,7 +34,7 @@ Mesh v1 is built on the upstream `istio-operator` project, which is no longer ma
 | Injection | Namespace label `istio.io/rev` and a platform webhook that adds the sidecar settings of each `MicroService` to the pod | Namespace label `istio.io/rev` and the settings written in the workload template |
 | Gateways | `GatewayDeploy` resources, each rendered into its own `IstioOperator` resource | Gateway injection deployments that you manage yourself, or Gateway API |
 | Governance | Platform resources such as `MicroService`, `ConnectionPool`, `LoadBalancer`, `Whitelist` | Istio resources such as `DestinationRule` and `AuthorizationPolicy` |
-| Observability | Platform tracing console, OpenTelemetry v1 and Jaeger 1.x | Kiali, Alauda Container Platform Application Observability and Jaeger v2 |
+| Observability | Platform tracing console, OpenTelemetry v1 and Jaeger 1.x | Alauda Service Mesh Console, Alauda Container Platform Application Observability and Alauda Container Platform Distributed Tracing |
 | Management | Web console plus platform resources | `kubectl` and Istio resources |
 
 Istio resources — `Gateway`, `VirtualService`, `DestinationRule`, `ServiceEntry`, `Sidecar`, `PeerAuthentication`, `Telemetry` and the rest — are reused as they are. The migration changes which control plane programs them, not the resources themselves.
