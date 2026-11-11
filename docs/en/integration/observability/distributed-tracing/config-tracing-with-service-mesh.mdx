@@ -6,23 +6,23 @@ weight: 10
 
 Alauda Service Mesh supports distributed tracing through integration with the following components:
 
-- **Alauda Build of Jaeger v2**: A customized distribution based on the open source [Jaeger](https://www.jaegertracing.io/) project. It provides end-to-end visibility into requests across complex distributed systems. In v2, the Jaeger instance is deployed as an `OpenTelemetryCollector` custom resource managed by the Alauda Build of OpenTelemetry v2 Operator.
+- **Alauda Container Platform Distributed Tracing**: A customized distribution based on the open source [Jaeger](https://www.jaegertracing.io/) project. It provides end-to-end visibility into requests across complex distributed systems. In v2, the Jaeger instance is deployed as an `OpenTelemetryCollector` custom resource managed by the Alauda Container Platform Application Observability Operator.
 
-- **Alauda Build of OpenTelemetry v2**: Based on the [OpenTelemetry](https://opentelemetry.io/) project, this Operator manages the lifecycle of both the Jaeger v2 instance and the OpenTelemetry Collector that fronts it.
+- **Alauda Container Platform Application Observability**: Based on the [OpenTelemetry](https://opentelemetry.io/) project, this Operator manages the lifecycle of both the Jaeger v2 instance and the OpenTelemetry Collector that fronts it.
 
 The [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) acts as an intermediary for telemetry signals. It supports multiple data formats and provides a standardized pipeline for processing and exporting telemetry to backends such as Jaeger.
 
 ## Configuring distributed tracing data collection with Service Mesh
 
-You can integrate Alauda Service Mesh with Alauda Distributed Tracing by deploying a Jaeger v2 instance and an OpenTelemetry Collector, then configuring Istio to export trace data through them.
+You can integrate Alauda Service Mesh with Alauda Container Platform Distributed Tracing by deploying a Jaeger v2 instance and an OpenTelemetry Collector, then configuring Istio to export trace data through them.
 
-The Jaeger v2 instance and the OpenTelemetry Collector are not service-mesh-specific: a single Jaeger v2 and OpenTelemetry Collector pair (deployed by default in the `jaeger-system` namespace) can serve both Service Mesh and other workloads in the cluster. This section only covers the Service Mesh-specific configuration; refer to the Alauda Distributed Tracing documentation for the underlying installation steps.
+The Jaeger v2 instance and the OpenTelemetry Collector are not service-mesh-specific: a single Jaeger v2 and OpenTelemetry Collector pair (deployed by default in the `jaeger-system` namespace) can serve both Service Mesh and other workloads in the cluster. This section only covers the Service Mesh-specific configuration; refer to the Alauda Container Platform Distributed Tracing documentation for the underlying installation steps.
 
 **Prerequisites**
 
-- The **Alauda Container Platform Distributed Tracing** (previously **Alauda Build of Jaeger v2**) cluster plugin is installed on the target cluster. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-elasticsearch.html#installing-the-alauda-build-of-jaeger-v2-cluster-plugin" children="Installing the Alauda Build of Jaeger v2 Cluster Plugin" />. The plugin publishes the container images of the tracing components to the registry of the platform and records their addresses in the `jaeger-cluster-plugin-manifest` ConfigMap in `cpaas-system`, which the steps below read.
-- The **Alauda Container Platform Application Observability** (previously **Alauda Build of OpenTelemetry v2**) Operator is installed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-elasticsearch.html#installing-the-alauda-build-of-opentelemetry-v2-operator" children="Installing the Alauda Build of OpenTelemetry v2 Operator" />.
-- A Jaeger v2 instance is deployed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-elasticsearch.html#deploying-the-alauda-build-of-jaeger-v2" children="Deploying the Alauda Build of Jaeger v2 with Elasticsearch" /> or <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-opensearch.html#deploying-the-alauda-build-of-jaeger-v2" children="Deploying the Alauda Build of Jaeger v2 with OpenSearch" />.
+- The **Alauda Container Platform Distributed Tracing** (previously **Alauda Build of Jaeger v2**) cluster plugin is installed on the target cluster. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-elasticsearch.html#installing-the-alauda-build-of-jaeger-v2-cluster-plugin" children="Installing the Alauda Container Platform Distributed Tracing Cluster Plugin" />. The plugin publishes the container images of the tracing components to the registry of the platform and records their addresses in the `jaeger-cluster-plugin-manifest` ConfigMap in `cpaas-system`, which the steps below read.
+- The **Alauda Container Platform Application Observability** (previously **Alauda Build of OpenTelemetry v2**) Operator is installed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-elasticsearch.html#installing-the-alauda-build-of-opentelemetry-v2-operator" children="Installing the Alauda Container Platform Application Observability Operator" />.
+- A Jaeger v2 instance is deployed. See <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-elasticsearch.html#deploying-the-alauda-build-of-jaeger-v2" children="Deploying Jaeger with Elasticsearch" /> or <ExternalSiteLink name="distributed-tracing" href="/installing/installing-distributed-tracing-opensearch.html#deploying-the-alauda-build-of-jaeger-v2" children="Deploying Jaeger with OpenSearch" />.
   :::info
   The `JAEGER_ES_INDEX_PREFIX` variable referenced in the install procedure controls the prefix of the Elasticsearch indices that store trace data. The default value, `acp-${CLUSTER_NAME}`, works for a single-cluster deployment. For a service mesh deployment, choose the prefix according to the topology of the mesh:
 
@@ -188,4 +188,4 @@ Before removing the underlying components, detach the mesh from the OpenTelemetr
 
 Skip this step if other workloads in the cluster still rely on the OpenTelemetry Collector or the Jaeger v2 instance.
 
-For instructions on deleting the OpenTelemetry Collector instance, the Jaeger v2 instance, and (optionally) the **Alauda Container Platform Application Observability** (previously **Alauda Build of OpenTelemetry v2**) Operator, see <ExternalSiteLink name="distributed-tracing" href="/uninstalling/uninstalling-distributed-tracing.html" children="Uninstalling Alauda Distributed Tracing" />.
+For instructions on deleting the OpenTelemetry Collector instance, the Jaeger v2 instance, and (optionally) the **Alauda Container Platform Application Observability** (previously **Alauda Build of OpenTelemetry v2**) Operator, see <ExternalSiteLink name="distributed-tracing" href="/uninstalling/uninstalling-distributed-tracing.html" children="Uninstalling Alauda Container Platform Distributed Tracing" />.

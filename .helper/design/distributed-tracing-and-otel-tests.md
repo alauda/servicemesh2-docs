@@ -4,7 +4,7 @@
 >
 > - `distributed-tracing-docs/docs/en/installing/installing-distributed-tracing.mdx` —— 分布式调用链安装
 > - `distributed-tracing-docs/docs/en/uninstalling/uninstalling-distributed-tracing.mdx` —— 分布式调用链卸载
-> - `opentelemetry-docs/docs/en/installing/install-opentelemetry.mdx` 的「Installing the Alauda Build of OpenTelemetry v2 Operator」章节 —— 既作为独立的 OTel Operator 安装测试，也是分布式调用链安装的前置依赖
+> - `opentelemetry-docs/docs/en/installing/install-opentelemetry.mdx` 的「Installing the Alauda Container Platform Application Observability Operator」章节 —— 既作为独立的 OTel Operator 安装测试，也是分布式调用链安装的前置依赖
 >
 > **v2 相比 v1 的核心变化**：测试框架从 `servicemesh2-docs/tests/` 抽离为**独立的兄弟仓库 `docs-runme-tests`**。v1 方案（框架留在 servicemesh2-docs、兄弟仓库反向 source、`EXTRA_DOC_REPOS` 环境变量）整体作废，由本文档取代。
 
@@ -243,7 +243,7 @@ if ( set -e
 
 ### 3.1 `opentelemetry-docs` —— 3 处 block 重命名
 
-`install_operator()` 对块名有固定约定。`install-opentelemetry.mdx` 的「Installing the Alauda Build of OpenTelemetry v2 Operator」章节需重命名 3 个块：
+`install_operator()` 对块名有固定约定。`install-opentelemetry.mdx` 的「Installing the Alauda Container Platform Application Observability Operator」章节需重命名 3 个块：
 
 | 期望块名 | 当前块名 |
 | --- | --- |
@@ -301,7 +301,7 @@ if ( set -e
 
 ### 4.1 `runme-test_install-opentelemetry.sh`（新增，opentelemetry-docs）
 
-位置：`opentelemetry-docs/docs/en/installing/runme-test_install-opentelemetry.sh`。范围限定「Installing the Alauda Build of OpenTelemetry v2 Operator」章节——既是 `run-otel-all.sh` 的唯一 Case，也验证 tracing 所依赖的 Operator 安装路径。
+位置：`opentelemetry-docs/docs/en/installing/runme-test_install-opentelemetry.sh`。范围限定「Installing the Alauda Container Platform Application Observability Operator」章节——既是 `run-otel-all.sh` 的唯一 Case，也验证 tracing 所依赖的 Operator 安装路径。
 
 | 步骤 | 描述 | 模式 | 涉及 |
 | --- | --- | --- | --- |
