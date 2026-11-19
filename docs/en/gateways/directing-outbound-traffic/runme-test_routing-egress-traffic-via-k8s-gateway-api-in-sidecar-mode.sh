@@ -22,6 +22,9 @@ test_routing_egress_traffic_via_k8s_gateway_api_in_sidecar_mode() {
     # Section 1: Procedure（部署 egress 网关）
     # ==========================================
 
+    # 前置：EGRESS_EXTERNAL_MOCK=true 时部署集群内的模拟外部服务（不依赖外网），否则 no-op
+    egress_mock_setup || return 1
+
     # 步骤 1: 创建 egress-gateway 命名空间
     log_info "步骤 1: 创建 egress-gateway 命名空间"
     _create_namespace_safe sidecar-egress:create-namespace egress-gateway || {
@@ -48,6 +51,8 @@ test_routing_egress_traffic_via_k8s_gateway_api_in_sidecar_mode() {
         log_error "应用 egress 网关 CR 失败"
         return 1
     }
+    # 内网模拟时 ServiceEntry 的 endpoints 指向模拟服务（默认 no-op）
+    egress_mock_patch_service_entry egress-gateway httpbin-ext || return 1
 
     # 步骤 4: (仅 ENABLE_GW_LINUX_KERNEL_COMPAT=true 生效) egress 网关监听 80 特权端口，
     #         按 Scenario 2 (root) 为 K8s Gateway API 网关挂 asm-kube-gateway-options
@@ -98,6 +103,8 @@ EOF
         return 1
     }
     _wait_for_deployment curl curl
+    # 内网模拟时 curl 把外部主机解析到模拟服务，不依赖外网 DNS（默认 no-op）
+    egress_mock_add_host_alias curl curl httpbingo.org || return 1
 
     # 步骤 10: 获取 curl pod 名称（文档块已 export，eval 后即为导出变量）
     log_info "步骤 10: 获取 curl pod 名称"
@@ -144,6 +151,7 @@ cleanup_routing_egress_traffic_via_k8s_gateway_api_in_sidecar_mode() {
         log_error "清理资源失败"
         return 1
     }
+    egress_mock_cleanup || return 1
 
     log_success "测试资源清理完成"
     return 0

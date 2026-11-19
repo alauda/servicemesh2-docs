@@ -31,6 +31,9 @@ test_routing_egress_traffic_via_istio_apis() {
     # （开关开时先修补 mesh 级 gateway 注入模板再装网关，关时为 no-op）。
     install_gateway_via_injection "$GW_NAME" "$GW_NS" true || return 1
 
+    # 前置：EGRESS_EXTERNAL_MOCK=true 时部署集群内的模拟外部服务（不依赖外网），否则 no-op
+    egress_mock_setup || return 1
+
     # ==========================================
     # Section 1: Procedure（配置 ServiceEntry / Gateway / DestinationRule / VirtualService）
     # ==========================================
@@ -56,6 +59,8 @@ test_routing_egress_traffic_via_istio_apis() {
         return 1
     }
     _wait_for_deployment curl curl
+    # 内网模拟时 curl 把外部主机解析到模拟服务，不依赖外网 DNS（默认 no-op）
+    egress_mock_add_host_alias curl curl docs.alauda.io || return 1
 
     # 步骤 6: 获取 curl pod 名称（文档块已 export，eval 后即为导出变量）
     log_info "步骤 6: 获取 curl pod 名称"
@@ -76,6 +81,8 @@ test_routing_egress_traffic_via_istio_apis() {
         log_error "应用 ServiceEntry 失败"
         return 1
     }
+    # 内网模拟时 ServiceEntry 的 endpoints 指向模拟服务（默认 no-op）
+    egress_mock_patch_service_entry curl egress-se || return 1
 
     # 步骤 8: 验证 ServiceEntry 已生效（curl 经 sidecar 直连外部主机，期望返回 HTTP 状态）
     # 访问外部网络，可能受波动影响，使用 retry_command 重试
@@ -127,12 +134,14 @@ EOF
     # ==========================================
 
     # 步骤 12: 重发请求，经 egress 网关访问外部主机（期望 302→200；外部网络，重试）
-    # 输出含动态值（location 等），使用 __cmp_lines 校验关键稳定行
+    # 输出含动态值（location 等），使用 __cmp_lines 校验关键稳定行。
+    # 内网模拟时模拟服务直接回 200，没有跳转到 HTTPS 那一跳，状态行是 HTTP/1.1
     log_info "步骤 12: 经 egress 网关访问外部主机"
-    local egress_output
+    local egress_output expect_status="+ HTTP/2 200"
+    egress_mock_enabled && expect_status="+ HTTP/1.1 200"
     egress_output=$(retry_command "runme run istio-egress:verify-egress 2>&1" 10 5)
-    if ! __cmp_lines "$egress_output" "$(cat <<'EOF'
-+ HTTP/2 200
+    if ! __cmp_lines "$egress_output" "$(cat <<EOF
+${expect_status}
 + server: envoy
 EOF
     )"; then
@@ -197,6 +206,7 @@ cleanup_routing_egress_traffic_via_istio_apis() {
     # 删除 egress 注入网关命名空间（install_gateway_via_injection 所建，测试基建；
     # 连带 Gateway / DestinationRule / Telemetry）
     kubectl delete namespace "$GW_NS" --ignore-not-found || rc=1
+    egress_mock_cleanup || rc=1
 
     [ "$rc" -eq 0 ] && log_success "测试资源清理完成"
     return "$rc"
