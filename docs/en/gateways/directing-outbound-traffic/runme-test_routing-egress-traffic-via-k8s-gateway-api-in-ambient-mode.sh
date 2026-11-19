@@ -17,6 +17,9 @@ test_ambient_egress_gateway() {
     log_info "开始 Ambient 模式 Egress Gateway 测试"
     log_info "=========================================="
 
+    # 前置：EGRESS_EXTERNAL_MOCK=true 时部署集群内的模拟外部服务（不依赖外网），否则 no-op
+    egress_mock_setup || return 1
+
     # 步骤 1: 创建 egress-gateway 命名空间
     log_info "步骤 1: 创建 egress-gateway 命名空间"
     _create_namespace_safe ambient-egress:create-namespace egress-gateway || {
@@ -51,6 +54,9 @@ test_ambient_egress_gateway() {
         log_error "应用 ServiceEntry 失败"
         return 1
     }
+    # 内网模拟时 ServiceEntry 的 endpoints 指向模拟服务（默认 no-op）。
+    # ambient 不加 hostAliases：ztunnel 的 DNS 代理把主机解析成 ServiceEntry 的 VIP
+    egress_mock_patch_service_entry egress-gateway httpbin-ext || return 1
 
     # 步骤 6: 为 istio-waypoint 网关类打 seccompProfile overlay
     # egress-gateway 命名空间启用 Restricted PSA，waypoint pod 需要 RuntimeDefault seccomp 才能准入；
@@ -153,6 +159,7 @@ cleanup_ambient_egress_gateway() {
         log_error "清理资源失败"
         return 1
     }
+    egress_mock_cleanup || return 1
 
     log_success "测试资源清理完成"
     return 0
