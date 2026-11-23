@@ -247,7 +247,7 @@ The following steps show how to integrate the Alauda Service Mesh Console with m
   ```
   </Directive>
 
-  ### Retrieve platform configuration from the business cluster:
+  ### Retrieve platform configuration from the workload cluster:
 
   ```bash {name=config-kiali:get-platform-config}
   export PLATFORM_URL=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.platformURL}')
