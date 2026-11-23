@@ -33,8 +33,8 @@ You can integrate Alauda Service Mesh with OpenTelemetry to instrument, generate
 
 **Prerequisites**
 
-- <ExternalSiteLink name="acp" href="/observability/tracing/installation.html#installing-the-jaeger-operator" children="Alauda Build of Jaeger is installed" />.
-- <ExternalSiteLink name="acp" href="/observability/tracing/installation.html#installing-the-opentelemetry-operator" children="Alauda Build of OpenTelemetry is installed" />.
+- Alauda Build of Jaeger is installed.
+- Alauda Build of OpenTelemetry is installed.
 - An Istio instance is created.
 - An Istio CNI instance is created.
 
@@ -43,7 +43,7 @@ You can integrate Alauda Service Mesh with OpenTelemetry to instrument, generate
 <Steps>
   ### Install a `Jaeger` instance in the `istio-system` namespace.
 
-  Refer to the installation script in <ExternalSiteLink name="acp" href="/observability/tracing/installation.html#deploying-a-jaeger-instance" children="Deploying a Jaeger Instance" /> and use the example command below to deploy an Istio-dedicated `Jaeger`:
+  Refer to the Jaeger instance installation script in the distributed tracing installation documentation of Alauda Container Platform 4.3 or earlier, and use the example command below to deploy an Istio-dedicated `Jaeger`:
 
   :::info
   The `--jaeger-es-index-prefix` parameter sets the index prefix in Elasticsearch where trace data is stored.
