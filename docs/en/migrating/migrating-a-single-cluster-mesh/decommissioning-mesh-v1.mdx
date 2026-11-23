@@ -123,7 +123,7 @@ kubectl get ns istio-system -o jsonpath='{.metadata.name} {.status.phase}{"\n"}'
 
 Expected: `NotFound` for every resource of this mesh, and `istio-system Active` on the mesh cluster. The last listing shows what is left on the `global` cluster: the meshes you did not migrate. It is empty only when this was the last Mesh v1 mesh of the platform.
 
-### Uninstall the Alauda Service Mesh Essentials plugin \{#uninstall-the-service-mesh-essentials-plugin}
+### Uninstall the Alauda Service Mesh Essentials Cluster Plugin \{#uninstall-the-service-mesh-essentials-plugin}
 
 The plugin serves every Mesh v1 mesh of the platform, so what you do here depends on whether any mesh is left. List them — the mesh you migrated is already gone, its resources were deleted in the previous step:
 
@@ -137,7 +137,7 @@ Then follow the case that matches the output.
 
 Remove it from the web console: **Marketplace** → **Cluster Plugins** on the `global` cluster → **Alauda Service Mesh Essentials** → **Uninstall**.
 
-On the command line, a cluster plugin is uninstalled by deleting the `ModuleInfo` that records it as installed. List it first — the `CLUSTER` column shows which cluster the entry targets, `global` for this plugin:
+On the command line, a Cluster Plugin is uninstalled by deleting the `ModuleInfo` that records it as installed. List it first — the `CLUSTER` column shows which cluster the entry targets, `global` for this plugin:
 
 ```bash {name=migrate-decommission:list-essentials-moduleinfo}
 kubectl --context "${GLOBAL_CONTEXT}" get moduleinfoes.cluster.alauda.io -l cpaas.io/module-name=asm-global
@@ -413,7 +413,7 @@ kubectl --context "${GLOBAL_CONTEXT}" get moduleinfoes.cluster.alauda.io -l "asm
 
 The selector is what keeps the other meshes of the platform out of the list: their clusters still run Mesh v1 and their entries are not stale. Everything the command prints belongs to the mesh you migrated, and the components behind it were removed by hand earlier on this page.
 
-Delete them. The web console does not list these two among the cluster plugins, so the command line is the only way:
+Delete them. The web console does not list these two among the Cluster Plugins, so the command line is the only way:
 
 ```bash {name=migrate-decommission:delete-stale-plugin-records}
 kubectl --context "${GLOBAL_CONTEXT}" delete moduleinfoes.cluster.alauda.io -l "asm.cpaas.io/meshgroup=${MESH_GROUP}"
