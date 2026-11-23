@@ -138,8 +138,8 @@ The following procedure applies to both ingress and egress gateway deployments.
         The `gateway` injection template does not read `spec.values.global.proxy.seccompProfile` from the `Istio` resource, so the profile must be set on the gateway deployment itself.
         Remove this field if the gateway namespace does not enforce the `Restricted` profile.
      6. Sets the `serviceAccountName` to the name of the `ServiceAccount` created previously.
-     7. (Optional) Uncomment to set node selectors that schedule the gateway pods on <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />.
-     8. (Optional) Uncomment to set tolerations that allow the gateway pods to be scheduled on <ExternalSiteLink name="acp" href="/configure/clusters/acp-node-planning.html" children="Infra Nodes" />.
+     7. (Optional) Uncomment to set node selectors that schedule the gateway pods on infra nodes.
+     8. (Optional) Uncomment to set tolerations that allow the gateway pods to be scheduled on infra nodes.
    </Callouts>
 
 6. Apply the YAML file by running the following command:
