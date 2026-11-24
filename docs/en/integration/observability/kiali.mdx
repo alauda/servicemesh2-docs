@@ -218,10 +218,10 @@ The following steps show how to integrate the Alauda Build of Kiali with monitor
 **Procedure**
 
 <Steps>
-  ### Retrieve the CA certificate for Alauda Container Platform in **Global** cluster:
+  ### Retrieve the CA certificate for Alauda Container Platform in the `global` cluster:
 
   :::note
-  Run the following command in the **Global** cluster
+  Run the following command in the `global` cluster
   :::
 
   ```bash {name=config-kiali:get-ca-certificate}
@@ -239,7 +239,7 @@ The following steps show how to integrate the Alauda Build of Kiali with monitor
   ```
   </Directive>
 
-  ### Retrieve platform configuration from the business cluster:
+  ### Retrieve platform configuration from the workload cluster:
 
   ```bash {name=config-kiali:get-platform-config}
   export PLATFORM_URL=$(kubectl -nkube-public get configmap global-info -o jsonpath='{.data.platformURL}')
@@ -362,8 +362,8 @@ The following steps show how to integrate the Alauda Build of Kiali with monitor
 
   <Callouts>
     1. `web_port` (string) is the port for accessing the Kiali dashboard.
-    2. `web_root` is the path under platform url for accessing the Kiali dashboard.
-    3. `web_fqdn` is the public domain name for accessing the Kiali dashboard (the domain part of the platform URL). Kiali derives it from request headers by default; set it only if the derived OIDC `redirect_uri` is incorrect and login fails.
+    2. `web_root` is the path under the Platform Access Address for accessing the Kiali dashboard.
+    3. `web_fqdn` is the public domain name for accessing the Kiali dashboard (the domain part of the Platform Access Address). Kiali derives it from request headers by default; set it only if the derived OIDC `redirect_uri` is incorrect and login fails.
     4. `web_schema` is the public URL scheme for accessing the Kiali dashboard, also derived from request headers by default; set it together with `web_fqdn`.
     5. `api_proxy` points to **erebus** to map ACP user tokens to Kubernetes tokens.
     6. `api_proxy_ca_data` is the base64‑encoded CA certificate used by **erebus**.
