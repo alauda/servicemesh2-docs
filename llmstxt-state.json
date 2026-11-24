@@ -484,11 +484,11 @@
       "updated_at": "2026-05-16T09:39:26Z"
     },
     "docs/en/integration/observability/kiali.mdx": {
-      "sha256": "66b948d2ca280901525c086a56db415cebe718ab614c56dec66461dd3a45bdd4",
-      "size": 20665,
+      "sha256": "683c561a8320ef493fa90e8f27252dc34392d86e40eb94bb9f10e0bd8cb7c12b",
+      "size": 20696,
       "description": "Installs and configures Alauda Service Mesh Console (Kiali Operator v2.17.1-r1), as the mesh management console, covering OperatorHub and CLI install via Subscription/InstallPlan, then creating a `Kiali` CR with OpenID auth backed by Dex, ingress through the platform's ALB class, and Prometheus/VictoriaMetrics access via the `kiali-monitoring-basic-auth` Secret and optional Thanos proxy. Also shows how to enable distributed tracing in Kiali by setting `external_services.tracing` to a Jaeger or Tempo backend so traces appear under the Workload Traces tab.",
       "generation_method": "ai_agent_reading",
-      "updated_at": "2026-05-16T09:39:26Z"
+      "updated_at": "2026-11-23T17:17:40Z"
     },
     "docs/en/integration/observability/metrics-and-mesh.mdx": {
       "sha256": "a15cc7182fd32a147f9f21466a02fb0b3995a2a187a0a4f638b7a5ca7afa78c6",
