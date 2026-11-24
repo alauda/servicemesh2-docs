@@ -115,7 +115,7 @@ kubectl delete istiorevisiontag default
 
 Mesh v1 is gone. Recovery means installing it again. Restore every resource with the function from [Preparing for the migration](./preparing-for-migration.mdx#restore-a-resource-from-the-backup): a backup holds the object as the cluster had it, and applying it unchanged recreates owner references to resources that no longer exist, which makes the garbage collector delete what you just restored.
 
-1. Install the Service Mesh Essentials plugin on the `global` cluster from **Marketplace** → **Cluster Plugins** — but only if [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx#uninstall-the-service-mesh-essentials-plugin) uninstalled it. It is left installed when the platform still serves another Mesh v1 mesh, and `global-asm-controller` and the Mesh v1 webhooks then never went away either, which makes this whole step a no-op. Check which of the two cases you are in:
+1. Install the Service Mesh Essentials Cluster Plugin on the `global` cluster from **Marketplace** → **Cluster Plugins** — but only if [Phase 5](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx#uninstall-the-service-mesh-essentials-plugin) uninstalled it. It is left installed when the platform still serves another Mesh v1 mesh, and `global-asm-controller` and the Mesh v1 webhooks then never went away either, which makes this whole step a no-op. Check which of the two cases you are in:
 
    ```bash {name=migrate-rollback:check-plugin}
    kubectl --context "${GLOBAL_CONTEXT}" get moduleinfoes.cluster.alauda.io -l cpaas.io/module-name=asm-global

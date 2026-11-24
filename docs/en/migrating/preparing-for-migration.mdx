@@ -14,7 +14,7 @@ Complete every section before you install the Mesh v2 control plane.
 - Mesh v1 runs Istio 1.22. [Record the Mesh v1 configuration](#record-the-mesh-v1-configuration) below checks this.
 - The Alauda Service Mesh v2 Operator, the **Alauda Service Mesh Console** (previously **Alauda Build of Kiali**) Operator and the **Alauda Container Platform Application Observability** (previously **Alauda Build of OpenTelemetry v2**) Operator are available in the cluster catalog. Do not install them yet.
 - If applications use OpenTelemetry Java auto-instrumentation, an OpenTelemetry Java agent 2.x image in a registry the cluster can pull from. Mesh v1 shipped its own agent image and Mesh v2 does not, see [Prepare the Java agent image](./migrating-observability.mdx#prepare-the-java-agent-image).
-- The **ACP Multi-Network** (previously **ACP Networking for Multus**) plugin is installed. `IstioCNI` writes its configuration to the Multus configuration directory.
+- The **ACP Multi-Network** (previously **ACP Networking for Multus**) Cluster Plugin is installed. `IstioCNI` writes its configuration to the Multus configuration directory.
 - `cluster-admin` on the cluster that runs the mesh and on the `global` cluster, in one kubeconfig that has a context for each of them. A mesh that spans several clusters needs a context per cluster, see [Address one cluster at a time](./migrating-a-multi-cluster-mesh/index.mdx#address-one-cluster-at-a-time).
 - The following tools on the machine you run the migration from:
 
@@ -475,7 +475,7 @@ kubectl --context "${GLOBAL_CONTEXT}" get \
 
 The webhook configurations are needed again only if the `global` cluster keeps serving another Mesh v1 mesh, see [Decommissioning Mesh v1](./migrating-a-single-cluster-mesh/decommissioning-mesh-v1.mdx#uninstall-the-service-mesh-essentials-plugin).
 
-`asm-global` is the Alauda Service Mesh Essentials cluster plugin. `ModulePlugin` is its entry in the plugin catalog of the platform and `ModuleInfo` the record that it is installed on the `global` cluster. [Rolling back the migration](./rollback.mdx) reinstalls the plugin from these two files.
+`asm-global` is the Alauda Service Mesh Essentials Cluster Plugin. `ModulePlugin` is its entry in the plugin catalog of the platform and `ModuleInfo` the record that it is installed on the `global` cluster. [Rolling back the migration](./rollback.mdx) reinstalls the plugin from these two files.
 
 :::warning The root certificate authority is in this backup
 `asm-istio-rootca` contains the private key of the root certificate authority of the mesh. [Phase 6](./migrating-a-single-cluster-mesh/finalizing-the-migration.mdx) signs a new intermediate certificate with it. Store the backup where you keep private keys, not on the cluster.
